@@ -1,0 +1,324 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Nunito Sans', system-ui, sans-serif;
+    background-color: #F9FAFB;
+    color: #1F2937;
+    line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: 'Google Sans Flex', system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #F3F4F6;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #D1D5DB;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
+}
+
+/* Modal Backdrop */
+.modal-backdrop {
+    backdrop-filter: blur(4px);
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Card Hover Effect */
+.card-hover {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+/* Gradient Background for Login */
+.gradient-bg {
+    background: linear-gradient(135deg, #EFF6FF 0%, #ECFEFF 50%, #FFFBEB 100%);
+}
+
+/* Stage Button Styles */
+.stage-btn {
+    transition: all 0.2s ease;
+}
+
+.stage-btn:hover {
+    background-color: #EFF6FF;
+    border-left-color: #60A5FA;
+}
+
+.stage-btn.active {
+    background-color: #DBEAFE;
+    border-left-color: #3B82F6;
+    color: #1E40AF;
+    font-weight: 600;
+}
+
+/* Input Focus States */
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    ring: 2px;
+    ring-color: #60A5FA;
+    border-color: #60A5FA;
+}
+
+/* Button Animations */
+.btn-primary {
+    background: linear-gradient(135deg, #60A5FA 0%, #22D3EE 100%);
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #3B82F6 0%, #06B6D4 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* Follow-up Chat Style */
+.follow-up-item {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Pulse Animation for New Items */
+@keyframes pulse-border {
+
+    0%,
+    100% {
+        border-color: #60A5FA;
+    }
+
+    50% {
+        border-color: #22D3EE;
+    }
+}
+
+.new-item {
+    animation: pulse-border 2s ease-in-out 3;
+}
+
+/* Keep mobile stage drawers touch-scrollable without a scrollbar covering labels. */
+.stage-sidebar-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.stage-sidebar-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* Stage tabs can be swiped horizontally on phones without covering their labels. */
+.customer-stage-tabs {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.customer-stage-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+/* ─── PM Surya Ghar Agreement Print & Document Styles ─── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  /* Reset container backgrounds to pure white/transparent */
+  html, body, #root {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide all non-document UI controls during print */
+  .no-print,
+  .no-print *,
+  header,
+  nav,
+  aside,
+  button,
+  .modal-backdrop,
+  .fixed {
+    display: none !important;
+  }
+
+  .print-only-modal {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+    background: #ffffff !important;
+    display: block !important;
+  }
+
+  /* Strip yellow / custom highlight background colors during print */
+  .doc-page span,
+  .doc-page div,
+  .doc-page p {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  /* Unconstrain page scroll containers without breaking flexbox */
+  .h-screen, 
+  .w-screen,
+  .overflow-hidden, 
+  .overflow-y-auto {
+    height: auto !important;
+    width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
+
+  .print-document-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* Reset zoom transform in print mode */
+  .print-document-container > div {
+    transform: none !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .doc-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
+    margin: 0 auto !important;
+    padding: 12mm 15mm 16mm 15mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    background: #ffffff !important;
+    overflow: hidden !important;
+  }
+
+  /* Footer pinning in print */
+  .doc-page .absolute.bottom-5 {
+    position: absolute !important;
+    bottom: 12mm !important;
+    left: 15mm !important;
+    right: 15mm !important;
+  }
+}
+
+/* Screen Document Page view */
+.doc-page {
+  font-family: Calibri, 'Calibri Light', 'Gill Sans', 'Segoe UI', Arial, sans-serif;
+  font-weight: 400;
+  width: 210mm;
+  min-height: 297mm;
+  height: 297mm;
+  padding: 12mm 15mm 16mm 15mm;
+  box-sizing: border-box;
+  position: relative;
+  background: #ffffff;
+  overflow: hidden;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Explicit regular font weight for non-bold items */
+.doc-page p,
+.doc-page div,
+.doc-page span,
+.doc-page td,
+.doc-page li {
+  font-weight: 400;
+}
+
+.doc-page .font-normal {
+  font-weight: 400 !important;
+}
+
+.doc-page .font-medium {
+  font-weight: 500 !important;
+}
+
+.doc-page .font-semibold {
+  font-weight: 600 !important;
+}
+
+/* Crisp bold font weight for titles/headers */
+.doc-page .font-bold,
+.doc-page b,
+.doc-page strong {
+  font-weight: 700 !important;
+}
