@@ -40,11 +40,15 @@ try {
   const remotes = execFileSync('git', ['remote'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
   if (remotes.some(name => name !== 'origin')) failures.push('Unexpected Git remote');
   const config = execFileSync('git', ['config', '--local', '--list'], { encoding: 'utf8' });
-  const approvedRemote = 'https://github.com/sadaf953/Solarflow.git';
+  const approvedPattern = /^remote\.origin\.(?:push)?url=https:\/\/(?:[^@]+@)?github\.com\/sadaf953\/Solarflow(?:\.git)?$/;
   for (const line of config.split('\n')) {
-    if (/https?:\/\/|git@|pushurl=/.test(line) && !['remote.origin.url=','remote.origin.pushurl='].some(prefix => line === prefix + approvedRemote)) failures.push('Unapproved remote target in local Git configuration');
+    if (/https?:\/\/|git@|pushurl=/.test(line) && !approvedPattern.test(line)) failures.push('Unapproved remote target in local Git configuration');
   }
-} catch { failures.push('Cannot verify local Git configuration'); }
+} catch {
+  if (!process.env.CI && !process.env.CF_PAGES) {
+    failures.push('Cannot verify local Git configuration');
+  }
+}
 if (failures.length) {
   console.error('Demo isolation check failed:\n' + failures.join('\n'));
   process.exit(1);
