@@ -35,10 +35,7 @@ function scan(dir) {
 for (const dir of ['src', 'public', 'dist']) scan(dir);
 if (existsSync('.github/workflows') && readdirSync('.github/workflows').some(n => /\.ya?ml$/.test(n))) failures.push('GitHub automation is not allowed in this demo');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-const approvedDeploy = 'npm run build && wrangler pages deploy dist --project-name=solarflow';
-if (pkg.homepage || pkg.scripts.predeploy || (pkg.scripts.deploy && pkg.scripts.deploy !== approvedDeploy)) {
-  failures.push('Unapproved deployment configuration in package.json');
-}
+if (pkg.homepage || pkg.scripts.deploy || pkg.scripts.predeploy) failures.push('Deployment configuration is not allowed');
 try {
   const remotes = execFileSync('git', ['remote'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
   if (remotes.some(name => name !== 'origin')) failures.push('Unexpected Git remote');
