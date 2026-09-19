@@ -191,6 +191,25 @@ export default function LoginScreen({onLogin,initialError=''}) {
 
  return (
   <main className="demo-login">
+   {/* Top Banner: Want to try our base model? */}
+   <div className="max-w-[940px] mx-auto mb-5 -mt-4 sm:-mt-6">
+     <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-500/10 border border-amber-300/80 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs shadow-2xs">
+       <div className="flex items-center gap-2 text-stone-800 font-medium">
+         <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+         <span>Want to try our base model?</span>
+       </div>
+       <a 
+         href="https://deeprootsystems.in/solarflow-basic" 
+         target="_blank" 
+         rel="noopener noreferrer"
+         className="inline-flex items-center gap-1 font-bold text-amber-900 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-300/90 px-3 py-1 rounded-xl transition shadow-2xs cursor-pointer text-[11px]"
+       >
+         <span>Explore Base Model</span>
+         <ArrowRight size={12} />
+       </a>
+     </div>
+   </div>
+
    <div className="demo-login-intro">
     <BrandMark size="lg"/>
     <span className="demo-eyebrow">SOLARFLOW CRM DEMO</span>
@@ -567,11 +586,10 @@ export default function LoginScreen({onLogin,initialError=''}) {
     )}
    </div>
 
-   {/* Customization & Reach Us Enquiry Section commented out
+   {/* Customization & Reach Us Enquiry Section */}
    <div className="mt-8 max-w-3xl mx-auto w-full">
     <CustomizationEnquiryForm />
    </div>
-   */}
 
    <p className="demo-login-footnote mt-6">Private demo workspace with preloaded customer projects. Switch roles anytime from the header.</p>
   </main>
