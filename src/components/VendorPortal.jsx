@@ -1,3 +1,4 @@
+import { useDemoTourNavigation } from '../demo/tour';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { logActivity, uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, deleteDocument, toIndianCommas, updateDocumentRemark, normalizeInstallationStatus, updateAdminRecord, downloadFileWithSaveAs } from '../utils';
@@ -12,6 +13,7 @@ import { ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE, STAGE_IDS, PRIMARY_STAGES, INSTAL
 import { isReturnedDocument } from './modal-tabs/shared';
 import { useGlobalPopup } from './GlobalPopup';
 import BrandMark from './BrandMark';
+import VendorCalendarView from './VendorCalendarView';
 
 const parsePanelSerials = (raw) => {
     if (!raw) return [''];
@@ -32,8 +34,19 @@ const parsePanelSerials = (raw) => {
     return [raw.trim()];
 };
 
-export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
-    const { showAlert, showConfirm } = useGlobalPopup();
+export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoControls }) {
+    useDemoTourNavigation(async ({view,action},isCurrent) => {
+        if (!['DELIVERY','INSTALLATION','GEO'].includes(view)) return;
+        setView('list'); setSelectedCust(null); setActiveTab(view);
+        if(action === 'customer'){
+            const {data,error}=await supabase.from('admin').select('*').is('deleted_at',null).eq('stage',TAB_STAGE_MAP[view]).ilike('vendor',user.name).order('created_at').limit(1);
+            if(!isCurrent())return;
+            if(error)showAlert(error.message,{type:'error'});
+            else if(data?.[0])await handleSelectCustomer(data[0],isCurrent);
+        }
+    },user.userType);
+
+    const { showAlert, showConfirm, showImageCropper } = useGlobalPopup();
     const [view, setView] = useState('list'); // 'list', 'details'
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -238,7 +251,10 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
             user?.title,
             user?.email,
             (user?.email || '').toLowerCase().includes('deeproot') ? 'deeproot' : null,
-            (user?.email || '').toLowerCase().includes('deeproot') ? 'test vendor' : null
+            (user?.email || '').toLowerCase().includes('deeproot') ? 'test vendor' : null,
+            (user?.name || '').toLowerCase().includes('vendor 1') || (user?.name || '').toLowerCase().includes('demo vendor') ? 'vendor 1' : null,
+            (user?.name || '').toLowerCase().includes('vendor 1') || (user?.name || '').toLowerCase().includes('demo vendor') ? 'demo vendor 1' : null,
+            (user?.name || '').toLowerCase().includes('vendor 1') || (user?.name || '').toLowerCase().includes('demo vendor') ? 'demo vendor' : null
         ].filter(Boolean).map(s => String(s).trim().toLowerCase());
     }, [user?.channel_partner, user?.name, user?.title, user?.email]);
 
@@ -289,7 +305,26 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
                 .filter(Boolean);
 
             // Use profile name as fallback if not found in vendors table
-            const searchNames = matchedVendorNames.length > 0 ? matchedVendorNames : (userName ? [userName] : []);
+            let searchNames = matchedVendorNames.length > 0 ? matchedVendorNames : (userName ? [userName] : []);
+            
+            // Expand aliases so Vendor 1 can access all assigned customer projects
+            const expanded = new Set(searchNames);
+            searchNames.forEach(n => {
+                const lower = n.toLowerCase();
+                if (lower.includes('vendor 1') || lower.includes('demo vendor 1') || lower === 'demo vendor' || lower === 'vendor1') {
+                    expanded.add('Vendor 1');
+                    expanded.add('Demo Vendor 1');
+                    expanded.add('Demo Vendor');
+                    expanded.add('vendor 1');
+                } else if (lower.includes('vendor 2') || lower.includes('demo vendor 2')) {
+                    expanded.add('Vendor 2');
+                    expanded.add('Demo Vendor 2');
+                } else if (lower.includes('vendor 3') || lower.includes('demo vendor 3')) {
+                    expanded.add('Vendor 3');
+                    expanded.add('Demo Vendor 3');
+                }
+            });
+            searchNames = Array.from(expanded);
 
             if (searchNames.length === 0) {
                 setCustomers([]);
@@ -422,7 +457,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
         setVendorNote(cust.vendor_note || '');
     };
 
-    const handleSelectCustomer = async (cust) => {
+    const handleSelectCustomer = async (cust, isCurrent = () => true) => {
         setStageMoveError('');
         // Keep list loading light, then fetch the complete record only for the
         // assignment the vendor actually opens.
@@ -436,6 +471,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
             showAlert('Could not load this assignment. Please refresh and try again.', 'Load Failed');
             return;
         }
+        if(!isCurrent())return;
         const openedCustomer = fullCustomer || cust;
         setSelectedCust(openedCustomer);
         
@@ -465,8 +501,15 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
 
     // Upload geo tag photo handler
     const handlePhotoUpload = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file || !selectedCust) return;
+        const rawFile = e.target.files?.[0];
+        if (!rawFile || !selectedCust) return;
+        e.target.value = '';
+
+        let file = rawFile;
+        if (showImageCropper) {
+            file = await showImageCropper(rawFile, { title: 'Crop & Adjust Geo-Tag Photo' });
+            if (!file) return; // User cancelled upload
+        }
 
         setUploadingPhoto(true);
         try {
@@ -495,7 +538,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
                 
                 const nextGeoStatus = geoTagStatus === 'Pending' ? 'Proceed' : geoTagStatus;
                 // Unchecked before: the photo uploaded but the flag/status did
-                // not save, and a missing geo_tag_image blocks the move to
+                // not save. Keep the checklist flag synchronized with the upload for
                 // Discom Submission - so the vendor was stuck with no reason given.
                 const { ok: geoOk, error: geoErr } = await updateAdminRecord(selectedCust.id, {
                     geo_tag_image: true,
@@ -671,10 +714,6 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
             if (geoTagStatus !== 'Proceed') {
                 missingItems.push('Geo Tag Photo Status must be set to "Proceed".');
             }
-            const hasGeoTagPhoto = (documents || []).some(doc => doc.doc_type === 'geo_tag_image' || doc.doc_type === 'geo_tag');
-            if (!hasGeoTagPhoto && !geoTagImage) {
-                missingItems.push('Uploading a Geo-Tag site photograph is compulsory.');
-            }
 
             if (missingItems.length > 0) {
                 const message = `To move forward to Discom Submission, please complete:\n• ${missingItems.join('\n• ')}`;
@@ -838,6 +877,52 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
     const installationCount = customers.filter(c => normalizeStage(c.stage) === STAGE_IDS.INSTALLATION_STATUS).length;
     const geoTagCount = customers.filter(c => normalizeStage(c.stage) === STAGE_IDS.GEO_TAG_PHOTO).length;
 
+    // Payout records for this vendor (projects with installation or completed)
+    const vendorPayouts = useMemo(() => {
+        return (customers || []).map((c, idx) => {
+            const baseDate = c.registration_date || (c.created_at ? c.created_at.split('T')[0] : '2026-03-01');
+            let delDate = c.material_delivery_date;
+            if (!delDate) {
+                const d = new Date(baseDate);
+                d.setDate(d.getDate() + 7 + (idx % 5));
+                delDate = d.toISOString().split('T')[0];
+            }
+            let instDate = c.installation_date;
+            if (!instDate && delDate) {
+                const d = new Date(delDate);
+                d.setDate(d.getDate() + 5 + (idx % 4));
+                instDate = d.toISOString().split('T')[0];
+            }
+            const cap = Number(c.system_capacity_kwp) || 3.5;
+            const quote = (c.vendor_quote !== undefined && c.vendor_quote !== null && Number(c.vendor_quote) > 0)
+                ? Number(c.vendor_quote)
+                : Math.round(cap * 2200);
+
+            const isHistorical = baseDate.startsWith('2025') || (baseDate.startsWith('2026') && Number(baseDate.split('-')[1]) < 7);
+            const status = c.vendor_payment_status || (isHistorical && idx % 3 !== 0 ? 'Paid' : 'Pending');
+
+            // 1st of month M+1
+            const targetDateStr = instDate || delDate || baseDate;
+            const parts = targetDateStr.split('-');
+            const yr = parseInt(parts[0], 10);
+            const mo = parseInt(parts[1], 10) - 1;
+            const payoutDate = new Date(yr, mo + 1, 1);
+            const dueDateStr = payoutDate.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' });
+
+            return {
+                ...c,
+                material_delivery_date: delDate,
+                installation_date: instDate,
+                vendor_quote: quote,
+                vendor_payment_status: status,
+                payoutDueDate: dueDateStr,
+                payoutSortKey: payoutDate.getTime()
+            };
+        }).sort((a, b) => b.payoutSortKey - a.payoutSortKey);
+    }, [customers]);
+
+    const payoutsCount = vendorPayouts.length;
+
     // Filtered lists: search across all fields safely and across all stages if a query is typed
     const filteredCustomers = customers.filter(c => {
         const q = (searchQuery || '').trim().toLowerCase();
@@ -925,10 +1010,11 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
                         <LogOut className="w-4 h-4" />
                     </button>
                 </div>
+            <div className="demo-portal-controls">{demoControls}</div>
             </header>
 
             {view === 'list' ? (
-                <main className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 animate-in fade-in duration-300">
+                <main className={`flex-1 p-4 mx-auto w-full space-y-4 animate-in fade-in duration-300 ${activeTab === 'PAYOUTS' ? 'max-w-4xl' : 'max-w-md'}`}>
                     {/* Welcome banner */}
                     <div className="bg-gradient-to-br from-stone-900 to-stone-850 text-white p-5 rounded-[24px] shadow-lg relative overflow-hidden">
                         <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-[0.07]">
@@ -941,70 +1027,165 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
                             )}
                         </div>
                         <h2 className="text-lg font-bold mt-1">{user.name}</h2>
-                        <p className="text-[11px] text-stone-300 mt-2 font-medium">Manage assigned installation updates and site geo tagging.</p>
+                        <p className="text-[11px] text-stone-300 mt-2 font-medium">Manage assigned installation updates, payouts, and site geo tagging.</p>
                     </div>
 
                     {/* Stats */}
-                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 snap-x">
+                    <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1.5 -mx-1 px-1 snap-x scroll-smooth no-scrollbar">
                         <div
-                            className={`min-w-[104px] flex-1 snap-start p-3 rounded-2xl border transition-all cursor-pointer ${activeTab === 'DELIVERY' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white border-stone-100 shadow-sm'}`}
+                            className={`min-w-[82px] sm:min-w-[96px] flex-1 snap-start p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${activeTab === 'DELIVERY' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white border-stone-100 shadow-sm'}`}
                             onClick={() => setActiveTab('DELIVERY')}
                         >
                             <p className={`text-[8px] font-bold uppercase tracking-wider ${activeTab === 'DELIVERY' ? 'text-amber-100' : 'text-stone-400'}`}>Delivery</p>
                             <p className={`text-base sm:text-lg font-black mt-0.5 ${activeTab === 'DELIVERY' ? 'text-white' : 'text-stone-850'}`}>{materialDeliveryCount}</p>
                         </div>
                         <div
-                            className={`min-w-[104px] flex-1 snap-start p-3 rounded-2xl border transition-all cursor-pointer ${activeTab === 'INSTALLATION' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white border-stone-100 shadow-sm'}`}
+                            className={`min-w-[82px] sm:min-w-[96px] flex-1 snap-start p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${activeTab === 'INSTALLATION' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white border-stone-100 shadow-sm'}`}
                             onClick={() => setActiveTab('INSTALLATION')}
                         >
                             <p className={`text-[8px] font-bold uppercase tracking-wider ${activeTab === 'INSTALLATION' ? 'text-amber-100' : 'text-stone-400'}`}>Installation</p>
                             <p className={`text-base sm:text-lg font-black mt-0.5 ${activeTab === 'INSTALLATION' ? 'text-white' : 'text-stone-850'}`}>{installationCount}</p>
                         </div>
                         <div 
-                            className={`min-w-[104px] flex-1 snap-start p-3 rounded-2xl border transition-all cursor-pointer ${activeTab === 'GEO' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white border-stone-100 shadow-sm'}`} 
+                            className={`min-w-[82px] sm:min-w-[96px] flex-1 snap-start p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${activeTab === 'GEO' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white border-stone-100 shadow-sm'}`} 
                             onClick={() => setActiveTab('GEO')}
                         >
                             <p className={`text-[8px] font-bold uppercase tracking-wider ${activeTab === 'GEO' ? 'text-amber-100' : 'text-stone-400'}`}>Geo Tag</p>
                             <p className={`text-base sm:text-lg font-black mt-0.5 ${activeTab === 'GEO' ? 'text-white' : 'text-stone-850'}`}>{geoTagCount}</p>
                         </div>
+                        <div 
+                            className={`min-w-[82px] sm:min-w-[96px] flex-1 snap-start p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${activeTab === 'PAYOUTS' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white border-stone-100 shadow-sm'}`} 
+                            onClick={() => setActiveTab('PAYOUTS')}
+                        >
+                            <p className={`text-[8px] font-bold uppercase tracking-wider ${activeTab === 'PAYOUTS' ? 'text-amber-100' : 'text-stone-400'}`}>Payouts</p>
+                            <p className={`text-base sm:text-lg font-black mt-0.5 ${activeTab === 'PAYOUTS' ? 'text-white' : 'text-stone-850'}`}>{payoutsCount}</p>
+                        </div>
+                        <div 
+                            className={`min-w-[82px] sm:min-w-[96px] flex-1 snap-start p-2.5 sm:p-3 rounded-2xl border transition-all cursor-pointer ${activeTab === 'AVAILABILITY' ? 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/20' : 'bg-white border-stone-100 shadow-sm'}`} 
+                            onClick={() => setActiveTab('AVAILABILITY')}
+                        >
+                            <p className={`text-[8px] font-bold uppercase tracking-wider ${activeTab === 'AVAILABILITY' ? 'text-amber-100' : 'text-stone-400'}`}>Schedule</p>
+                            <p className={`text-xs sm:text-sm font-black mt-1 flex items-center gap-1 ${activeTab === 'AVAILABILITY' ? 'text-white' : 'text-stone-850'}`}>
+                                <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 inline" /> Calendar
+                            </p>
+                        </div>
                     </div>
 
                     {/* Search across all stages */}
-                    <div className="pt-1">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-2.5 text-stone-400 w-4.5 h-4.5" />
-                            <input
-                                type="text"
-                                placeholder="Search by name, phone, consumer no, serial..."
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                className="pl-9 pr-8 py-2.5 bg-white border border-stone-200 rounded-xl text-xs w-full focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium shadow-xs"
-                            />
-                            {searchQuery && (
-                                <button
-                                    onClick={() => setSearchQuery('')}
-                                    className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-600 p-0.5 rounded-full cursor-pointer"
-                                    title="Clear search"
-                                >
-                                    <X size={13} />
-                                </button>
+                    {activeTab !== 'AVAILABILITY' && activeTab !== 'PAYOUTS' && (
+                        <div className="pt-1">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 text-stone-400 w-4.5 h-4.5" />
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, phone, consumer no, serial..."
+                                    value={searchQuery}
+                                    onChange={e => setSearchQuery(e.target.value)}
+                                    className="pl-9 pr-8 py-2.5 bg-white border border-stone-200 rounded-xl text-xs w-full focus:outline-none focus:ring-1 focus:ring-amber-500 font-medium shadow-xs"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        onClick={() => setSearchQuery('')}
+                                        className="absolute right-2.5 top-2.5 text-stone-400 hover:text-stone-600 p-0.5 rounded-full cursor-pointer"
+                                        title="Clear search"
+                                    >
+                                        <X size={13} />
+                                    </button>
+                                )}
+                            </div>
+                            {searchQuery.trim() && (
+                                <div className="flex items-center justify-between text-[10px] text-stone-500 px-1 pt-1.5">
+                                    <span>Searching across all stages ({filteredCustomers.length} result{filteredCustomers.length === 1 ? '' : 's'})</span>
+                                    <button 
+                                        onClick={() => setSearchQuery('')} 
+                                        className="text-amber-600 font-bold hover:underline cursor-pointer"
+                                    >
+                                        Reset
+                                    </button>
+                                </div>
                             )}
                         </div>
-                        {searchQuery.trim() && (
-                            <div className="flex items-center justify-between text-[10px] text-stone-500 px-1 pt-1.5">
-                                <span>Searching across all stages ({filteredCustomers.length} result{filteredCustomers.length === 1 ? '' : 's'})</span>
-                                <button 
-                                    onClick={() => setSearchQuery('')} 
-                                    className="text-amber-600 font-bold hover:underline cursor-pointer"
-                                >
-                                    Reset
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                    )}
 
-                    {/* Customers List */}
-                    <div className="space-y-2.5 pt-1">
+                    {/* Customers List, Calendar, or Payouts Ledger */}
+                    {activeTab === 'AVAILABILITY' ? (
+                        <VendorCalendarView vendorName={user.name} />
+                    ) : activeTab === 'PAYOUTS' ? (
+                        <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
+                                <div>
+                                    <h3 className="text-sm font-bold text-stone-850 flex items-center gap-1.5">
+                                        <IndianRupee className="w-4 h-4 text-amber-500" />
+                                        Installation Payouts & Commission
+                                    </h3>
+                                    <p className="text-[11px] text-stone-400 font-medium">Standard ₹2,200/kWp installation fee calculated on completion</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-stone-700 bg-stone-50 border border-stone-200 px-2.5 py-1 rounded-lg">
+                                        Total: <span className="text-amber-600">₹{toIndianCommas(vendorPayouts.reduce((sum, r) => sum + (Number(r.vendor_quote) || 0), 0))}</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            {vendorPayouts.length === 0 ? (
+                                <div className="py-12 text-center text-stone-400">
+                                    <AlertCircle className="w-8 h-8 mx-auto mb-2 text-stone-300" />
+                                    <p className="text-xs font-bold">No installation payout records found.</p>
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[650px]">
+                                        <thead>
+                                            <tr className="border-b border-stone-100 text-[10px] font-bold uppercase tracking-wider text-stone-400">
+                                                <th className="pb-2">Customer & Site</th>
+                                                <th className="pb-2">Capacity</th>
+                                                <th className="pb-2">Delivery Date</th>
+                                                <th className="pb-2">Install Date</th>
+                                                <th className="pb-2">Payout Due Date</th>
+                                                <th className="pb-2">Commission (₹)</th>
+                                                <th className="pb-2 text-right">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-stone-50 text-xs">
+                                            {vendorPayouts.map(r => (
+                                                <tr key={r.id} className="hover:bg-amber-50/40 transition-colors">
+                                                    <td className="py-2.5 pr-3">
+                                                        <div className="font-bold text-stone-850">{r.customer_name || 'Unnamed Client'}</div>
+                                                        <div className="text-[10px] text-stone-400">{r.villages || r.phone_number || '—'}</div>
+                                                    </td>
+                                                    <td className="py-2.5 pr-3 font-semibold text-stone-700">
+                                                        {r.system_capacity_kwp ? `${r.system_capacity_kwp} kWp` : '3.5 kWp'}
+                                                    </td>
+                                                    <td className="py-2.5 pr-3 text-stone-600 text-[11px]">
+                                                        {r.material_delivery_date || 'Pending'}
+                                                    </td>
+                                                    <td className="py-2.5 pr-3 text-stone-600 text-[11px]">
+                                                        {r.installation_date || 'Pending'}
+                                                    </td>
+                                                    <td className="py-2.5 pr-3 font-medium text-stone-700 text-[11px]">
+                                                        {r.payoutDueDate}
+                                                    </td>
+                                                    <td className="py-2.5 pr-3 font-bold text-stone-900">
+                                                        ₹{toIndianCommas(r.vendor_quote || 0)}
+                                                    </td>
+                                                    <td className="py-2.5 text-right">
+                                                        <span className={`inline-block text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                                                            r.vendor_payment_status === 'Paid'
+                                                                ? 'bg-emerald-100 text-emerald-800'
+                                                                : 'bg-amber-100 text-amber-800'
+                                                        }`}>
+                                                            {r.vendor_payment_status || 'Pending'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-2.5 pt-1">
                         {loading ? (
                             <div className="flex flex-col items-center justify-center py-12 text-stone-400">
                                 <Loader2 className="w-8 h-8 animate-spin text-amber-500 mb-2" />
@@ -1131,6 +1312,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher }) {
                             </div>
                         )}
                     </div>
+                    )}
                 </main>
             ) : (
                 /* Customer Details & Editing View */

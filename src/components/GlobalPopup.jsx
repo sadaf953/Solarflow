@@ -7,6 +7,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, Share2 } from 'lucide-react';
+import ImageCropModal from './ImageCropModal';
 
 const GlobalPopupContext = createContext(null);
 
@@ -101,10 +102,37 @@ export function GlobalPopupProvider({ children }) {
         });
     }, []);
 
+    const showImageCropper = useCallback((file, opts = {}) => {
+        if (!file) return Promise.resolve(null);
+        const isImage = (file.type && file.type.startsWith('image/')) || 
+                        /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(file.name || '');
+        if (!isImage) {
+            return Promise.resolve(file);
+        }
+
+        return new Promise((resolve) => {
+            setPopup({
+                mode: 'image-cropper',
+                file,
+                title: opts.title || 'Crop & Adjust Image',
+                onResolve: (result) => { setPopup(null); resolve(result); },
+            });
+        });
+    }, []);
+
     return (
-        <GlobalPopupContext.Provider value={{ showAlert, showConfirm, showChoice }}>
+        <GlobalPopupContext.Provider value={{ showAlert, showConfirm, showChoice, showImageCropper }}>
             {children}
-            {popup && (
+            {popup?.mode === 'image-cropper' ? (
+                <ImageCropModal
+                    isOpen={true}
+                    file={popup.file}
+                    title={popup.title}
+                    onCropSave={(cropped) => popup.onResolve(cropped)}
+                    onSkip={(orig) => popup.onResolve(orig)}
+                    onClose={() => popup.onResolve(null)}
+                />
+            ) : popup ? (
                 <div
                     className="fixed inset-0 z-[10000] flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-200"
                     onClick={() => { if (popup.mode === 'alert') popup.onResolve(); else if (popup.mode === 'choice') popup.onResolve('cancel'); }}
@@ -193,7 +221,7 @@ export function GlobalPopupProvider({ children }) {
                         )}
                     </div>
                 </div>
-            )}
+            ) : null}
         </GlobalPopupContext.Provider>
     );
 }

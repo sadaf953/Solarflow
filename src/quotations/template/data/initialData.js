@@ -201,7 +201,7 @@ export const INITIAL_QUOTATION = {
   },
 
   footer: {
-    authorizedPartner: 'SOLARFLOW DEMO PARTNER',
+    authorizedPartner: 'SOLARFLOW Demo Aurora Solar',
     corporateOffice: '100 Demo Avenue, Sample City (fictional)',
     branchOffice: 'Suite 2, Sample Plaza, Demo Town (fictional)',
   },

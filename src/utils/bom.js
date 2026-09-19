@@ -9,10 +9,10 @@
 // same document.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { supabase } from '../supabase';
-import { ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE } from '../constants';
+import { supabase } from '../supabase.js';
+import reference from '../inventory/reference.json' with { type: 'json' };
 
-export const getBomTemplateForType = (type) => (type === 'SHED' ? SHED_BOM_TEMPLATE : ROOF_BOM_TEMPLATE);
+export const getBomTemplateForType = (type) => reference.scenarios[type === 'SHED' ? 'SHED' : 'ROOF'][0].items.map(item => ({...item, quantity_editable:true}));
 
 // Roof vs Shed is derived from the Material Order specification.
 export const getBomTypeForCustomer = (customer) =>
@@ -51,27 +51,30 @@ const mergeAgainstTemplate = (savedItems, template) => {
 
     const mergedStandardItems = template.map((tItem, idx) => {
         const saved = savedMap.get(norm(tItem.product_name));
+        const cleanNote = saved?.note && !['Synthetic sample item', 'Reference BOM quantities from supplied CS'].includes(saved.note.trim()) ? saved.note : '';
         return {
             ...tItem,
             id: saved?.id || null,
+            stock_quantity: saved?.stock_quantity ?? null,
             sr_no: idx + 1,
-            quantity: saved?.quantity !== undefined && saved?.quantity !== null && String(saved.quantity).trim() !== ''
+            quantity: saved?.quantity !== undefined && saved?.quantity !== null
                 ? String(saved.quantity)
                 : (tItem.quantity || ''),
             uom: tItem.uom || getUomForProduct(tItem.product_name, template),
             integration_by: saved?.integration_by || '',
-            note: saved?.note || '',
+            note: cleanNote,
         };
     });
 
     const mergedCustomItems = extraCustomItems.map((item, cIdx) => ({
         id: item.id || null,
+        stock_quantity: item.stock_quantity ?? null,
         sr_no: template.length + cIdx + 1,
         product_name: item.product_name || '',
         quantity: item.quantity !== undefined && item.quantity !== null ? String(item.quantity) : '',
         uom: item.uom || getUomForProduct(item.product_name, template),
         integration_by: item.integration_by || '',
-        note: item.note || '',
+        note: item.note && !['Synthetic sample item', 'Reference BOM quantities from supplied CS'].includes(item.note.trim()) ? item.note : '',
     }));
 
     return [...mergedStandardItems, ...mergedCustomItems];
@@ -80,7 +83,7 @@ const mergeAgainstTemplate = (savedItems, template) => {
 // Resolves in the same order the admin tab always used: the customer's inline
 // bom_data JSON, then the relational tables, then the local cache.
 export const loadBomForCustomer = async (customer, activeType) => {
-    const template = getBomTemplateForType(activeType);
+    const template = getBomTemplateForType(activeType).map(item => item.product_name === 'Solar Panel' && Number(customer?.no_of_modules)>0 ? {...item, quantity:String(customer.no_of_modules)} : item);
     if (!customer?.id) return { bom: null, items: mergeAgainstTemplate(null, template) };
 
     let bomData = null;
@@ -90,7 +93,7 @@ export const loadBomForCustomer = async (customer, activeType) => {
     if (rawBomData) {
         try {
             const parsed = typeof rawBomData === 'string' ? JSON.parse(rawBomData) : rawBomData;
-            if (parsed) {
+            if (parsed && (!(parsed.bom || parsed).bom_type || (parsed.bom || parsed).bom_type === activeType)) {
                 bomData = parsed.bom || parsed;
                 itemData = parsed.items || (Array.isArray(parsed) ? parsed : null);
             }
@@ -106,14 +109,12 @@ export const loadBomForCustomer = async (customer, activeType) => {
 
     if (!bomData) {
         try {
-            // Was .maybeSingle(), which ERRORS when more than one bom row shares
-            // an admin_id. A duplicate row therefore made the BOM permanently
-            // unreadable, and the swallowed error fell through to a blank
-            // template. Take the earliest row instead, and say so.
+            // Roof and shed are separate designs. Load only the requested type.
             const { data: rows, error } = await supabase
                 .from('bom')
                 .select('*')
                 .eq('admin_id', customer.id)
+                .eq('bom_type', activeType)
                 .order('created_at', { ascending: true });
 
             if (error) {
@@ -142,8 +143,10 @@ export const loadBomForCustomer = async (customer, activeType) => {
             const localRaw = localStorage.getItem(`solarflow_bom_${customer.id}`);
             if (localRaw) {
                 const parsed = JSON.parse(localRaw);
-                bomData = parsed.bom || parsed;
-                itemData = parsed.items;
+                if (!(parsed.bom || parsed).bom_type || (parsed.bom || parsed).bom_type === activeType) {
+                    bomData = parsed.bom || parsed;
+                    itemData = parsed.items;
+                }
             }
         } catch { /* not valid JSON, fall through to template */ }
     }

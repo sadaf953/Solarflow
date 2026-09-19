@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
-import { Zap, User, Building2, Package, FolderOpen, ShieldCheck, Phone, Edit3, Truck, Calendar } from 'lucide-react';
+import { Zap, User, Building2, Package, FolderOpen, ShieldCheck, Phone, Edit3, Truck, Calendar, Clock, MapPin, ExternalLink, HardDrive } from 'lucide-react';
 import { PRIMARY_STAGES, SUBSIDY_TAGS, SUBSIDY_TAG_COLORS } from '../constants';
+import { getTelephoneHref } from '../utils';
 
 const CustomerCard = memo(function CustomerCard({ customer, onSelect, onMoveStage, currentUser }) {
     const [showStageMenu, setShowStageMenu] = useState(false);
@@ -77,9 +78,23 @@ const CustomerCard = memo(function CustomerCard({ customer, onSelect, onMoveStag
                         <span className="truncate">{customer.channel_partner || 'No Channel Partner'}</span>
                     </div>
                     {customer.phone_number && (
-                        <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
-                            <Phone size={11} className="text-stone-300 flex-shrink-0" />
-                            <span>{customer.phone_number}</span>
+                        <div className="flex items-center gap-1.5 text-xs font-medium">
+                            {getTelephoneHref(customer.phone_number) ? (
+                                <a
+                                    href={getTelephoneHref(customer.phone_number)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 hover:underline cursor-pointer group/phone"
+                                    title={`Click to call ${customer.phone_number}`}
+                                >
+                                    <Phone size={11} className="text-emerald-500 flex-shrink-0 group-hover/phone:scale-110 transition-transform" />
+                                    <span>{customer.phone_number}</span>
+                                </a>
+                            ) : (
+                                <div className="flex items-center gap-1.5 text-stone-500">
+                                    <Phone size={11} className="text-stone-300 flex-shrink-0" />
+                                    <span>{customer.phone_number}</span>
+                                </div>
+                            )}
                         </div>
                     )}
                     {customer.vendor && (
@@ -97,7 +112,51 @@ const CustomerCard = memo(function CustomerCard({ customer, onSelect, onMoveStag
                     {customer.created_at && (
                         <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-medium col-span-2 pt-0.5">
                             <Calendar size={11} className="text-stone-300 flex-shrink-0" />
-                            <span>{new Date(customer.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                            <span>Created: {new Date(customer.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                        </div>
+                    )}
+                    {customer.updated_at && customer.updated_at !== customer.created_at && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-amber-700/80 font-medium col-span-2">
+                            <Clock size={11} className="text-amber-500/80 flex-shrink-0" />
+                            <span>Updated: {new Date(customer.updated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                        </div>
+                    )}
+                    {customer.completed_at && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-semibold col-span-2">
+                            <CheckCircle2 size={11} className="text-emerald-500 flex-shrink-0" />
+                            <span>Completed: {new Date(customer.completed_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                        </div>
+                    )}
+                    {(customer.google_drive_link || customer.location_link) && (
+                        <div className="col-span-2 flex flex-wrap items-center gap-2 pt-1 border-t border-stone-100">
+                            {customer.google_drive_link && (
+                                <a
+                                    href={customer.google_drive_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50/80 hover:bg-blue-100 border border-blue-200/80 px-2 py-0.5 rounded-md transition-colors"
+                                    title={`Open Google Drive: ${customer.google_drive_link}`}
+                                >
+                                    <HardDrive size={11} className="text-blue-500 flex-shrink-0" />
+                                    <span>Google Drive</span>
+                                    <ExternalLink size={9} className="text-blue-400 ml-0.5 opacity-70" />
+                                </a>
+                            )}
+                            {customer.location_link && (
+                                <a
+                                    href={customer.location_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/80 px-2 py-0.5 rounded-md transition-colors"
+                                    title={`Open Location Link: ${customer.location_link}`}
+                                >
+                                    <MapPin size={11} className="text-emerald-600 flex-shrink-0" />
+                                    <span>Site Location</span>
+                                    <ExternalLink size={9} className="text-emerald-500 ml-0.5 opacity-70" />
+                                </a>
+                            )}
                         </div>
                     )}
                 </div>

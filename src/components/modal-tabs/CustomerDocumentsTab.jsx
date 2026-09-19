@@ -1,5 +1,5 @@
-import { FolderOpen, Plus, Search, FileText, Eye, Trash2, Image as ImageIcon, Download, Loader2 } from "lucide-react";
-import { DocGalleryRemarkRow } from "./shared";
+import { FolderOpen, Plus, Search, FileText, Eye, Trash2, Image as ImageIcon, Download, Loader2, Sparkles } from "lucide-react";
+import { DocGalleryRemarkRow, generateDemoSampleFile } from "./shared";
 import { formatDateToDDMMYYYY } from "../../utils";
 import { useGlobalPopup } from "../GlobalPopup";
 
@@ -74,17 +74,32 @@ export default function CustomerDocumentsTab({
                             </button>
                         )}
                         {isEditable && (
-                            <label className="bg-stone-900 hover:bg-stone-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer">
-                            <Plus size={14} />
-                            <span>{uploading ? 'Uploading...' : 'Upload File'}</span>
-                            <input
-                                type="file"
-                                accept="image/png,image/jpeg,image/jpg,application/pdf,.png,.jpg,.jpeg,.pdf"
-                                onChange={handleFileUpload}
-                                disabled={uploading}
-                                className="hidden"
-                            />
-                            </label>
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const sample = generateDemoSampleFile('general_document', 'General Customer Document');
+                                        handleFileUpload({ target: { files: [sample], value: '' } });
+                                    }}
+                                    disabled={uploading}
+                                    className="bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                    title="Add a sample verified demo document (1-click upload)"
+                                >
+                                    <Sparkles size={14} />
+                                    <span>Use Demo Doc</span>
+                                </button>
+                                <label className="bg-stone-900 hover:bg-stone-800 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer">
+                                    <Plus size={14} />
+                                    <span>{uploading ? 'Uploading...' : 'Upload File'}</span>
+                                    <input
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/jpg,application/pdf,.png,.jpg,.jpeg,.pdf"
+                                        onChange={handleFileUpload}
+                                        disabled={uploading}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </>
                         )}
                     </div>
                 </div>

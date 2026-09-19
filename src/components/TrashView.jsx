@@ -27,7 +27,7 @@ function TrashDetailDrawer({ customer, onClose }) {
                         </div>
                         <p className="text-[10px] text-stone-400 mt-1">Deleted {formatDate(customer.deleted_at)} · Read only</p>
                     </div>
-                    <button onClick={onClose} className="text-white/40 hover:text-white"><X size={22} /></button>
+                    <button onClick={onClose} className="text-white/40 hover:text-white cursor-pointer"><X size={22} /></button>
                 </div>
                 <div className="p-6 space-y-3">
                     {[
@@ -35,6 +35,8 @@ function TrashDetailDrawer({ customer, onClose }) {
                         ['Email',            customer.email_address],
                         ['Channel Partner',  customer.channel_partner],
                         ['Capacity',         customer.system_capacity_kwp ? `${customer.system_capacity_kwp} kWp` : null],
+                        ['Quantity (Modules)', customer.no_of_modules ? `${customer.no_of_modules} Modules` : null],
+                        ['Panel / WP',       (customer.module_brand || customer.module_wp) ? `${customer.module_brand || ''} ${customer.module_wp ? `(${customer.module_wp}W)` : ''}`.trim() : null],
                         ['Stage at Deletion',PRIMARY_STAGES.find(s => s.id === customer.stage)?.label || customer.stage],
                         ['Subsidy Status',   tagInfo?.label],
                     ].map(([label, val]) => val ? (
@@ -50,7 +52,7 @@ function TrashDetailDrawer({ customer, onClose }) {
     );
 }
 
-export default function TrashView({ onRecover, onHardDelete, isAdmin }) {
+export default function TrashView({ onRecover, onHardDelete, isAdmin, onCountChange }) {
     const [viewing, setViewing] = useState(null);
     const [confirmHard, setConfirmHard] = useState(null);
     const [trashedCustomers, setTrashedCustomers] = useState([]);
@@ -87,6 +89,12 @@ export default function TrashView({ onRecover, onHardDelete, isAdmin }) {
         fetchTrashed();
     }, []);
 
+    useEffect(() => {
+        if (typeof onCountChange === 'function' && !loading) {
+            onCountChange(trashedCustomers.length);
+        }
+    }, [trashedCustomers.length, onCountChange, loading]);
+
     const handleRecover = async (id) => {
         await onRecover(id);
         setTrashedCustomers(prev => prev.filter(c => c.id !== id));
@@ -107,38 +115,70 @@ export default function TrashView({ onRecover, onHardDelete, isAdmin }) {
         </div>
     );
 
+    const totalKwp = trashedCustomers.reduce((acc, c) => acc + (parseFloat(c.system_capacity_kwp) || 0), 0);
+    const totalModules = trashedCustomers.reduce((acc, c) => acc + (parseInt(c.no_of_modules, 10) || 0), 0);
+
     return (
         <div className="max-w-4xl mx-auto space-y-3">
-            <div className="flex items-center gap-2 mb-4">
-                <Trash2 className="w-4 h-4 text-stone-400" />
-                <p className="text-sm text-stone-500">{trashedCustomers.length} deleted record{trashedCustomers.length !== 1 ? 's' : ''}</p>
-                {isAdmin && <span className="ml-auto text-[10px] text-stone-400">Admins can permanently delete</span>}
+            <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <Trash2 className="w-4 h-4 text-stone-400" />
+                    <p className="text-sm text-stone-600 font-medium">
+                        {trashedCustomers.length} deleted record{trashedCustomers.length !== 1 ? 's' : ''}
+                    </p>
+                    {(totalKwp > 0 || totalModules > 0) && (
+                        <div className="flex items-center gap-1.5 ml-2">
+                            {totalKwp > 0 && (
+                                <span className="text-xs bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full font-bold">
+                                    {totalKwp % 1 === 0 ? totalKwp : totalKwp.toFixed(1)} kWp Total
+                                </span>
+                            )}
+                            {totalModules > 0 && (
+                                <span className="text-xs bg-stone-100 text-stone-700 border border-stone-200 px-2 py-0.5 rounded-full font-semibold">
+                                    {totalModules} Modules Total
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </div>
+                {isAdmin && <span className="text-[10px] text-stone-400">Admins can permanently delete</span>}
             </div>
 
             {trashedCustomers.map(c => (
                 <div key={c.id} className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 flex items-center gap-4 hover:border-red-100 transition-all">
                     <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <p className="font-bold text-stone-600">{c.customer_name}</p>
-                            <span className="text-[9px] bg-red-50 text-red-400 px-2 py-0.5 rounded font-bold uppercase">Deleted</span>
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <p className="font-bold text-stone-700 truncate">{c.customer_name}</p>
+                            <span className="text-[9px] bg-red-50 text-red-500 border border-red-100 px-2 py-0.5 rounded font-bold uppercase">Deleted</span>
+                            {c.system_capacity_kwp && (
+                                <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200/80 px-2 py-0.5 rounded-md font-bold">
+                                    {c.system_capacity_kwp} kWp
+                                </span>
+                            )}
+                            {c.no_of_modules && (
+                                <span className="text-[10px] bg-stone-100 text-stone-700 border border-stone-200/80 px-2 py-0.5 rounded-md font-semibold">
+                                    Qty: {c.no_of_modules} {parseInt(c.no_of_modules, 10) === 1 ? 'module' : 'modules'}
+                                </span>
+                            )}
                         </div>
                         <p className="text-xs text-stone-400">
                             {PRIMARY_STAGES.find(s => s.id === c.stage)?.label || c.stage || '–'} ·{' '}
-                            {c.villages || 'No location'} · Deleted {formatDate(c.deleted_at)}
+                            {c.villages || 'No location'}
+                            {c.channel_partner ? ` · ${c.channel_partner}` : ''} · Deleted {formatDate(c.deleted_at)}
                         </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         <button onClick={() => setViewing(c)}
-                            className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 rounded-xl transition-colors" title="View">
+                            className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 rounded-xl transition-colors cursor-pointer" title="View">
                             <Eye className="w-4 h-4" />
                         </button>
                         <button onClick={() => handleRecover(c.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors">
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors cursor-pointer">
                             <RotateCcw className="w-3.5 h-3.5" /> Recover
                         </button>
                         {isAdmin && (
                             <button onClick={() => setConfirmHard(c)}
-                                className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors" title="Permanently delete">
+                                className="p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors cursor-pointer" title="Permanently delete">
                                 <Trash2 className="w-4 h-4" />
                             </button>
                         )}

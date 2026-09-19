@@ -69,7 +69,7 @@ export default function DevRoleSwitcher({ currentUser, onSwitchUser, isOpen, onT
             userType: role.user_type,
             role: role.role,
             name: `${role.label} (Preview)`,
-            channel_partner: role.user_type === "channel_partner_office" || role.user_type === "office2" || role.user_type === "agent2" || role.user_type === "agent" ? "Demo Partner" : "",
+            channel_partner: role.user_type === "channel_partner_office" || role.user_type === "office2" || role.user_type === "agent2" || role.user_type === "agent" ? "Demo Aurora Solar" : "",
             isDevRole: true,
         });
 

@@ -13,3 +13,14 @@ test('deferred conversion retry inserts exactly one lead',async()=>{const{repo,r
 test('deferred simultaneous conversion attempts converge on the same lead',async()=>{const{repo,row,client}=await setup();const results=await Promise.allSettled([repo.insertConversionLead(row,{customer_name:'Lead'},user),repo.insertConversionLead(row,{customer_name:'Lead'},user)]);assert.equal(client.state.tables.admin.length,1);assert.ok(results.some(r=>r.status==='fulfilled'));const retry=await repo.insertConversionLead(row,{},user);assert.equal(retry.data.id,row.id);});
 test('deferred conversion preserves the quotation document',async()=>{const{repo,row,client}=await setup();await repo.insertConversionLead(row,{customer_name:'Lead Customer'},user);assert.equal(client.state.tables.admin.length,1);assert.equal((await repo.get(row.id)).converted_lead_id,row.id);assert.deepEqual((await repo.get(row.id)).quotation_data.form,row.quotation_data.form);});
 test('pagination and number search',async()=>{const{repo,row,client}=await setup();for(let i=0;i<25;i++)client.state.tables.quotations.push({...row,id:`extra${i}`,quotation_no:4000+i});assert.equal((await repo.list({page:0})).rows.length,20);assert.equal((await repo.list({page:1})).rows.length,6);assert.equal((await repo.list({search:'Quote-4003'})).rows[0].quotation_no,4003);});
+test('lost quotation cannot create a lead until reopened, converted stays in both lists',async()=>{
+ const {repo,row,client}=await setup();
+ const lost=await repo.outcome(row,'lost',user,'Customer paused');
+ await assert.rejects(repo.insertConversionLead(lost,{customer_name:'Lead'},user),/Reopen/);
+ assert.equal(client.state.tables.admin.length,0);
+ const reopened=await repo.outcome(lost,'reopened',user);
+ await repo.insertConversionLead(reopened,{customer_name:'Lead',stage:'LEADS'},user);
+ assert.equal(client.state.tables.admin.length,1);
+ assert.equal((await repo.list({status:'converted'})).rows.length,1);
+ await assert.rejects(repo.outcome(await repo.get(row.id),'lost',user,'Later'),/converted quotation/);
+});

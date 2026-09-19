@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 // ─── DashboardView.jsx ────────────────────────────────────────────────────────
 // Metrics overview: project counts, financial summary, stage pipeline bar chart.
 // • "Total" = all non-deleted records
@@ -7,9 +7,10 @@ import { useMemo } from 'react';
 // Numbers use Indian locale (₹1,00,000)
 // ──────────────────────────────────────────────────────────────────────────────
 
-import { FolderOpen, Activity, CheckCircle2 } from 'lucide-react';
+import { FolderOpen, Activity, CheckCircle2, XCircle } from 'lucide-react';
 import { PRIMARY_STAGES } from '../constants';
 import { formatINRCompact } from '../utils';
+import CustomizationEnquiryForm from './CustomizationEnquiryForm';
 
 const fmtLakh = formatINRCompact;
 
@@ -18,6 +19,7 @@ const MetricBox = ({ label, value, sub, icon: Icon, color }) => {
         amber:   'bg-amber-50 text-amber-600',
         emerald: 'bg-emerald-50 text-emerald-600',
         blue:    'bg-blue-50 text-blue-600',
+        rose: 'bg-rose-50 text-rose-600',
     };
     return (
         <div className="bg-white p-6 rounded-[28px] border border-stone-100 shadow-sm">
@@ -31,7 +33,8 @@ const MetricBox = ({ label, value, sub, icon: Icon, color }) => {
     );
 };
 
-export default function DashboardView({ metrics, loading }) {
+export default function DashboardView({ metrics, loading, scoped = false }) {
+    const [showEnquiryModal, setShowEnquiryModal] = useState(false);
     const {
         totalProjects = 0,
         completedCount = 0,
@@ -57,11 +60,47 @@ export default function DashboardView({ metrics, loading }) {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">
+            {/* Customization enquiry modal and banner commented out
+            {showEnquiryModal && (
+                <CustomizationEnquiryForm isModal={true} onClose={() => setShowEnquiryModal(false)} />
+            )}
+
+            <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center font-black text-base flex-shrink-0 shadow-sm">
+                        ☀️
+                    </div>
+                    <div>
+                        <h4 className="text-xs font-bold text-stone-900 uppercase tracking-wide">Customized per your business workflow</h4>
+                        <p className="text-xs text-stone-600 mt-0.5">
+                            Available with a clean fresh database or full historical data migration. Basic &amp; Advance versions tailored to your needs.
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                        type="button"
+                        onClick={() => setShowEnquiryModal(true)}
+                        className="flex-shrink-0 bg-stone-900 hover:bg-stone-800 text-amber-400 hover:text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                    >
+                        <span>Custom Setup / Enquiry →</span>
+                    </button>
+                    <a
+                        href="mailto:enquiry@deeprootsystems.in"
+                        className="flex-shrink-0 text-stone-500 hover:text-stone-800 text-xs font-semibold px-2 py-1 transition-all"
+                    >
+                        enquiry@deeprootsystems.in
+                    </a>
+                </div>
+            </div>
+            */}
+
             {/* Project counts */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <MetricBox label="Total Database" value={totalProjects}  icon={FolderOpen}   color="blue"    sub={`${liveProjects} active records`} />
-                <MetricBox label="Live Projects"  value={liveProjects}   icon={Activity}     color="amber"   sub="Excluding Completed" />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                <MetricBox label={scoped ? "My Office & Dealers" : "Total Database"} value={totalProjects}  icon={FolderOpen}   color="blue"    sub={`${liveProjects} active records`} />
+                <MetricBox label="Live Projects"  value={liveProjects}   icon={Activity}     color="amber"   sub="Excluding completed and lost" />
                 <MetricBox label="Completed"      value={completedCount} icon={CheckCircle2} color="emerald" sub="Fully commissioned" />
+                <MetricBox label="Lost Projects" value={metrics.lostCount ?? stageCounts['LOST PROJECT'] ?? 0} icon={XCircle} color="rose" sub="Projects marked lost" />
             </div>
 
             {/* Financial Analytics */}

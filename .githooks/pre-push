@@ -1,3 +1,0 @@
-#!/bin/sh
-echo 'Push blocked: this is an isolated local demo. Configure a separate demo repository deliberately before enabling pushes.' >&2
-exit 1

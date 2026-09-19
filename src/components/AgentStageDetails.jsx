@@ -1,5 +1,6 @@
-import { ClipboardList, Eye, Download } from 'lucide-react';
+import { ClipboardList, Eye, Download, Phone } from 'lucide-react';
 import { STAGE_IDS } from '../constants';
+import { getTelephoneHref } from '../utils';
 
 const STAGE_FIELDS = {
     [STAGE_IDS.LEADS]: [
@@ -154,7 +155,18 @@ export default function AgentStageDetails({ stage, customer, bom, bomItems = [],
                     <div key={label} className="grid grid-cols-[minmax(110px,0.8fr)_minmax(0,1.2fr)] gap-3 py-2 items-center">
                         <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide leading-tight">{label}</span>
                         <div className="flex flex-col items-end gap-1.5">
-                            <span className="font-semibold text-stone-900 whitespace-pre-line break-words text-right">{value}</span>
+                            {label.toLowerCase().includes('phone') && getTelephoneHref(value) ? (
+                                <a
+                                    href={getTelephoneHref(value)}
+                                    className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                    title={`Click to call ${value}`}
+                                >
+                                    <Phone size={11} className="text-emerald-500 flex-shrink-0" />
+                                    <span>{value}</span>
+                                </a>
+                            ) : (
+                                <span className="font-semibold text-stone-900 whitespace-pre-line break-words text-right">{value}</span>
+                            )}
                             {relatedDocs && relatedDocs.length > 0 && (
                                 <div className="flex gap-1.5 flex-wrap justify-end">
                                     {relatedDocs.map(doc => (

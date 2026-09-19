@@ -55,3 +55,12 @@ test('unknown stored versions fail closed and module roles are explicit',() => {
     for(const userType of ['agent','agent2','admin','sales']) assert.equal(canUseQuotations({userType}),true);
     for(const userType of ['vendor','stamp','office2',undefined]) assert.equal(canUseQuotations({userType}),false);
 });
+
+test('uploaded quotation artwork survives saved draft and PDF document reconstruction', () => {
+    const template = freshTemplate();
+    template.assets = { demoQualityLogoUrl:'data:image/png;base64,Z2VkYQ==', demoEnergyLogoUrl:'data:image/png;base64,ZW1ibGVt', demoBannerUrl:'data:image/png;base64,YmFubmVy' };
+    const row = { ...payload(complete(),template), quotation_no:51 };
+    assert.deepEqual(documentFor(row).assets,template.assets);
+    const reopened = payload(fromRow(row,user),row.quotation_data.template);
+    assert.deepEqual(documentFor(reopened).assets,template.assets);
+});

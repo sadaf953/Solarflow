@@ -1,6 +1,6 @@
 import React from 'react';
 import { User, ClipboardList, Edit3, X } from 'lucide-react';
-import { SectionHeader, EditableDetailItem, CheckboxRemarkItem } from './shared';
+import { SectionHeader, EditableDetailItem, CheckboxRemarkItem, ChecklistModeToggle } from './shared';
 import { useGlobalPopup } from '../GlobalPopup';
 import { calculateSystemCapacityKwp } from '../../utils/capacity';
 
@@ -83,23 +83,25 @@ export default function LeadsTab({
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <EditableDetailItem label="Customer Name *" field="customer_name" value={editData.customer_name} onChange={handleChange} isEditing={editingSection === 'cus'} />
                     <EditableDetailItem label="Phone Number *" field="phone_number" value={editData.phone_number} onChange={handleChange} type="number" isEditing={editingSection === 'cus'} />
-                    <EditableDetailItem label="Email Address *" field="email_address" value={editData.email_address || editData.email_address} onChange={handleChange} isEditing={editingSection === 'cus'} />
-                    <EditableDetailItem label="Consumer No *" field="consumer_no" value={editData.consumer_no} onChange={handleChange} type="number" isEditing={editingSection === 'cus'} />
-                    <EditableDetailItem label="Villages *" field="villages" value={editData.villages} onChange={handleChange} isEditing={editingSection === 'cus'} />
+                    <EditableDetailItem label="Email Address" field="email_address" value={editData.email_address || editData.email_address} onChange={handleChange} isEditing={editingSection === 'cus'} />
+                    <EditableDetailItem label="Consumer No" field="consumer_no" value={editData.consumer_no} onChange={handleChange} type="number" isEditing={editingSection === 'cus'} />
+                    <EditableDetailItem label="Villages" field="villages" value={editData.villages} onChange={handleChange} isEditing={editingSection === 'cus'} />
                     <div className="col-span-2 md:col-span-3">
                         <EditableDetailItem label="Full Address" field="full_address" value={editData.full_address} onChange={handleChange} type="textarea" isEditing={editingSection === 'cus'} />
                     </div>
                     <EditableDetailItem label="Pincode" field="pincode" value={editData.pincode} onChange={(field, value) => handleChange(field, String(value || '').replace(/\D/g, '').slice(0, 6))} isEditing={editingSection === 'cus'} />
-                    <EditableDetailItem label="Tehsil / Sub Division *" field="sub_divisions" value={editData.sub_divisions} onChange={handleChange} isEditing={editingSection === 'cus'} />
-                    <EditableDetailItem label="District *" field="district" value={editData.district} onChange={handleChange} isEditing={editingSection === 'cus'} />
+                    <EditableDetailItem label="Tehsil / Sub Division" field="sub_divisions" value={editData.sub_divisions} onChange={handleChange} isEditing={editingSection === 'cus'} />
+                    <EditableDetailItem label="District" field="district" value={editData.district} onChange={handleChange} isEditing={editingSection === 'cus'} />
                     {String(editData.payment_type || '').trim().toLowerCase() === 'loan' && (
                         <>
                             <EditableDetailItem label="Bank Name" field="bank_name" value={editData.bank_name} onChange={handleChange} isEditing={editingSection === 'cus'} />
                             <EditableDetailItem label="Bank Branch" field="bank_branch" value={editData.bank_branch} onChange={handleChange} isEditing={editingSection === 'cus'} />
                         </>
                     )}
+                    <EditableDetailItem label="Google Drive Link" field="google_drive_link" value={editData.google_drive_link} onChange={handleChange} isEditing={editingSection === 'cus'} />
+                    <EditableDetailItem label="Site Location Link" field="location_link" value={editData.location_link} onChange={handleChange} isEditing={editingSection === 'cus'} />
                     <EditableDetailItem
-                        label="Channel Partner Name *"
+                        label="Channel Partner Name"
                         field="channel_partner"
                         value={isChannelPartnerManager ? managerCpoName : editData.channel_partner}
                         onChange={handleChange}
@@ -120,10 +122,10 @@ export default function LeadsTab({
                         isEditing={!isAgent2 && editingSection === 'cus'}
                         options={subAgents}
                     />
-                    <EditableDetailItem label="MODULE BRAND *" field="module_brand" value={editData.module_brand} onChange={handleChange} options={meta['module_brand']} category="module_brand" isEditing={editingSection === 'cus'} user={user} />
-                    <EditableDetailItem label="MODULE WP *" field="module_wp" value={editData.module_wp} onChange={handleChange} options={meta['module_wp'] && meta['module_wp'].length > 0 ? meta['module_wp'] : ['540', '545', '550', '570', '575', '580', '585', '590', '600', '610', '615', '620']} category="module_wp" isEditing={editingSection === 'cus'} user={user} />
-                    <EditableDetailItem label="No of Modules *" field="no_of_modules" value={editData.no_of_modules} onChange={handleChange} type="number" isEditing={editingSection === 'cus'} />
-                    <EditableDetailItem label="System Capacity (kWp) *" field="system_capacity_kwp" value={editData.system_capacity_kwp} onChange={handleChange} isEditing={editingSection === 'cus'} onAutoCalc={autoCalcCapacity} />
+                    <EditableDetailItem label="MODULE BRAND" field="module_brand" value={editData.module_brand} onChange={handleChange} options={meta['module_brand']} category="module_brand" isEditing={editingSection === 'cus'} user={user} />
+                    <EditableDetailItem label="MODULE WP" field="module_wp" value={editData.module_wp} onChange={handleChange} options={meta['module_wp'] && meta['module_wp'].length > 0 ? meta['module_wp'] : ['540', '545', '550', '570', '575', '580', '585', '590', '600', '610', '615', '620']} category="module_wp" isEditing={editingSection === 'cus'} user={user} />
+                    <EditableDetailItem label="No of Modules" field="no_of_modules" value={editData.no_of_modules} onChange={handleChange} type="number" isEditing={editingSection === 'cus'} />
+                    <EditableDetailItem label="System Capacity (kWp)" field="system_capacity_kwp" value={editData.system_capacity_kwp} onChange={handleChange} isEditing={editingSection === 'cus'} onAutoCalc={autoCalcCapacity} />
                     {editData.created_at && (
                         <div className="p-2.5 rounded-xl border border-stone-200 bg-stone-50 flex flex-col justify-center">
                             <span className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">Lead Generated (IST)</span>
@@ -137,15 +139,19 @@ export default function LeadsTab({
 
             {/* Document Checklist */}
             <section id="section-reg_checklist">
-                <div className="flex items-center justify-between mb-3 border-b border-stone-100 pb-1.5 mt-4">
-                    <h3 className="text-[9px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-2">
-                        <ClipboardList size={12} /> Document Checklist
+                <div className="flex flex-wrap items-center justify-between mb-3 border-b border-stone-100 pb-2 mt-4 gap-2">
+                    <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-widest flex items-center gap-2">
+                        <ClipboardList size={13} className="text-amber-500" /> Document Checklist
                     </h3>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">Mode:</span>
+                        <ChecklistModeToggle />
+                    </div>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm space-y-4">
                     {/* Payment Type Selection at the top */}
                     <div className="pb-3 border-b border-stone-100">
-                        <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Payment Type Selection <span className="text-red-500">*</span></label>
+                        <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Payment Type Selection</label>
                         {isEditable ? (
                             (() => {
                                 // Stored values are title-cased ('Cash'/'Loan') but these

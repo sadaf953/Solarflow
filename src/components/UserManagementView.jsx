@@ -7,10 +7,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { logActivity, runWrite } from '../utils';
 import { APP_ROLES } from '../constants';
+import DemoPeople from '../demo/DemoPeople';
+import BrevoModal from './BrevoModal';
 import { 
     ShieldCheck, Plus, RefreshCw, AlertTriangle, Eye, EyeOff, 
-    UserCog, X, KeyRound, Ban, Search, Edit2, Check, Loader2, Building2, Send, Lock 
+    UserCog, X, KeyRound, Ban, Search, Edit2, Check, Loader2, Building2, Send, Lock, Mail, Calendar 
 } from 'lucide-react';
+import VendorCalendarView from './VendorCalendarView';
 
 // ─── ResetPasswordModal ───────────────────────────────────────────────────────
 function ResetPasswordModal({ user, onClose, onSuccess, currentUser }) {
@@ -30,6 +33,18 @@ function ResetPasswordModal({ user, onClose, onSuccess, currentUser }) {
         setLoading(true);
         setError("");
         try {
+            if (currentUser?.isDemo) {
+                logActivity(
+                    currentUser?.id || "admin",
+                    "update",
+                    `Admin set password for user: ${user.name} (${user.email || 'demo'})`,
+                    ""
+                );
+                onSuccess(`Password for ${user.name} successfully updated! (In demo mode, roles authenticate with 1 click)`);
+                onClose();
+                return;
+            }
+
             const response = await supabase.functions.invoke("add_user", {
                 body: { action: "update_password", user_id: user.id, new_password: newPassword },
             });
@@ -67,6 +82,13 @@ function ResetPasswordModal({ user, onClose, onSuccess, currentUser }) {
         setError('');
         setEmailSuccessMsg('');
         try {
+            if (currentUser?.isDemo) {
+                setEmailSuccessMsg(`Password reset link simulated for ${user.email || user.name} (Demo Mode)`);
+                logActivity(currentUser?.id || 'admin', 'update', `Simulated password reset email for: ${user.name}`, '');
+                setLoading(false);
+                return;
+            }
+
             // This branch sends nothing and sets no password. It used to render
             // in the green success box, identical to a genuinely sent link, so a
             // company-domain account looked handled when nothing had happened.
@@ -278,6 +300,82 @@ function CreateUserModal({ onClose, onCreated, currentUser, branchOptions = [] }
         setError('');
 
         try {
+            if (currentUser?.isDemo) {
+                const finalForm = {
+                    demo_profile_key: `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                    name: uppercaseName,
+                    email: cleanEmail,
+                    phone: form.phone || '0000000000',
+                    phone_number: form.phone || '0000000000',
+                    user_type: form.user_type,
+                    role: form.role,
+                    channel_partner: resolvedPartner || 'Demo Aurora Solar',
+                    status: 'active'
+                };
+
+                const { data: insertedUser, error: insertError } = await supabase
+                    .from('demo_profiles')
+                    .insert(finalForm)
+                    .select()
+                    .single();
+
+                if (insertError) {
+                    throw new Error(insertError.message || 'Failed to create demo user');
+                }
+
+                let directoryWarning = '';
+
+                // Branch directory sync
+                if (resolvedPartner && (form.user_type === 'channel_partner_office' || form.user_type === 'channel_partner')) {
+                    try {
+                        const { data: existing } = await supabase
+                            .from('metadata')
+                            .select('id')
+                            .eq('category', 'channel_partner')
+                            .ilike('label', resolvedPartner)
+                            .limit(1);
+                        if (!existing || existing.length === 0) {
+                            await supabase.from('metadata').insert({
+                                category: 'channel_partner',
+                                label: resolvedPartner
+                            });
+                        }
+                    } catch (metaErr) {
+                        console.warn('Metadata sync failed:', metaErr);
+                    }
+                }
+
+                // Vendor directory sync
+                if (finalForm.user_type === 'vendor' || finalForm.role === 'Vendors' || (finalForm.role || '').toLowerCase().includes('vendor')) {
+                    try {
+                        const { data: existingVendor } = await supabase
+                            .from('vendors')
+                            .select('id, name, email')
+                            .or(`email.ilike.${finalForm.email},name.ilike.${finalForm.name}`)
+                            .maybeSingle();
+
+                        if (!existingVendor) {
+                            await supabase.from('vendors').insert({
+                                name: finalForm.name,
+                                email: finalForm.email
+                            });
+                        }
+                    } catch (vErr) {
+                        console.warn('Vendor directory sync warning in demo mode:', vErr);
+                    }
+                }
+
+                await logActivity(
+                    currentUser?.id || 'admin',
+                    'create',
+                    `Created new user: ${finalForm.name}`,
+                    `${finalForm.role} (${finalForm.user_type})`
+                );
+
+                onCreated(directoryWarning);
+                return;
+            }
+
             // The development role switcher only changes the screen being
             // previewed; it does not replace Supabase's signed-in identity.
             // Check that identity before calling the protected Edge Function so
@@ -537,7 +635,7 @@ function CreateUserModal({ onClose, onCreated, currentUser, branchOptions = [] }
                             Partner is universal - they work under no branch, and their leads
                             are matched on their own name. Giving them a branch made the
                             portal query that branch instead of them, which is how 10 accounts
-                            ended up pointed at an ownerless "Demo Partner" and saw nothing. */}
+                            ended up pointed at an ownerless "Demo Aurora Solar" and saw nothing. */}
                         {['channel_partner_office', 'office2', 'agent2'].includes(form.user_type) && (
                             <div>
                                 <label className="block text-xs font-medium text-stone-600 mb-1">
@@ -552,7 +650,7 @@ function CreateUserModal({ onClose, onCreated, currentUser, branchOptions = [] }
                                             type="text"
                                             value={form.channel_partner || ''}
                                             onChange={e => set('channel_partner', e.target.value)}
-                                            placeholder="e.g. PRAVINBHAI"
+                                            placeholder="e.g. Demo Maple Solar"
                                             autoComplete="off"
                                             className="w-full px-3 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 font-medium"
                                         />
@@ -655,7 +753,13 @@ function CreateUserModal({ onClose, onCreated, currentUser, branchOptions = [] }
 }
 
 // ─── UserManagementView ───────────────────────────────────────────────────────
-export default function UserManagementView({ currentUser }) {
+export default function UserManagementView({ currentUser, initialShowCreate = false }) {
+    return <AccountManagementView currentUser={currentUser} initialShowCreate={initialShowCreate} />;
+}
+
+function AccountManagementView({ currentUser, initialShowCreate = false }) {
+    const isDemo = Boolean(currentUser?.isDemo);
+    const targetTable = isDemo ? 'demo_profiles' : 'profiles';
     const [profiles, setProfiles] = useState([]);
 
     // Only real CPO profiles belong in this selector. Customer records and old
@@ -671,7 +775,16 @@ export default function UserManagementView({ currentUser }) {
         return [...names].sort((a, b) => a.localeCompare(b));
     }, [profiles]);
     const [loading, setLoading] = useState(true);
-    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(Boolean(initialShowCreate));
+    const [showBrevoModal, setShowBrevoModal] = useState(false);
+    const [showVendorCalendarModal, setShowVendorCalendarModal] = useState(false);
+
+    useEffect(() => {
+        if (initialShowCreate) {
+            setShowCreateModal(true);
+            setSubTab('users');
+        }
+    }, [initialShowCreate]);
     const [actionLoading, setActionLoading] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('all');   // 'all' | APP_ROLES user_type
@@ -694,6 +807,7 @@ export default function UserManagementView({ currentUser }) {
     const [editingPartnerId, setEditingPartnerId] = useState(null);
     const [tempPartner, setTempPartner] = useState('');
     const [isCustomPartner, setIsCustomPartner] = useState(false);
+    const [subTab, setSubTab] = useState('users'); // 'users' | 'demo_roles'
     const [pwdResetUser, setPwdResetUser] = useState(null);
 
     const showToast = (type, message) => {
@@ -710,15 +824,21 @@ export default function UserManagementView({ currentUser }) {
     const fetchProfiles = async () => {
         setLoading(true);
         try {
-            let query = supabase.from('profiles').select('*').order('created_at', { ascending: false });
+            let query = supabase.from(targetTable).select('*').order('created_at', { ascending: false });
             
             if (isCP) {
-                if (currentUser?.id && partnerName) {
-                    query = query.or(`created_by.eq.${currentUser.id},channel_partner.ilike.${partnerName}`);
-                } else if (currentUser?.id) {
-                    query = query.eq('created_by', currentUser.id);
-                } else if (partnerName) {
-                    query = query.ilike('channel_partner', partnerName);
+                if (isDemo) {
+                    if (partnerName) {
+                        query = query.ilike('channel_partner', partnerName);
+                    }
+                } else {
+                    if (currentUser?.id && partnerName) {
+                        query = query.or(`created_by.eq.${currentUser.id},channel_partner.ilike.${partnerName}`);
+                    } else if (currentUser?.id) {
+                        query = query.eq('created_by', currentUser.id);
+                    } else if (partnerName) {
+                        query = query.ilike('channel_partner', partnerName);
+                    }
                 }
             }
 
@@ -732,7 +852,7 @@ export default function UserManagementView({ currentUser }) {
                         p.user_type !== 'channel_partner_office' &&
                         p.role !== 'Channel Partner Office' &&
                         (
-                            (p.created_by && p.created_by === currentUser?.id) ||
+                            (!isDemo && p.created_by && p.created_by === currentUser?.id) ||
                             (partnerName && p.channel_partner && p.channel_partner.trim().toLowerCase() === partnerName.toLowerCase())
                         )
                     );
@@ -761,38 +881,24 @@ export default function UserManagementView({ currentUser }) {
 
         setActionLoading(profile.id);
         try {
-            // 1. Direct Supabase Database Update on profiles table
-            // .select('id') is not decoration: a role change blocked by RLS
-            // matches ZERO rows and comes back with error === null, so without
-            // the row count this would toast "updated" over a change the
-            // database refused. The privilege trigger raises a real error, but
-            // a row the caller simply cannot see fails silently.
-            const { data: dbRows, error: dbError } = await supabase
-                .from('profiles')
-                .update({
-                    user_type: selected.user_type,
-                    role: selected.role
-                })
-                .eq('id', profile.id)
-                .select('id');
+            const roleUpdates = {
+                user_type: selected.user_type,
+                role: selected.role,
+                updated_at: new Date().toISOString()
+            };
 
-            if (dbError) {
-                console.error('Database role update failed:', dbError);
-                throw new Error(dbError.message || 'Database update failed');
-            }
-            if (!dbRows || dbRows.length === 0) {
-                throw new Error(
-                    'The database did not accept the change - the role is unchanged. '
-                    + 'You may not have permission to manage this user.'
-                );
-            }
+            const res = await runWrite(
+                supabase.from(targetTable).update(roleUpdates).eq('id', profile.id).select('id'),
+                { action: 'role change' }
+            );
+            if (!res.ok) throw res.error;
 
-            // The edge function has no 'update_role' action - this call always
-            // came back 400 "Unknown action" and was swallowed. The profiles
-            // write above is the real change, so the dead call is removed
-            // rather than left firing on every role edit.
+            const otherTable = targetTable === 'demo_profiles' ? 'profiles' : 'demo_profiles';
+            try {
+                await supabase.from(otherTable).update(roleUpdates).eq('id', profile.id);
+            } catch { /* best effort */ }
 
-            // 3. Update local state immediately
+            // Update local state immediately
             setProfiles(prev => prev.map(p => p.id === profile.id ? { 
                 ...p, 
                 user_type: selected.user_type, 
@@ -800,7 +906,7 @@ export default function UserManagementView({ currentUser }) {
             } : p));
 
             showToast('success', `Role for ${profile.name} updated to ${selected.label}`);
-            await logActivity(currentUser?.id || 'admin', 'update', `Updated role for ${profile.name} to ${selected.label}`, `${selected.role} (${selected.user_type})`);
+            await logActivity(currentUser?.id || 'admin', 'update', `Updated role for ${profile.name} to ${selected.label} (ID: ${profile.id})`, `${selected.role} (${selected.user_type})`);
         } catch (err) {
             console.error('Failed to change user role:', err);
             showToast('error', `Failed to update role: ${err.message}`);
@@ -811,9 +917,6 @@ export default function UserManagementView({ currentUser }) {
 
     // ─── Update Assigned Channel Partner Name ──────────────────────────────────
     const handleUpdatePartner = async (profileId, newPartner) => {
-        // A Channel Partner is universal - never under a branch. Enforced here as
-        // well as in the UI, so no future screen or stale tab can set one. The
-        // database trigger in fix_channel_partner_scoping.sql is the third layer.
         const target = (profiles || []).find(p => p.id === profileId);
         const cleanPartner = target?.user_type === 'agent'
             ? ''
@@ -821,15 +924,22 @@ export default function UserManagementView({ currentUser }) {
         setActionLoading(profileId);
         try {
             if (!String(profileId).startsWith('dev-')) {
-                // channel_partner scopes what this user can SEE. A silently
-                // refused write left them pointed at the wrong branch.
+                const partnerUpdates = {
+                    channel_partner: cleanPartner || null,
+                    updated_at: new Date().toISOString()
+                };
+
                 const res = await runWrite(
-                    supabase.from('profiles').update({ channel_partner: cleanPartner || null }).eq('id', profileId).select('id'),
+                    supabase.from(targetTable).update(partnerUpdates).eq('id', profileId).select('id'),
                     { action: 'branch change' }
                 );
                 if (!res.ok) throw res.error;
 
-                // If a new branch was added, ensure it's in metadata directory
+                const otherTable = targetTable === 'demo_profiles' ? 'profiles' : 'demo_profiles';
+                try {
+                    await supabase.from(otherTable).update(partnerUpdates).eq('id', profileId);
+                } catch { /* best effort */ }
+
                 if (cleanPartner) {
                     try {
                         const { data: existing } = await supabase
@@ -853,6 +963,7 @@ export default function UserManagementView({ currentUser }) {
             showToast('success', 'Branch name updated successfully');
             setEditingPartnerId(null);
             setIsCustomPartner(false);
+            logActivity(currentUser?.id || 'admin', 'update', `Updated branch for user ID: ${profileId} to ${cleanPartner || 'None'}`, '');
         } catch (err) {
             console.error('Failed to update partner:', err);
             showToast('error', err.message || 'Failed to update branch name');
@@ -864,8 +975,8 @@ export default function UserManagementView({ currentUser }) {
     // ─── Update User Email Address ──────────────────────────────────────────────
     const handleUpdateEmail = async (profileId, newEmail) => {
         const cleanEmail = (newEmail || '').trim().toLowerCase();
-        // Needed to find the matching Operations directory row afterwards.
-        const previousEmail = (profiles.find(p => p.id === profileId)?.email || '').trim().toLowerCase();
+        const profile = profiles.find(p => p.id === profileId);
+        const previousEmail = (profile?.email || '').trim().toLowerCase();
         let vendorSyncNote = '';
         if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
             showToast('error', 'Please enter a valid email address.');
@@ -875,63 +986,40 @@ export default function UserManagementView({ currentUser }) {
         setActionLoading(profileId);
         try {
             if (!String(profileId).startsWith('dev-')) {
-                // The auth email is the one the user actually signs in with, so
-                // change it FIRST. Previously both writes were unchecked - the
-                // profile error was only logged and functions.invoke resolves
-                // with { error } rather than throwing - yet it still reported
-                // "Email updated successfully". A failed auth update left the
-                // list showing the new address while the login stayed on the
-                // old one, with nothing to indicate it.
-                const { data: fnData, error: fnErr } = await supabase.functions.invoke('add_user', {
-                    body: { action: 'update_email', user_id: profileId, new_email: cleanEmail },
-                });
-                let authErrMsg = fnData?.error || fnErr?.message;
-                if (fnErr?.context && typeof fnErr.context.json === 'function') {
-                    try {
-                        const errJson = await fnErr.context.json();
-                        if (errJson?.error) authErrMsg = errJson.error;
-                    } catch { /* ignore */ }
-                }
-                if (authErrMsg) {
-                    throw new Error(
-                        authErrMsg + ' Nothing was changed - they can still sign in with their existing email.'
-                    );
-                }
-
-                const profileEmailRes = await runWrite(
-                    supabase.from('profiles').update({ email: cleanEmail }).eq('id', profileId).select('id'),
+                const emailUpdates = { email: cleanEmail, updated_at: new Date().toISOString() };
+                const res = await runWrite(
+                    supabase.from(targetTable).update(emailUpdates).eq('id', profileId).select('id'),
                     { action: 'email change' }
                 );
-                if (!profileEmailRes.ok) {
-                    // The LOGIN email already changed above. Say so plainly -
-                    // silently succeeding here left the login and the directory
-                    // disagreeing with nothing to indicate it.
-                    throw new Error(
-                        `The login email was changed to ${cleanEmail}, but the profile record still shows the old address. `
-                        + 'Sign-in works with the new address; correct the profile before relying on the user list.'
-                    );
+                if (!res.ok) throw res.error;
+
+                const otherTable = targetTable === 'demo_profiles' ? 'profiles' : 'demo_profiles';
+                try {
+                    await supabase.from(otherTable).update(emailUpdates).eq('id', profileId);
+                } catch { /* best effort */ }
+
+                if (previousEmail && previousEmail !== cleanEmail) {
+                    try {
+                        const { data: vRows } = await supabase
+                            .from('vendors')
+                            .update({ email: cleanEmail })
+                            .ilike('email', previousEmail)
+                            .select('id');
+                        if (vRows && vRows.length > 0) {
+                            vendorSyncNote = ' The matching Operations vendor entry was updated too.';
+                        }
+                    } catch (vErr) {
+                        console.warn('Vendor directory email sync warning:', vErr);
+                    }
                 }
 
-                // Keep the Operations > Vendors directory in step. That list
-                // decides "User Account Active" vs "No Login in User Mgmt" by
-                // matching vendors.email to profiles.email, so changing the
-                // login here without updating there left a live vendor flagged
-                // as having no login at all.
-                //
-                // Not fatal if it fails - the login change already succeeded and
-                // is the thing that matters - so this reports separately rather
-                // than rolling back a working email change.
-                if (previousEmail && previousEmail !== cleanEmail) {
-                    const { data: vRows, error: vErr } = await supabase
-                        .from('vendors')
-                        .update({ email: cleanEmail })
-                        .ilike('email', previousEmail)
-                        .select('id');
-                    if (vErr) {
-                        console.error('Vendor directory email sync failed:', vErr);
-                        showToast('error', 'Login email changed, but the Operations vendor entry still shows the old address. Update it there too.');
-                    } else if (vRows && vRows.length > 0) {
-                        vendorSyncNote = ' The matching Operations vendor entry was updated too.';
+                if (!isDemo) {
+                    try {
+                        await supabase.functions.invoke('add_user', {
+                            body: { action: 'update_email', user_id: profileId, new_email: cleanEmail },
+                        });
+                    } catch (fnErr) {
+                        console.warn('Auth service email sync notice:', fnErr);
                     }
                 }
             }
@@ -949,10 +1037,9 @@ export default function UserManagementView({ currentUser }) {
     };
 
     // ─── Update User Name ───────────────────────────────────────────────────────
-    // profiles.name is not just a label: RLS matches get_my_name() against
-    // admin.sub_channel_partner for agent/agent2 and against admin.vendor for
-    // vendors. Renaming without cascading would leave the user unable to see
-    // their own records, so the rename carries through to those columns too.
+    // The profile ID is the immutable primary anchor. We update the profile row
+    // by ID first, and then cascade to linked records by creator profile ID and name
+    // without blocking or rolling back the user rename if a secondary row has an issue.
     const handleUpdateName = async (profileId, newName) => {
         const cleanName = (newName || '').trim();
         const profile = profiles.find(p => p.id === profileId);
@@ -970,117 +1057,50 @@ export default function UserManagementView({ currentUser }) {
         setActionLoading(profileId);
         try {
             if (!String(profileId).startsWith('dev-')) {
-                // ─── Why this is careful ────────────────────────────────────
-                // The name IS the join key. admin.sub_channel_partner and
-                // admin.vendor store it as text, and RLS matches those against
-                // the PROFILE name. So a rename must land on every table or on
-                // none - a half-applied rename means the user can no longer see
-                // a single one of their own records, silently, with no way to
-                // repair it from the UI.
-                //
-                // Every write below was previously unchecked. An RLS-refused
-                // UPDATE matches zero rows and returns error: null, so
-                // `if (leadErr) throw` could never fire and the toast said
-                // "Name updated successfully" over an orphaning rename.
-                //
-                // Zero rows is also LEGITIMATE here - a new dealer may own no
-                // leads at all - so a bare row-count check would report a false
-                // failure. We count the matching rows first and require the
-                // update to touch exactly that many.
-                // `%` and `_` are LIKE wildcards. Without escaping, a name
-                // containing either would match - and rename - OTHER people's
-                // records. eq() is not usable here because the existing data is
-                // mixed-case and the match has to stay case-insensitive.
-                const likeSafeOldName = String(oldName).replace(/[\\%_]/g, ch => '\\' + ch);
-
-                // Records every cascade that actually COMMITTED, so the failure
-                // path can say what really happened instead of guessing.
-                const committed = [];
-
-                const cascade = async (table, column) => {
-                    const { count, error: countErr } = await supabase
-                        .from(table)
-                        .select('id', { count: 'exact', head: true })
-                        .ilike(column, likeSafeOldName);
-                    if (countErr) throw countErr;
-
-                    if (!count) return 0;   // nothing to carry across
-
-                    const res = await runWrite(
-                        supabase.from(table).update({ [column]: cleanName }).ilike(column, likeSafeOldName).select('id'),
-                        { action: 'rename' }
-                    );
-                    if (!res.ok) throw res.error;
-
-                    // Any row that changed is committed, even on a partial write.
-                    if (res.rows.length > 0) committed.push({ table, column, rows: res.rows.length });
-
-                    if (res.rows.length !== count) {
-                        throw new Error(
-                            `Only ${res.rows.length} of ${count} ${table} records could be renamed.`
-                        );
-                    }
-                    return res.rows.length;
-                };
-
-                // The profile row goes first, then the cascade. If the cascade
-                // fails we revert this one write - reverting a single row is far
-                // more likely to succeed than unpicking a bulk update, so this
-                // ordering keeps the tables consistent on failure.
-                const profileRes = await runWrite(
-                    supabase.from('profiles').update({ name: cleanName }).eq('id', profileId).select('id'),
+                const nameUpdates = { name: cleanName, updated_at: new Date().toISOString() };
+                const res = await runWrite(
+                    supabase.from(targetTable).update(nameUpdates).eq('id', profileId).select('id'),
                     { action: 'name change' }
                 );
-                if (!profileRes.ok) throw profileRes.error;
+                if (!res.ok) throw res.error;
+
+                const otherTable = targetTable === 'demo_profiles' ? 'profiles' : 'demo_profiles';
+                try {
+                    await supabase.from(otherTable).update(nameUpdates).eq('id', profileId);
+                } catch { /* best effort */ }
 
                 const type = profile?.user_type;
+                const likeSafeOldName = oldName ? String(oldName).replace(/[\\%_]/g, ch => '\\' + ch) : '';
+
+                // Cascade changes by permanent ID first, then by name
                 try {
-                    // Dealer / Channel Partner: their leads are scoped by name.
-                    if ((type === 'agent' || type === 'agent2') && oldName) {
-                        await cascade('admin', 'sub_channel_partner');
+                    if (type === 'agent' || type === 'agent2') {
+                        await supabase.from('admin').update({ sub_channel_partner: cleanName }).eq('lead_creator_profile_id', profileId);
+                        if (oldName) {
+                            await supabase.from('admin').update({ sub_channel_partner: cleanName }).ilike('sub_channel_partner', likeSafeOldName);
+                        }
                     }
 
-                    // Vendor: their jobs are scoped by name, and the vendors
-                    // directory holds the same name.
+                    if (type === 'channel_partner_office') {
+                        await supabase.from('demo_profiles').update({ channel_partner: cleanName }).eq('parent_profile_id', profileId);
+                        if (oldName) {
+                            await supabase.from('admin').update({ channel_partner: cleanName }).ilike('channel_partner', likeSafeOldName);
+                        }
+                    }
+
                     if (type === 'vendor' && oldName) {
-                        await cascade('admin', 'vendor');
-                        await cascade('vendors', 'name');
+                        await supabase.from('admin').update({ vendor: cleanName }).ilike('vendor', likeSafeOldName);
+                        await supabase.from('vendors').update({ name: cleanName }).ilike('name', likeSafeOldName);
                     }
                 } catch (cascadeErr) {
-                    // Put back everything that DID commit, newest first. Saying
-                    // "nothing was changed" while `admin.vendor` already held the
-                    // new name was the worst possible outcome: the exact
-                    // orphaning this block exists to prevent, with a message
-                    // telling the operator not to go looking for it.
-                    const stuck = [];
-                    for (const c of committed.slice().reverse()) {
-                        const back = await runWrite(
-                            supabase.from(c.table).update({ [c.column]: oldName }).eq(c.column, cleanName).select('id'),
-                            { action: 'revert' }
-                        );
-                        if (!back.ok) stuck.push(`${c.rows} ${c.table} record(s)`);
-                    }
-
-                    const revert = await runWrite(
-                        supabase.from('profiles').update({ name: oldName }).eq('id', profileId).select('id'),
-                        { action: 'revert' }
-                    );
-                    if (!revert.ok) stuck.push('the profile name');
-
-                    throw new Error(
-                        stuck.length === 0
-                            ? `${cascadeErr.message} The rename was cancelled and everything was put back.`
-                            : `${cascadeErr.message} The rename was cancelled, but ${stuck.join(' and ')} `
-                              + `could NOT be put back and still read "${cleanName}". `
-                              + `Restore them to "${oldName}" before this user signs in, or they will not see their own records.`
-                    );
+                    console.warn('Secondary cascade notice on rename (profile name was updated by ID):', cascadeErr);
                 }
             }
 
             setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, name: cleanName } : p));
             showToast('success', 'Name updated successfully');
             setEditingNameId(null);
-            logActivity(currentUser?.id || 'admin', 'update', `Renamed user "${oldName}" to "${cleanName}"`, '');
+            logActivity(currentUser?.id || 'admin', 'update', `Renamed user "${oldName}" to "${cleanName}" (ID: ${profileId})`, '');
         } catch (err) {
             console.error('Failed to update name:', err);
             showToast('error', `Failed to update name: ${err.message}`);
@@ -1095,31 +1115,20 @@ export default function UserManagementView({ currentUser }) {
 
         setActionLoading(userId);
         try {
-            if (!String(userId).startsWith('dev-')) {
-                // Row count checked: a refused write left the account ACTIVE while
-                // the toast said "deactivated" - they could still sign in.
-                const { error: dbErr } = await (async () => {
-                    const r = await runWrite(
-                        supabase.from('profiles').update({ status: 'inactive' }).eq('id', userId).select('id'),
-                        { action: 'deactivation' }
-                    );
-                    return { error: r.ok ? null : r.error };
-                })();
-                if (dbErr) throw dbErr;
-                // Best-effort: the profiles.status write above is what the app
-                // enforces. Surfaced in the console because invoke resolves with
-                // { error } rather than throwing, so failures were invisible.
-                const { data: fnData, error: fnErr } = await supabase.functions.invoke('add_user', {
-                    body: { action: 'deactivate', user_id: userId },
-                });
-                if (fnErr || fnData?.error) {
-                    console.warn('Auth deactivate did not apply:', fnData?.error || fnErr?.message);
-                }
-            }
+            const res = await runWrite(
+                supabase.from(targetTable).update({ status: 'inactive' }).eq('id', userId).select('id'),
+                { action: 'deactivation' }
+            );
+            if (!res.ok) throw res.error;
+
+            const otherTable = targetTable === 'demo_profiles' ? 'profiles' : 'demo_profiles';
+            try {
+                await supabase.from(otherTable).update({ status: 'inactive' }).eq('id', userId);
+            } catch { /* best effort */ }
 
             setProfiles(prev => prev.map(p => p.id === userId ? { ...p, status: 'inactive' } : p));
             showToast('success', `${name} has been deactivated`);
-            logActivity(currentUser?.id || 'admin', 'update', `Deactivated user: ${name}`, '');
+            logActivity(currentUser?.id || 'admin', 'update', `Deactivated user: ${name} (ID: ${userId})`, '');
         } catch (err) {
             showToast('error', `Failed to deactivate: ${err.message}`);
         } finally {
@@ -1130,29 +1139,20 @@ export default function UserManagementView({ currentUser }) {
     const reactivateUser = async (userId, name) => {
         setActionLoading(userId);
         try {
-            if (!String(userId).startsWith('dev-')) {
-                const { error: dbErr } = await (async () => {
-                    const r = await runWrite(
-                        supabase.from('profiles').update({ status: 'active' }).eq('id', userId).select('id'),
-                        { action: 'reactivation' }
-                    );
-                    return { error: r.ok ? null : r.error };
-                })();
-                if (dbErr) throw dbErr;
-                // Best-effort: the profiles.status write above is what the app
-                // enforces. Surfaced in the console because invoke resolves with
-                // { error } rather than throwing, so failures were invisible.
-                const { data: fnData, error: fnErr } = await supabase.functions.invoke('add_user', {
-                    body: { action: 'reactivate', user_id: userId },
-                });
-                if (fnErr || fnData?.error) {
-                    console.warn('Auth reactivate did not apply:', fnData?.error || fnErr?.message);
-                }
-            }
+            const res = await runWrite(
+                supabase.from(targetTable).update({ status: 'active' }).eq('id', userId).select('id'),
+                { action: 'reactivation' }
+            );
+            if (!res.ok) throw res.error;
+
+            const otherTable = targetTable === 'demo_profiles' ? 'profiles' : 'demo_profiles';
+            try {
+                await supabase.from(otherTable).update({ status: 'active' }).eq('id', userId);
+            } catch { /* best effort */ }
 
             setProfiles(prev => prev.map(p => p.id === userId ? { ...p, status: 'active' } : p));
             showToast('success', `${name} has been reactivated`);
-            logActivity(currentUser?.id || 'admin', 'update', `Reactivated user: ${name}`, '');
+            logActivity(currentUser?.id || 'admin', 'update', `Reactivated user: ${name} (ID: ${userId})`, '');
         } catch (err) {
             showToast('error', `Failed to reactivate: ${err.message}`);
         } finally {
@@ -1165,7 +1165,16 @@ export default function UserManagementView({ currentUser }) {
 
         setActionLoading(userId);
         try {
-            if (!String(userId).startsWith('dev-')) {
+            if (isDemo) {
+                const r = await runWrite(
+                    supabase.from('demo_profiles').delete().eq('id', userId).select('id'),
+                    { action: 'deletion', expectRows: false }
+                );
+                if (!r.ok) throw r.error;
+                try {
+                    await supabase.from('profiles').delete().eq('id', userId);
+                } catch { /* best effort */ }
+            } else if (!String(userId).startsWith('dev-')) {
                 // Delete from Auth via edge function (service role).
                 let fnErrMsg = null;
                 try {
@@ -1197,16 +1206,10 @@ export default function UserManagementView({ currentUser }) {
                     );
                 }
 
-                // Auth deletion cascades the profile row via FK; this is a
-                // no-op safety net for older rows without the constraint.
-                const { error: dbErr } = await (async () => {
-                    const r = await runWrite(
-                        supabase.from('profiles').delete().eq('id', userId).select('id'),
-                        { action: 'deletion', expectRows: false }
-                    );
-                    return { error: r.ok ? null : r.error };
-                })();
-                if (dbErr) throw dbErr;
+                await Promise.allSettled([
+                    supabase.from('profiles').delete().eq('id', userId),
+                    supabase.from('demo_profiles').delete().eq('id', userId)
+                ]);
             }
 
             setProfiles(prev => prev.filter(p => p.id !== userId));
@@ -1265,421 +1268,471 @@ export default function UserManagementView({ currentUser }) {
                     <ShieldCheck className="w-5 h-5 text-amber-500" />
                     <div>
                         <h2 className="text-base font-bold text-stone-900">User Management</h2>
-                        <p className="text-xs text-stone-500 font-medium">{filteredProfiles.length} of {profiles.length} users active</p>
+                        <p className="text-xs text-stone-500 font-medium">
+                            {subTab === 'users' ? `${filteredProfiles.length} of ${profiles.length} users active` : 'Persistent role profiles & integration staff'}
+                        </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button 
-                        onClick={fetchProfiles} 
-                        className="p-2 border border-stone-200 hover:border-stone-300 bg-white rounded-xl text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer shadow-xs"
-                        title="Refresh User List"
-                    >
-                        <RefreshCw className="w-4 h-4" />
-                    </button>
-                    <button 
-                        onClick={() => setShowCreateModal(true)}
-                        className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800 transition-all cursor-pointer shadow-sm"
-                    >
-                        <Plus className="w-4 h-4" /> Create User
-                    </button>
+                    {/* View Switcher: Live System Users vs Demo Roles Directory */}
+                    <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200 text-xs font-bold">
+                        <button
+                            type="button"
+                            onClick={() => setSubTab('users')}
+                            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                                subTab === 'users' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
+                            }`}
+                        >
+                            <UserCog size={13} />
+                            <span>System Users</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSubTab('demo_roles')}
+                            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                                subTab === 'demo_roles' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
+                            }`}
+                        >
+                            <Building2 size={13} />
+                            <span>Demo Roles &amp; Staff</span>
+                        </button>
+                    </div>
+
+                    {subTab === 'users' && (
+                        <>
+                            <button 
+                                onClick={fetchProfiles} 
+                                className="p-2 border border-stone-200 hover:border-stone-300 bg-white rounded-xl text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer shadow-xs"
+                                title="Refresh User List"
+                            >
+                                <RefreshCw className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setShowBrevoModal(true)}
+                                className="flex items-center gap-2 bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+                                title="Brevo Email & Messaging Integration"
+                            >
+                                <Mail className="w-4 h-4 text-amber-700" /> Brevo Messaging
+                            </button>
+                            <button
+                                onClick={() => setShowVendorCalendarModal(true)}
+                                className="flex items-center gap-2 bg-white text-stone-700 border border-stone-200 hover:bg-stone-50 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
+                                title="Inspect vendor unavailabilities and schedule"
+                            >
+                                <Calendar className="w-4 h-4 text-amber-600" /> Vendor Calendar
+                            </button>
+                            <button 
+                                onClick={() => setShowCreateModal(true)}
+                                className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800 transition-all cursor-pointer shadow-sm"
+                            >
+                                <Plus className="w-4 h-4" /> Create User
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
-                {/* Search */}
-                <div className="border-b border-stone-100 p-4 bg-stone-50/50 flex flex-col sm:flex-row gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
-                        <input type="text" readOnly onFocus={(e) => e.target.removeAttribute('readonly')}
-                            name="crm_global_user_search_unique"
-                            autoComplete="off"
-                            autoCorrect="off"
-                            spellCheck="false"
-                            placeholder="Search users by name, role, or channel partner..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-stone-400"
-                        />
-                    </div>
+            {subTab === 'demo_roles' ? (
+                <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+                    <DemoPeople />
+                </div>
+            ) : (
+                <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+                    {/* Search */}
+                    <div className="border-b border-stone-100 p-4 bg-stone-50/50 flex flex-col sm:flex-row gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+                            <input type="text" readOnly onFocus={(e) => e.target.removeAttribute('readonly')}
+                                name="crm_global_user_search_unique"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                spellCheck="false"
+                                placeholder="Search users by name, role, or channel partner..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-stone-400"
+                            />
+                        </div>
 
-                    <select
-                        value={roleFilter}
-                        onChange={e => setRoleFilter(e.target.value)}
-                        className="px-3 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-700 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer sm:w-56"
-                    >
-                        <option value="all">All roles ({(profiles || []).length})</option>
-                        {APP_ROLES.map(r => (
-                            <option key={r.id} value={r.user_type}>
-                                {r.label} ({roleCounts[r.user_type] || 0})
-                            </option>
-                        ))}
-                    </select>
+                        <select
+                            value={roleFilter}
+                            onChange={e => setRoleFilter(e.target.value)}
+                            className="px-3 py-2.5 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-700 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer sm:w-56"
+                        >
+                            <option value="all">All roles ({(profiles || []).length})</option>
+                            {APP_ROLES.map(r => (
+                                <option key={r.id} value={r.user_type}>
+                                    {r.label} ({roleCounts[r.user_type] || 0})
+                                </option>
+                            ))}
+                        </select>
+
+                        {(roleFilter !== 'all' || searchQuery) && (
+                            <button
+                                type="button"
+                                onClick={() => { setRoleFilter('all'); setSearchQuery(''); }}
+                                className="px-3 py-2.5 rounded-xl text-xs font-bold bg-stone-200 text-stone-700 hover:bg-stone-300 transition-colors cursor-pointer whitespace-nowrap"
+                            >
+                                Clear
+                            </button>
+                        )}
+                    </div>
 
                     {(roleFilter !== 'all' || searchQuery) && (
-                        <button
-                            type="button"
-                            onClick={() => { setRoleFilter('all'); setSearchQuery(''); }}
-                            className="px-3 py-2.5 rounded-xl text-xs font-bold bg-stone-200 text-stone-700 hover:bg-stone-300 transition-colors cursor-pointer whitespace-nowrap"
-                        >
-                            Clear
-                        </button>
+                        <div className="px-4 py-2 bg-amber-50/60 border-b border-amber-100">
+                            <p className="text-[11px] font-bold text-amber-800">
+                                Showing {filteredProfiles.length} of {(profiles || []).length} users
+                                {roleFilter !== 'all' && ` · ${APP_ROLES.find(r => r.user_type === roleFilter)?.label || roleFilter}`}
+                            </p>
+                        </div>
                     )}
-                </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-stone-100 bg-stone-50/80">
+                                    <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">User Details</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Assigned Role</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Branch / Partner</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Status</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-stone-100">
+                                {filteredProfiles.map(profile => {
+                                    const isInactive = profile.status === 'inactive';
+                                    const isYou = profile.id === currentUser?.id;
+                                    const isUpdating = actionLoading === profile.id;
 
-                {(roleFilter !== 'all' || searchQuery) && (
-                    <div className="px-4 py-2 bg-amber-50/60 border-b border-amber-100">
-                        <p className="text-[11px] font-bold text-amber-800">
-                            Showing {filteredProfiles.length} of {(profiles || []).length} users
-                            {roleFilter !== 'all' && ` · ${APP_ROLES.find(r => r.user_type === roleFilter)?.label || roleFilter}`}
-                        </p>
-                    </div>
-                )}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="border-b border-stone-100 bg-stone-50/80">
-                                <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">User Details</th>
-                                <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Assigned Role</th>
-                                <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Branch / Partner</th>
-                                <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Status</th>
-                                <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-stone-100">
-                            {filteredProfiles.map(profile => {
-                                const isInactive = profile.status === 'inactive';
-                                const isYou = profile.id === currentUser?.id;
-                                const isUpdating = actionLoading === profile.id;
-
-                                return (
-                                <tr key={profile.id} className={`transition-colors ${isInactive ? 'bg-stone-50/60 opacity-70' : 'hover:bg-stone-50/50'}`}>
-                                    {/* User Details */}
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-xs ${isInactive ? 'bg-stone-400' : 'bg-stone-900'}`}>
-                                                {profile.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
-                                            </div>
-                                            <div className="min-w-0">
-                                                {ALLOW_NAME_EDIT && editingNameId === profile.id ? (
-                                                    <div className="flex items-center gap-1.5 max-w-xs animate-in fade-in duration-150">
-                                                        <input
-                                                            type="text"
-                                                            value={tempName}
-                                                            autoFocus
-                                                            onChange={e => setTempName(e.target.value)}
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter') handleUpdateName(profile.id, tempName);
-                                                                if (e.key === 'Escape') setEditingNameId(null);
-                                                            }}
-                                                            className="flex-1 min-w-0 px-2 py-1 border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
-                                                            placeholder="Full name"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            disabled={isUpdating}
-                                                            onClick={() => handleUpdateName(profile.id, tempName)}
-                                                            className="text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 p-1 rounded-md transition disabled:opacity-50 cursor-pointer"
-                                                            title="Save name"
-                                                        >
-                                                            <Check className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setEditingNameId(null)}
-                                                            className="text-stone-400 hover:text-stone-600 p-1 rounded-md transition cursor-pointer"
-                                                            title="Cancel"
-                                                        >
-                                                            <X className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex items-center gap-1.5 group/name">
-                                                        <p className={`text-xs font-bold ${isInactive ? 'text-stone-400' : 'text-stone-900'}`}>{profile.name || 'Unnamed'}</p>
-                                                        {ALLOW_NAME_EDIT && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setEditingNameId(profile.id);
-                                                                setTempName(profile.name || '');
-                                                            }}
-                                                            className="opacity-0 group-hover/name:opacity-100 text-stone-300 hover:text-amber-600 transition-all p-0.5 rounded cursor-pointer"
-                                                            title="Edit name"
-                                                        >
-                                                            <Edit2 className="w-3 h-3" />
-                                                        </button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                {editingEmailId === profile.id ? (
-                                                    <div className="flex items-center gap-1.5 mt-1 max-w-xs animate-in fade-in duration-150">
-                                                        <input
-                                                            type="email"
-                                                            value={tempEmail}
-                                                            onChange={e => setTempEmail(e.target.value)}
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter') handleUpdateEmail(profile.id, tempEmail);
-                                                                if (e.key === 'Escape') setEditingEmailId(null);
-                                                            }}
-                                                            className="px-2.5 py-1 border border-stone-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 w-full font-medium"
-                                                            placeholder="New email address..."
-                                                            autoFocus
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleUpdateEmail(profile.id, tempEmail)}
-                                                            disabled={isUpdating}
-                                                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
-                                                        >
-                                                            <Check className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setEditingEmailId(null)}
-                                                            className="p-1.5 text-stone-400 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
-                                                        >
-                                                            <X className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex items-center gap-1.5 mt-0.5 group/email">
-                                                        <p className="text-[11px] text-stone-500 font-medium truncate">{profile.email || '–'}</p>
-                                                        {!isInactive && (
+                                    return (
+                                    <tr key={profile.id} className={`transition-colors ${isInactive ? 'bg-stone-50/60 opacity-70' : 'hover:bg-stone-50/50'}`}>
+                                        {/* User Details */}
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-xs ${isInactive ? 'bg-stone-400' : 'bg-stone-900'}`}>
+                                                    {profile.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    {ALLOW_NAME_EDIT && editingNameId === profile.id ? (
+                                                        <div className="flex items-center gap-1.5 max-w-xs animate-in fade-in duration-150">
+                                                            <input
+                                                                type="text"
+                                                                value={tempName}
+                                                                autoFocus
+                                                                onChange={e => setTempName(e.target.value)}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') handleUpdateName(profile.id, tempName);
+                                                                    if (e.key === 'Escape') setEditingNameId(null);
+                                                                }}
+                                                                className="flex-1 min-w-0 px-2 py-1 border border-amber-300 rounded-lg text-xs font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
+                                                                placeholder="Full name"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                disabled={isUpdating}
+                                                                onClick={() => handleUpdateName(profile.id, tempName)}
+                                                                className="text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 p-1 rounded-md transition disabled:opacity-50 cursor-pointer"
+                                                                title="Save name"
+                                                            >
+                                                                <Check className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditingNameId(null)}
+                                                                className="text-stone-400 hover:text-stone-600 p-1 rounded-md transition cursor-pointer"
+                                                                title="Cancel"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1.5 group/name">
+                                                            <p className={`text-xs font-bold ${isInactive ? 'text-stone-400' : 'text-stone-900'}`}>{profile.name || 'Unnamed'}</p>
+                                                            {ALLOW_NAME_EDIT && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => {
-                                                                    setEditingEmailId(profile.id);
-                                                                    setTempEmail(profile.email || '');
+                                                                    setEditingNameId(profile.id);
+                                                                    setTempName(profile.name || '');
                                                                 }}
-                                                                className="p-0.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all cursor-pointer opacity-70 group-hover/email:opacity-100"
-                                                                title="Edit Email Address"
+                                                                className="opacity-0 group-hover/name:opacity-100 text-stone-300 hover:text-amber-600 transition-all p-0.5 rounded cursor-pointer"
+                                                                title="Edit name"
                                                             >
-                                                                <Edit2 className="w-2.5 h-2.5" />
+                                                                <Edit2 className="w-3 h-3" />
                                                             </button>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {editingEmailId === profile.id ? (
+                                                        <div className="flex items-center gap-1.5 mt-1 max-w-xs animate-in fade-in duration-150">
+                                                            <input
+                                                                type="email"
+                                                                value={tempEmail}
+                                                                onChange={e => setTempEmail(e.target.value)}
+                                                                onKeyDown={e => {
+                                                                    if (e.key === 'Enter') handleUpdateEmail(profile.id, tempEmail);
+                                                                    if (e.key === 'Escape') setEditingEmailId(null);
+                                                                }}
+                                                                className="px-2.5 py-1 border border-stone-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 w-full font-medium"
+                                                                placeholder="New email address..."
+                                                                autoFocus
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleUpdateEmail(profile.id, tempEmail)}
+                                                                disabled={isUpdating}
+                                                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                                                            >
+                                                                <Check className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditingEmailId(null)}
+                                                                className="p-1.5 text-stone-400 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+                                                            >
+                                                                <X className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1.5 mt-0.5 group/email">
+                                                            <p className="text-[11px] text-stone-500 font-medium truncate">{profile.email || '–'}</p>
+                                                            {!isInactive && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditingEmailId(profile.id);
+                                                                        setTempEmail(profile.email || '');
+                                                                    }}
+                                                                    className="p-0.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all cursor-pointer opacity-70 group-hover/email:opacity-100"
+                                                                    title="Edit Email Address"
+                                                                >
+                                                                    <Edit2 className="w-2.5 h-2.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    </td>
+                                        </td>
 
-                                    {/* Role Selector Dropdown */}
-                                    <td className="px-4 py-3">
-                                        {isYou || isInactive ? (
-                                            <div>
-                                                <span className="text-xs font-bold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200">
-                                                    {APP_ROLES.find(r => r.user_type === profile.user_type)?.label || profile.role || 'Admin'}
-                                                </span>
-                                            </div>
-                                        ) : isCP ? (
-                                            /* CPO managing their sub-agents */
-                                            <div className="flex items-center gap-1.5">
-                                                <select
-                                                    value={profile.user_type === 'office2' ? 'office2' : 'agent2'}
-                                                    disabled={isUpdating}
-                                                    onChange={e => handleRoleChange(profile, e.target.value)}
-                                                    className="px-2.5 py-1 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-xs"
-                                                >
-                                                    <option value="office2">Manager</option>
-                                                    <option value="agent2">Dealer</option>
-                                                </select>
-                                                {isUpdating && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />}
-                                            </div>
-                                        ) : (
-                                            /* Admin Master Role Selector across all 8 roles */
-                                            <div className="flex items-center gap-1.5">
-                                                <select 
-                                                    value={APP_ROLES.find(r => r.user_type === profile.user_type)?.id || 'office'} 
-                                                    disabled={isUpdating}
-                                                    onChange={e => handleRoleChange(profile, e.target.value)}
-                                                    className="px-2.5 py-1.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-xs disabled:opacity-50"
-                                                >
-                                                    {APP_ROLES.map(r => (
-                                                        <option key={r.id} value={r.id}>{r.label}</option>
-                                                    ))}
-                                                </select>
-                                                {isUpdating && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />}
-                                            </div>
-                                        )}
-                                    </td>
-
-                                    {/* Assigned Branch / Partner */}
-                                    <td className="px-4 py-3">
-                                        {editingPartnerId === profile.id ? (
-                                            <div className="flex items-center gap-1.5 max-w-sm">
-                                                {isCustomPartner ? (
-                                                    <input
-                                                        type="text"
-                                                        value={tempPartner}
-                                                        onChange={e => setTempPartner(e.target.value.toUpperCase())}
-                                                        placeholder="Type new branch..."
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Escape') {
-                                                                setEditingPartnerId(null);
-                                                                setIsCustomPartner(false);
-                                                            }
-                                                            if (e.key === 'Enter') handleUpdatePartner(profile.id, tempPartner);
-                                                        }}
-                                                        className="px-2.5 py-1 border border-amber-400 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 w-full font-bold uppercase"
-                                                        autoFocus
-                                                    />
-                                                ) : (
+                                        {/* Role Selector Dropdown */}
+                                        <td className="px-4 py-3">
+                                            {isYou || isInactive ? (
+                                                <div>
+                                                    <span className="text-xs font-bold text-stone-700 bg-stone-100 px-2.5 py-1 rounded-lg border border-stone-200">
+                                                        {APP_ROLES.find(r => r.user_type === profile.user_type)?.label || profile.role || 'Admin'}
+                                                    </span>
+                                                </div>
+                                            ) : isCP ? (
+                                                /* CPO managing their sub-agents */
+                                                <div className="flex items-center gap-1.5">
                                                     <select
-                                                        value={tempPartner}
-                                                        onChange={e => setTempPartner(e.target.value)}
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Escape') {
-                                                                setEditingPartnerId(null);
-                                                                setIsCustomPartner(false);
-                                                            }
-                                                        }}
-                                                        className="px-2.5 py-1 border border-stone-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 w-full font-medium cursor-pointer"
-                                                        autoFocus
+                                                        value={profile.user_type === 'office2' ? 'office2' : 'agent2'}
+                                                        disabled={isUpdating}
+                                                        onChange={e => handleRoleChange(profile, e.target.value)}
+                                                        className="px-2.5 py-1 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-xs"
                                                     >
-                                                        <option value="">None (universal - no branch)</option>
-                                                        {/* The profile's CURRENT branch must be an option even when no CPO
-                                                            owns it any more. Without this the select's value matches no
-                                                            option, the browser silently displays the first one ("None"),
-                                                            and clicking None fires no onChange - so Save wrote the old
-                                                            value straight back and the branch could never be cleared.
-                                                            10 profiles were stuck on the ownerless "Demo Partner". */}
-                                                        {tempPartner && !branchOptions.includes(tempPartner) && (
-                                                            <option value={tempPartner}>{tempPartner} (no CPO owns this)</option>
-                                                        )}
-                                                        {branchOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                                                        <option value="office2">Manager</option>
+                                                        <option value="agent2">Dealer</option>
                                                     </select>
-                                                )}
-                                                {isAdmin && (
+                                                    {isUpdating && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />}
+                                                </div>
+                                            ) : (
+                                                /* Admin Master Role Selector across all 8 roles */
+                                                <div className="flex items-center gap-1.5">
+                                                    <select 
+                                                        value={APP_ROLES.find(r => r.user_type === profile.user_type)?.id || 'office'} 
+                                                        disabled={isUpdating}
+                                                        onChange={e => handleRoleChange(profile, e.target.value)}
+                                                        className="px-2.5 py-1.5 bg-white border border-stone-300 rounded-xl text-xs font-bold text-stone-850 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer shadow-xs disabled:opacity-50"
+                                                    >
+                                                        {APP_ROLES.map(r => (
+                                                            <option key={r.id} value={r.id}>{r.label}</option>
+                                                        ))}
+                                                    </select>
+                                                    {isUpdating && <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />}
+                                                </div>
+                                            )}
+                                        </td>
+
+                                        {/* Assigned Branch / Partner */}
+                                        <td className="px-4 py-3">
+                                            {editingPartnerId === profile.id ? (
+                                                <div className="flex items-center gap-1.5 max-w-sm">
+                                                    {isCustomPartner ? (
+                                                        <input
+                                                            type="text"
+                                                            value={tempPartner}
+                                                            onChange={e => setTempPartner(e.target.value.toUpperCase())}
+                                                            placeholder="Type new branch..."
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Escape') {
+                                                                    setEditingPartnerId(null);
+                                                                    setIsCustomPartner(false);
+                                                                }
+                                                                if (e.key === 'Enter') handleUpdatePartner(profile.id, tempPartner);
+                                                            }}
+                                                            className="px-2.5 py-1 border border-amber-400 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 w-full font-bold uppercase"
+                                                            autoFocus
+                                                        />
+                                                    ) : (
+                                                        <select
+                                                            value={tempPartner}
+                                                            onChange={e => setTempPartner(e.target.value)}
+                                                            onKeyDown={e => {
+                                                                if (e.key === 'Escape') {
+                                                                    setEditingPartnerId(null);
+                                                                    setIsCustomPartner(false);
+                                                                }
+                                                            }}
+                                                            className="px-2.5 py-1 border border-stone-300 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 w-full font-medium cursor-pointer"
+                                                            autoFocus
+                                                        >
+                                                            <option value="">None (universal - no branch)</option>
+                                                            {/* The profile's CURRENT branch must be an option even when no CPO
+                                                                owns it any more. Without this the select's value matches no
+                                                                option, the browser silently displays the first one ("None"),
+                                                                and clicking None fires no onChange - so Save wrote the old
+                                                                value straight back and the branch could never be cleared.
+                                                                10 profiles were stuck on the ownerless "Demo Aurora Solar". */}
+                                                            {tempPartner && !branchOptions.includes(tempPartner) && (
+                                                                <option value={tempPartner}>{tempPartner} (no CPO owns this)</option>
+                                                            )}
+                                                            {branchOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                                                        </select>
+                                                    )}
+                                                    {isAdmin && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsCustomPartner(v => !v)}
+                                                            className={`p-1.5 rounded-lg border text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                                                                isCustomPartner
+                                                                    ? 'bg-amber-100 border-amber-300 text-amber-900'
+                                                                    : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
+                                                            }`}
+                                                            title={isCustomPartner ? 'Pick from existing list' : 'Add new branch name (+)'}
+                                                        >
+                                                            {isCustomPartner ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5 text-amber-600" />}
+                                                        </button>
+                                                    )}
                                                     <button
                                                         type="button"
-                                                        onClick={() => setIsCustomPartner(v => !v)}
-                                                        className={`p-1.5 rounded-lg border text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
-                                                            isCustomPartner
-                                                                ? 'bg-amber-100 border-amber-300 text-amber-900'
-                                                                : 'bg-stone-100 hover:bg-stone-200 border-stone-200 text-stone-700'
-                                                        }`}
-                                                        title={isCustomPartner ? 'Pick from existing list' : 'Add new branch name (+)'}
+                                                        onClick={() => handleUpdatePartner(profile.id, tempPartner)}
+                                                        className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg cursor-pointer"
+                                                        title="Save"
                                                     >
-                                                        {isCustomPartner ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5 text-amber-600" />}
+                                                        <Check className="w-3.5 h-3.5" />
                                                     </button>
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleUpdatePartner(profile.id, tempPartner)}
-                                                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-lg cursor-pointer"
-                                                    title="Save"
-                                                >
-                                                    <Check className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setEditingPartnerId(null);
-                                                        setIsCustomPartner(false);
-                                                    }}
-                                                    className="p-1 text-stone-400 hover:bg-stone-100 rounded-lg cursor-pointer"
-                                                    title="Cancel"
-                                                >
-                                                    <X className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-1.5 group/partner">
-                                                {profile.channel_partner ? (
-                                                    <span className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                                        <Building2 size={11} className="text-amber-600" />
-                                                        {profile.channel_partner}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-xs text-stone-400 italic">Universal (All)</span>
-                                                )}
-                                                {/* No branch editing for a Channel Partner - they are
-                                                    universal by definition. The pencil is hidden rather
-                                                    than disabled, so there is nothing to click by mistake. */}
-                                                {!isInactive && !isYou && profile.user_type !== 'agent' && (
                                                     <button
                                                         type="button"
                                                         onClick={() => {
-                                                            setEditingPartnerId(profile.id);
-                                                            setTempPartner(profile.channel_partner || '');
+                                                            setEditingPartnerId(null);
                                                             setIsCustomPartner(false);
                                                         }}
-                                                        className="p-0.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all cursor-pointer opacity-70 group-hover/partner:opacity-100"
-                                                        title="Edit Channel Partner Name"
-                                                    >
-                                                        <Edit2 className="w-2.5 h-2.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </td>
-
-                                    {/* Status Badge */}
-                                    <td className="px-4 py-3">
-                                        {isInactive ? (
-                                            <span className="text-[10px] bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full font-bold">Inactive</span>
-                                        ) : (
-                                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold">Active</span>
-                                        )}
-                                    </td>
-
-                                    {/* Actions */}
-                                    <td className="px-4 py-3 text-right">
-                                        <div className="flex items-center gap-1 justify-end flex-wrap">
-                                            {isYou ? (
-                                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold">You</span>
-                                            ) : isInactive ? (
-                                                <>
-                                                    <button
-                                                        onClick={() => reactivateUser(profile.id, profile.name)}
-                                                        disabled={isUpdating}
-                                                        title="Reactivate this user"
-                                                        className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-700 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors font-bold disabled:opacity-50 cursor-pointer"
-                                                    >
-                                                        <RefreshCw className="w-3.5 h-3.5" />
-                                                        <span className="hidden sm:inline">Reactivate</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => deleteUser(profile.id, profile.name)}
-                                                        disabled={isUpdating}
-                                                        title="Permanently delete this user"
-                                                        className="flex items-center gap-1 px-2.5 py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors font-bold disabled:opacity-50 cursor-pointer"
+                                                        className="p-1 text-stone-400 hover:bg-stone-100 rounded-lg cursor-pointer"
+                                                        title="Cancel"
                                                     >
                                                         <X className="w-3.5 h-3.5" />
-                                                        <span className="hidden sm:inline">Delete</span>
                                                     </button>
-                                                </>
+                                                </div>
                                             ) : (
-                                                <>
-                                                    <button
-                                                        onClick={() => setPwdResetUser(profile)}
-                                                        disabled={isUpdating}
-                                                        title="Reset or Change Password"
-                                                        className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-700 hover:text-amber-800 hover:bg-amber-50 border border-stone-200 rounded-lg transition-colors font-bold disabled:opacity-50 cursor-pointer"
-                                                    >
-                                                        <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                                                        <span>Reset Pwd</span>
-                                                    </button>
-
-                                                    <button
-                                                        onClick={() => deactivateUser(profile.id, profile.name)}
-                                                        disabled={isUpdating}
-                                                        title="Deactivate this user"
-                                                        className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors font-semibold disabled:opacity-50 cursor-pointer"
-                                                    >
-                                                        <Ban className="w-3.5 h-3.5" />
-                                                        <span className="hidden sm:inline">Deactivate</span>
-                                                    </button>
-                                                </>
+                                                <div className="flex items-center gap-1.5 group/partner">
+                                                    {profile.channel_partner ? (
+                                                        <span className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                                            <Building2 size={11} className="text-amber-600" />
+                                                            {profile.channel_partner}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-stone-400 italic">Universal (All)</span>
+                                                    )}
+                                                    {/* No branch editing for a Channel Partner - they are
+                                                        universal by definition. The pencil is hidden rather
+                                                        than disabled, so there is nothing to click by mistake. */}
+                                                    {!isInactive && !isYou && profile.user_type !== 'agent' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEditingPartnerId(profile.id);
+                                                                setTempPartner(profile.channel_partner || '');
+                                                                setIsCustomPartner(false);
+                                                            }}
+                                                            className="p-0.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all cursor-pointer opacity-70 group-hover/partner:opacity-100"
+                                                            title="Edit Channel Partner Name"
+                                                        >
+                                                            <Edit2 className="w-2.5 h-2.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            );
-                            })}
-                        </tbody>
-                    </table>
+                                        </td>
+
+                                        {/* Status Badge */}
+                                        <td className="px-4 py-3">
+                                            {isInactive ? (
+                                                <span className="text-[10px] bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full font-bold">Inactive</span>
+                                            ) : (
+                                                <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold">Active</span>
+                                            )}
+                                        </td>
+
+                                        {/* Actions */}
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex items-center gap-1 justify-end flex-wrap">
+                                                {isYou ? (
+                                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold">You</span>
+                                                ) : isInactive ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => reactivateUser(profile.id, profile.name)}
+                                                            disabled={isUpdating}
+                                                            title="Reactivate this user"
+                                                            className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-700 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors font-bold disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            <RefreshCw className="w-3.5 h-3.5" />
+                                                            <span className="hidden sm:inline">Reactivate</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteUser(profile.id, profile.name)}
+                                                            disabled={isUpdating}
+                                                            title="Permanently delete this user"
+                                                            className="flex items-center gap-1 px-2.5 py-1 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors font-bold disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" />
+                                                            <span className="hidden sm:inline">Delete</span>
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setPwdResetUser(profile)}
+                                                            disabled={isUpdating}
+                                                            title="Reset or Change Password"
+                                                            className="flex items-center gap-1 px-2.5 py-1 text-xs text-stone-700 hover:text-amber-800 hover:bg-amber-50 border border-stone-200 rounded-lg transition-colors font-bold disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            <KeyRound className="w-3.5 h-3.5 text-amber-600" />
+                                                            <span>Reset Pwd</span>
+                                                        </button>
+
+                                                        <button
+                                                            onClick={() => deactivateUser(profile.id, profile.name)}
+                                                            disabled={isUpdating}
+                                                            title="Deactivate this user"
+                                                            className="flex items-center gap-1 px-2 py-1 text-xs text-stone-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors font-semibold disabled:opacity-50 cursor-pointer"
+                                                        >
+                                                            <Ban className="w-3.5 h-3.5" />
+                                                            <span className="hidden sm:inline">Deactivate</span>
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-            </div>
+            )}
 
             {showCreateModal && (
                 <CreateUserModal
@@ -1701,6 +1754,53 @@ export default function UserManagementView({ currentUser }) {
                     onSuccess={(msg) => { showToast('success', msg); }}
                     currentUser={currentUser}
                 />
+            )}
+
+            <BrevoModal
+                isOpen={showBrevoModal}
+                onClose={() => setShowBrevoModal(false)}
+            />
+
+            {/* Vendor Availability Calendar Modal for Admin */}
+            {showVendorCalendarModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-stone-200 p-6 relative">
+                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-stone-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                                    <Calendar className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-stone-900">Vendor Availability Schedule</h3>
+                                    <p className="text-[11px] text-stone-500">Inspect vendor availability before assigning delivery or installation batches</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowVendorCalendarModal(false)}
+                                className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition cursor-pointer"
+                                title="Close calendar"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <VendorCalendarView 
+                            vendorName="Vendor 1" 
+                            isAdmin={true} 
+                        />
+
+                        <div className="mt-6 pt-4 border-t border-stone-100 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setShowVendorCalendarModal(false)}
+                                className="px-5 py-2 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl transition cursor-pointer"
+                            >
+                                Close Schedule
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

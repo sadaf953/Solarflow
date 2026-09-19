@@ -4,6 +4,7 @@ import { supabase } from '../../supabase';
 import { SectionHeader, EditableDetailItem } from './shared';
 import BomPrintModal from '../BomPrintModal';
 import { ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE, COMMON_BOM_ITEMS } from '../../constants';
+import bomReference from '../../inventory/reference.json';
 import { loadBomForCustomer, getBomTemplateForType } from '../../utils/bom';
 import { useGlobalPopup } from '../GlobalPopup';
 
@@ -75,7 +76,7 @@ export default function MaterialIntegrationTab({
 
     const inverterMakeOptions = (meta?.['inverter_make'] && meta['inverter_make'].length > 0)
         ? meta['inverter_make']
-        : ['test1', 'test2', 'test3'];
+        : bomReference.metadata.inverter_make;
 
     useEffect(() => {
         setPanelSerials(parsePanelSerials(customer?.panel_serial_no || editData?.panel_serial_no));
@@ -147,7 +148,13 @@ export default function MaterialIntegrationTab({
     const currentSerialized = panelSerials.filter(Boolean).join('\n');
     const isSerialsDirty = originalSerialized !== currentSerialized;
 
-    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [showPrintModal, setShowPrintModal] = useState(() => Boolean(customer?._autoPrintBom));
+
+    useEffect(() => {
+        if (customer?._autoPrintBom) {
+            setShowPrintModal(true);
+        }
+    }, [customer?._autoPrintBom]);
 
     // Integration By dropdown options. No placeholder fallback - fabricated
     // names used to be offered when the list was empty, and anything picked
@@ -206,7 +213,7 @@ export default function MaterialIntegrationTab({
     const handleItemFieldChange = (index, field, value) => {
         onDirty?.();
         setBomItems(prev => {
-            const next = prev.map((item, i) => (i === index ? { ...item, [field]: value } : item));
+            const next = prev.map((item, i) => (i === index ? { ...item, [field]: value, ...(field === 'quantity' ? {stock_quantity:null} : {}) } : item));
             try {
                 const localData = {
                     bom: {
@@ -276,6 +283,7 @@ export default function MaterialIntegrationTab({
                     .from('bom')
                     .select('id')
                     .eq('admin_id', targetCust.id)
+                    .eq('bom_type', currentType)
                     .order('created_at', { ascending: true });
 
                 if (existingErr) throw existingErr;
@@ -400,8 +408,11 @@ export default function MaterialIntegrationTab({
                 const validItems = items.filter(item => item.product_name && item.product_name.trim() !== '');
 
                 if (validItems.length > 0) {
-                    const rowsToInsert = validItems.map((item) => ({
+                    const rowsToInsert = validItems.map((item, index) => ({
                         bom_id: currentBomId,
+                        sr_no: index + 1,
+                        uom: item.uom || null,
+                        stock_quantity: item.stock_quantity === '' || item.stock_quantity == null ? null : Number(item.stock_quantity),
                         product_name: item.product_name,
                         quantity: item.quantity !== undefined && item.quantity !== null ? String(item.quantity) : '',
                         integration_by: item.integration_by || null,
@@ -432,6 +443,13 @@ export default function MaterialIntegrationTab({
                     }
                 }
             }
+
+            // Keep the authoritative inline document in step with saved rows and reviewed stock quantities.
+            const savedDocument={bom:{id:currentBomId,admin_id:targetCust.id,bom_type:currentType,
+                paper_prepared_by:prepBy,paper_prepared_date:prepDate,material_loaded_by:loadBy,material_loaded_date:loadDate},items};
+            const {data:savedProjects,error:documentError}=await supabase.from('admin').update({bom_data:savedDocument}).eq('id',targetCust.id).select('id');
+            if(documentError || !savedProjects?.length)throw documentError || new Error('Could not save the BOM document.');
+            setEditData(previous=>({...previous,bom_data:savedDocument}));
 
             // 4. Save to localStorage backup
             try {
@@ -497,7 +515,7 @@ export default function MaterialIntegrationTab({
             <div className="flex flex-wrap justify-between items-center gap-2 border-b border-stone-100 pb-2">
                 <div>
                     <h4 className="text-xs font-bold text-stone-700 uppercase tracking-widest">Material Integration & BOM</h4>
-                    <p className="text-[11px] text-stone-500 font-medium">BOM configuration, loading milestones and equipment checklist.</p>
+                    <p className="text-[11px] text-stone-500 font-medium">Reference quantities from your BOM exports. Confirm measurements for this project; compound specifications stay unchanged.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">
@@ -654,7 +672,7 @@ export default function MaterialIntegrationTab({
                         </div>
                         <div>
                             <h4 className="text-xs font-bold text-stone-800 uppercase tracking-wide flex items-center gap-2">
-                                Panel Serial Numbers <span className="text-red-500">*</span>
+                                Panel Serial Numbers
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-stone-100 text-stone-600 border border-stone-200">
                                     {filledCount} {filledCount === 1 ? 'Panel' : 'Panels'}
                                 </span>
@@ -866,7 +884,7 @@ export default function MaterialIntegrationTab({
                 {isEditingMilestones ? (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-stone-50 p-2.5 rounded-xl border border-stone-200">
                         <div>
-                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Paper Prepared By <span className="text-red-500">*</span></label>
+                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Paper Prepared By </label>
                             <select
                                 value={paperPreparedBy}
                                 onChange={(e) => { setPaperPreparedBy(e.target.value); onDirty?.(); }}
@@ -891,7 +909,7 @@ export default function MaterialIntegrationTab({
                             )}
                         </div>
                         <div>
-                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Paper Prepared Date <span className="text-red-500">*</span></label>
+                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Paper Prepared Date </label>
                             <input
                                 type="date"
                                 value={paperPreparedDate}
@@ -901,7 +919,7 @@ export default function MaterialIntegrationTab({
                             />
                         </div>
                         <div>
-                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Material Loaded By <span className="text-red-500">*</span></label>
+                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Material Loaded By </label>
                             <select
                                 value={materialLoadedBy}
                                 onChange={(e) => { setMaterialLoadedBy(e.target.value); onDirty?.(); }}
@@ -926,7 +944,7 @@ export default function MaterialIntegrationTab({
                             )}
                         </div>
                         <div>
-                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Material Loaded Date <span className="text-red-500">*</span></label>
+                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Material Loaded Date </label>
                             <input
                                 type="date"
                                 value={materialLoadedDate}
@@ -939,19 +957,19 @@ export default function MaterialIntegrationTab({
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 bg-stone-50/70 p-2.5 rounded-xl border border-stone-200/60">
                         <div>
-                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-0.5">Paper Prepared By <span className="text-red-500">*</span></label>
+                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-0.5">Paper Prepared By </label>
                             <p className="text-xs font-bold text-stone-700">{loadingBom ? <span className="inline-block w-16 h-3 bg-stone-200 rounded animate-pulse align-middle" /> : (paperPreparedBy || "–")}</p>
                         </div>
                         <div>
-                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-0.5">Paper Prepared Date <span className="text-red-500">*</span></label>
+                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-0.5">Paper Prepared Date </label>
                             <p className="text-xs font-bold text-stone-700">{loadingBom ? <span className="inline-block w-16 h-3 bg-stone-200 rounded animate-pulse align-middle" /> : (paperPreparedDate || "–")}</p>
                         </div>
                         <div>
-                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-0.5">Material Loaded By <span className="text-red-500">*</span></label>
+                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-0.5">Material Loaded By </label>
                             <p className="text-xs font-bold text-stone-700">{loadingBom ? <span className="inline-block w-16 h-3 bg-stone-200 rounded animate-pulse align-middle" /> : (materialLoadedBy || "–")}</p>
                         </div>
                         <div>
-                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-0.5">Material Loaded Date <span className="text-red-500">*</span></label>
+                            <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-0.5">Material Loaded Date </label>
                             <p className="text-xs font-bold text-stone-700">{loadingBom ? <span className="inline-block w-16 h-3 bg-stone-200 rounded animate-pulse align-middle" /> : (materialLoadedDate || "–")}</p>
                         </div>
                     </div>
@@ -1010,6 +1028,11 @@ export default function MaterialIntegrationTab({
                                                 className="w-20 bg-white border border-stone-200 rounded px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-amber-300 font-semibold text-stone-800"
                                                 placeholder="Qty..."
                                             />
+                                            <label className="block text-[9px] text-emerald-700 mt-1">Stock quantity
+                                                <input type="number" min="0" step="0.001" value={item.stock_quantity ?? ''}
+                                                    onChange={e=>handleItemFieldChange(idx,'stock_quantity',e.target.value===''?null:Number(e.target.value))}
+                                                    placeholder="Use numeric Qty" className="w-24 border border-emerald-200 rounded px-2 py-1" />
+                                            </label>
                                         </td>
 
                                         <td className="px-3 py-2 text-stone-500 font-semibold">

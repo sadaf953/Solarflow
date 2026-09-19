@@ -1,8 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Trash2, Plus, Edit3, X, Paperclip, Eye, Upload, FileText, Image as ImageIcon, Download, MessageSquare, Check } from 'lucide-react';
-import { formatINR, toIndianCommas, parseIndianNumber, formatInputValue } from '../../utils';
+import { Trash2, Plus, Edit3, X, Paperclip, Eye, Upload, FileText, Image as ImageIcon, Download, MessageSquare, Check, Sparkles, Phone, CheckSquare, FolderOpen } from 'lucide-react';
+import { formatINR, toIndianCommas, parseIndianNumber, formatInputValue, getTelephoneHref } from '../../utils';
 import { supabase } from '../../supabase';
 import { useGlobalPopup } from '../GlobalPopup';
+
+// Generate synthetic demo documents for 1-click sample upload in demo mode
+export function generateDemoSampleFile(field = 'document', label = 'Sample Document') {
+    const cleanLabel = (label || field || 'Sample Document').replace(/[<>]/g, '');
+    const timestamp = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb" />
+      <stop offset="100%" stop-color="#fef3c7" />
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" rx="16" fill="url(#bgGrad)" stroke="#f59e0b" stroke-width="4"/>
+  <rect x="24" y="24" width="552" height="352" rx="12" fill="#ffffff" stroke="#e5e7eb" stroke-width="2"/>
+  <circle cx="70" cy="70" r="24" fill="#f59e0b" />
+  <path d="M70 54 L70 86 M54 70 L86 70 M59 59 L81 81 M59 81 L81 59" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  <text x="110" y="66" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="bold" fill="#1f2937">SolarFlow Demo Verification Document</text>
+  <text x="110" y="88" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="500" fill="#6b7280">Sample Document for Testing &amp; Verification</text>
+  <line x1="44" y1="120" x2="556" y2="120" stroke="#f3f4f6" stroke-width="2"/>
+  <rect x="44" y="140" width="512" height="150" rx="8" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="64" y="175" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#4b5563">DOCUMENT TYPE:</text>
+  <text x="210" y="175" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="bold" fill="#b45309">${cleanLabel}</text>
+  <text x="64" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#4b5563">VERIFIED DATE:</text>
+  <text x="210" y="210" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="500" fill="#111827">${timestamp}</text>
+  <text x="64" y="245" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="600" fill="#4b5563">AUTHENTICATION:</text>
+  <text x="210" y="245" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="500" fill="#059669">✓ Demo Record Certified (Simulated)</text>
+  <rect x="44" y="315" width="220" height="36" rx="6" fill="#fef3c7" stroke="#fbbf24" stroke-width="1"/>
+  <text x="56" y="338" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="bold" fill="#92400e">DEMO SAMPLE ATTACHMENT</text>
+  <text x="440" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-style="italic" fill="#9ca3af">SolarFlow CRM v2.0</text>
+</svg>`;
+    const fileName = `${(field || 'sample').toLowerCase().replace(/[^a-z0-9]/g, '_')}_demo_sample.svg`;
+    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+    return new File([blob], fileName, { type: 'image/svg+xml' });
+}
 
 // ─── Vendor name list (process-wide cache) ────────────────────────────────────
 // InstallationStatusTab and MaterialDeliveryTab each fetched this on mount with
@@ -160,12 +195,37 @@ export function DetailItem({ label, value, isMoney = false, isEnergy = false }) 
     if (label && typeof label === 'string' && label.toLowerCase().includes('capacity') && value) {
         displayVal = toIndianCommas(value);
     }
+    const isPhone = label && typeof label === 'string' && label.toLowerCase().includes('phone') && value;
+    const telHref = isPhone ? getTelephoneHref(value) : null;
+    const isUrl = label && typeof label === 'string' && label.toLowerCase().includes('link') && typeof value === 'string' && /^https?:\/\//i.test(value.trim());
+
     return (
         <div className="bg-stone-50 p-2.5 rounded-xl">
             <p className="text-[9px] text-stone-400 uppercase tracking-wide mb-0.5 font-bold"><RequiredLabel label={label} /></p>
-            <p className={`text-sm font-semibold truncate ${isMoney ? 'text-emerald-600' : isEnergy ? 'text-amber-600' : 'text-stone-800'}`}>
-                {isMoney ? fmt(value) : (displayVal || '–')}
-            </p>
+            {telHref ? (
+                <a
+                    href={telHref}
+                    className="text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1.5 cursor-pointer"
+                    title={`Click to call ${value}`}
+                >
+                    <Phone size={12} className="text-emerald-500 flex-shrink-0" />
+                    <span className="truncate">{displayVal}</span>
+                </a>
+            ) : isUrl ? (
+                <a
+                    href={value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1.5 cursor-pointer"
+                    title={`Open link: ${value}`}
+                >
+                    <span className="truncate">{displayVal}</span>
+                </a>
+            ) : (
+                <p className={`text-sm font-semibold truncate ${isMoney ? 'text-emerald-600' : isEnergy ? 'text-amber-600' : 'text-stone-800'}`}>
+                    {isMoney ? fmt(value) : (displayVal || '–')}
+                </p>
+            )}
         </div>
     );
 }
@@ -296,6 +356,8 @@ export function FilePreviewModal({ file, fileUrl, onClose, onDownload, onUpdateR
     const [savingRemark, setSavingRemark] = useState(false);
     const [remarkSaved, setRemarkSaved] = useState(false);
 
+    const [imgError, setImgError] = useState(false);
+
     if (!file) return null;
     const ext = (file.file_name || '').split('.').pop()?.toLowerCase();
     const isImage = file.file_type?.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'].includes(ext);
@@ -335,8 +397,26 @@ export function FilePreviewModal({ file, fileUrl, onClose, onDownload, onUpdateR
                     </div>
                 </div>
                 <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-stone-50">
-                    {isImage && fileUrl && (
-                        <img src={fileUrl} alt={file.file_name} className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm" />
+                    {isImage && fileUrl && !imgError && (
+                        <img 
+                            src={fileUrl} 
+                            alt={file.file_name} 
+                            className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-sm"
+                            onError={() => setImgError(true)}
+                        />
+                    )}
+                    {isImage && (imgError || !fileUrl) && (
+                        <div className="flex flex-col items-center gap-3 py-12 text-stone-400">
+                            <ImageIcon size={48} className="text-stone-300" />
+                            <p className="text-sm font-semibold text-stone-600">Could not preview image directly</p>
+                            <button
+                                type="button"
+                                onClick={onDownload}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-bold hover:bg-stone-800 transition"
+                            >
+                                <Download size={12} /> Download Image
+                            </button>
+                        </div>
                     )}
                     {isPdf && fileUrl && (
                         <iframe src={fileUrl} title={file.file_name} className="w-full h-[60vh] rounded-lg border border-stone-200" />
@@ -491,14 +571,119 @@ function DocRemarkRow({ doc, onUpdateRemark, isEditing }) {
 export const RETURNED_DOCUMENT_PREFIX = '[RETURNED]';
 export const isReturnedDocument = (doc) => String(doc?.remark || '').trim().toUpperCase().startsWith(RETURNED_DOCUMENT_PREFIX);
 
-export function CheckboxRemarkItem({ label, field, value, onChange, isEditing, documents = [], onUpload, onDelete, onPreview, onDownload, onUpdateRemark, note, canDelete = false, canReplace = canDelete, allowReturnedReplace = !canDelete }) {
-    const { showConfirm } = useGlobalPopup();
+export const getChecklistMode = () => {
+    try {
+        const stored = localStorage.getItem('solarflow_checklist_mode');
+        // Default to clean simple checklist mode when opened:
+        // "when they open it it should show checklsit simple checlist , you click that its checked thats all"
+        return stored === 'files' ? 'files' : 'checklist';
+    } catch {
+        return 'checklist';
+    }
+};
+
+export const setChecklistMode = (mode) => {
+    try {
+        localStorage.setItem('solarflow_checklist_mode', mode);
+        window.dispatchEvent(new CustomEvent('solarflow-checklist-mode-changed', { detail: { mode } }));
+    } catch {}
+};
+
+export function ChecklistModeToggle({ className = '', onFillAllDemoDocs = null, isFilling = false }) {
+    const [mode, setMode] = React.useState(() => getChecklistMode());
+
+    React.useEffect(() => {
+        const handleModeChange = (e) => {
+            if (e.detail?.mode) setMode(e.detail.mode);
+        };
+        window.addEventListener('solarflow-checklist-mode-changed', handleModeChange);
+        return () => window.removeEventListener('solarflow-checklist-mode-changed', handleModeChange);
+    }, []);
+
+    const handleSwitch = (newMode) => {
+        setChecklistMode(newMode);
+        setMode(newMode);
+    };
+
+    return (
+        <div className={`inline-flex items-center gap-2 ${className}`}>
+            <div className="inline-flex items-center rounded-lg bg-stone-100 p-0.5 border border-stone-200">
+                <button
+                    type="button"
+                    onClick={() => handleSwitch('checklist')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                        mode === 'checklist'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                    title="Simple Checklist: 1-click verify items directly without needing file attachments"
+                >
+                    <CheckSquare size={11} />
+                    <span>Simple Checklist</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => handleSwitch('files')}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                        mode === 'files'
+                            ? 'bg-amber-500 text-white shadow-xs'
+                            : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                    title="File Storage: Upload client documents, photos, and demo attachments"
+                >
+                    <FolderOpen size={11} />
+                    <span>File Storage</span>
+                </button>
+            </div>
+
+            {mode === 'files' && onFillAllDemoDocs && (
+                <button
+                    type="button"
+                    onClick={onFillAllDemoDocs}
+                    disabled={isFilling}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                    title="Generate and attach sample demo documents for all missing checklist items in this section"
+                >
+                    <Sparkles size={11} className="text-amber-500" />
+                    <span>{isFilling ? 'Attaching...' : '✨ Fill Demo Docs'}</span>
+                </button>
+            )}
+        </div>
+    );
+}
+
+export function CheckboxRemarkItem({ label, field, value, onChange, onAutoSave, isEditing, documents = [], onUpload, onDelete, onPreview, onDownload, onUpdateRemark, note, canDelete = false, canReplace = canDelete, allowReturnedReplace = !canDelete }) {
+    const { showConfirm, showImageCropper } = useGlobalPopup();
     const fieldDocs = documents.filter(d => d.doc_type === field);
     const fileInputRef = React.useRef(null);
     const [replacingDocId, setReplacingDocId] = React.useState(null);
 
-    // Unchecked by default; checked strictly when an actual photo/file is uploaded
+    const [checklistMode, setLocalChecklistMode] = React.useState(() => getChecklistMode());
+
+    React.useEffect(() => {
+        const handleModeChange = (e) => {
+            if (e.detail?.mode) setLocalChecklistMode(e.detail.mode);
+        };
+        window.addEventListener('solarflow-checklist-mode-changed', handleModeChange);
+        return () => window.removeEventListener('solarflow-checklist-mode-changed', handleModeChange);
+    }, []);
+
     const isUploaded = fieldDocs.length > 0;
+    const isChecklistOnly = checklistMode === 'checklist';
+    const isChecked = isChecklistOnly ? (Boolean(value) || isUploaded) : isUploaded;
+
+    const handleCheckboxClick = async () => {
+        if (!isEditing) return;
+        if (isChecklistOnly) {
+            const nextVal = !isChecked;
+            if (onChange) onChange(field, nextVal);
+            if (onAutoSave) {
+                await onAutoSave(field, nextVal);
+            }
+        } else if (!isUploaded) {
+            handleUploadClick();
+        }
+    };
 
     const handleUploadClick = (existingDocId = null) => {
         setReplacingDocId(existingDocId);
@@ -506,12 +691,18 @@ export function CheckboxRemarkItem({ label, field, value, onChange, isEditing, d
     };
 
     const handleFileSelected = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        // Save file ref and reset input immediately so re-renders don't re-trigger
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
         const inputEl = e.target;
-        const wrappedEvent = { target: { files: [file], value: '' } };
         inputEl.value = '';
+
+        let file = rawFile;
+        if (showImageCropper) {
+            file = await showImageCropper(rawFile, { title: `Crop & Adjust ${label || 'Document'}` });
+            if (!file) return; // User cancelled upload
+        }
+
+        const wrappedEvent = { target: { files: [file], value: '' } };
 
         // If replacing a specific document, or if field already has a document, delete old one first
         const replacingDoc = fieldDocs.find(d => d.id === replacingDocId);
@@ -533,6 +724,27 @@ export function CheckboxRemarkItem({ label, field, value, onChange, isEditing, d
         setReplacingDocId(null);
     };
 
+    const handleUploadSampleDoc = async (existingDocId = null) => {
+        const sampleFile = generateDemoSampleFile(field, label);
+        const wrappedEvent = { target: { files: [sampleFile], value: '' } };
+
+        const replacingDoc = fieldDocs.find(d => d.id === existingDocId);
+        const replacementAllowed = canReplace || (allowReturnedReplace && isReturnedDocument(replacingDoc));
+        if (replacementAllowed && existingDocId && onDelete) {
+            const oldDoc = fieldDocs.find(d => d.id === existingDocId);
+            if (oldDoc) await onDelete(oldDoc);
+        } else if (canReplace && fieldDocs.length > 0 && onDelete) {
+            for (const oldDoc of fieldDocs) {
+                await onDelete(oldDoc);
+            }
+        }
+
+        if (onUpload) await onUpload(wrappedEvent, field, existingDocId);
+        if (onChange) {
+            onChange(field, true);
+        }
+    };
+
     const handleDeleteClick = async (doc) => {
         const confirmed = await showConfirm(
             `Are you sure you want to permanently delete “${doc.file_name || 'this document'}”? It will be removed from the backend and cannot be recovered.`,
@@ -542,7 +754,7 @@ export function CheckboxRemarkItem({ label, field, value, onChange, isEditing, d
         const result = onDelete ? await onDelete(doc) : false;
         if (result === false) return;
         const remaining = fieldDocs.filter(d => d.id !== doc.id);
-        if (remaining.length === 0 && onChange) {
+        if (remaining.length === 0 && onChange && !isChecklistOnly) {
             onChange(field, false);
         }
     };
@@ -573,25 +785,39 @@ export function CheckboxRemarkItem({ label, field, value, onChange, isEditing, d
         <div className="py-1.5">
             <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
-                    {/* Non-editable check indicator box driven solely by file upload */}
-                    <div 
+                    {/* Interactive check indicator: clickable in checklist mode or triggers upload in file mode */}
+                    <button
+                        type="button"
+                        onClick={handleCheckboxClick}
+                        disabled={!isEditing}
                         className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
-                            isUploaded 
+                            isChecked 
                                 ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                : 'bg-stone-100 border-stone-300 text-transparent'
+                                : isEditing ? 'border-stone-300 hover:border-amber-400 bg-white cursor-pointer' : 'bg-stone-100 border-stone-300 text-transparent'
                         }`}
-                        title={isUploaded ? 'Verified & Uploaded' : 'Upload photo/file to verify'}
+                        title={isChecklistOnly ? (isChecked ? 'Completed (click to uncheck)' : 'Click to mark checked') : (isUploaded ? 'Verified & Uploaded' : 'Click to upload file to verify')}
                     >
-                        {isUploaded && (
+                        {isChecked && (
                             <svg className="w-2.5 h-2.5 stroke-[3] stroke-current" fill="none" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                             </svg>
                         )}
-                    </div>
-                    <span className={`text-xs select-none ${isUploaded ? 'font-bold text-stone-900' : 'font-medium text-stone-600'}`}>
+                    </button>
+                    <span 
+                        onClick={isChecklistOnly && isEditing ? handleCheckboxClick : undefined}
+                        className={`text-xs select-none ${isChecklistOnly && isEditing ? 'cursor-pointer' : ''} ${isChecked ? 'font-bold text-stone-900' : 'font-medium text-stone-600'}`}
+                    >
                         <RequiredLabel label={label} />
                     </span>
-                    {isUploaded ? (
+                    {isChecklistOnly ? (
+                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                            isChecked 
+                                ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                                : 'text-stone-400 bg-stone-100 border-stone-200'
+                        }`}>
+                            {isChecked ? 'Checked' : 'Pending'}
+                        </span>
+                    ) : isUploaded ? (
                         <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                             Uploaded
                         </span>
@@ -655,13 +881,24 @@ export function CheckboxRemarkItem({ label, field, value, onChange, isEditing, d
                         <DocRemarkRow doc={doc} onUpdateRemark={onUpdateRemark} isEditing={isEditing && canDelete} />
                     </div>
                 ))}
-                {fieldDocs.length === 0 && isEditing && onUpload && (
-                    <button
-                        onClick={() => handleUploadClick()}
-                        className="flex items-center gap-1.5 text-[10px] font-bold text-stone-500 hover:text-amber-600 px-2 py-1 rounded-lg border border-dashed border-stone-200 hover:border-amber-300 hover:bg-amber-50/30 transition-all cursor-pointer"
-                    >
-                        <Paperclip size={11} /> Attach File / Photo
-                    </button>
+                {!isChecklistOnly && fieldDocs.length === 0 && isEditing && onUpload && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={() => handleUploadClick()}
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-stone-500 hover:text-amber-600 px-2 py-1 rounded-lg border border-dashed border-stone-200 hover:border-amber-300 hover:bg-amber-50/30 transition-all cursor-pointer"
+                        >
+                            <Paperclip size={11} /> Attach File / Photo
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleUploadSampleDoc()}
+                            className="flex items-center gap-1.5 text-[10px] font-bold text-amber-700 hover:text-amber-800 px-2.5 py-1 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-all cursor-pointer shadow-xs"
+                            title="Generate and attach a sample document instantly (1-click test upload)"
+                        >
+                            <Sparkles size={11} className="text-amber-500" /> Use Demo Doc
+                        </button>
+                    </div>
                 )}
             </div>
         </div>

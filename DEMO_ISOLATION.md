@@ -1,36 +1,29 @@
 # SolarFlow demo isolation
 
-This working copy is disconnected from the original application's backend and deployment. It is intentionally an offline development shell, not a migrated database or a fully functional CRM backend.
+This copy uses only the new demo Supabase project qduonewmquwayrnwyzvc and the new GitHub remote https://github.com/sadaf953/Solarflow.git. The original backend, repository, deployment workflows and domain are disconnected.
 
-Run `npm run dev` and use http://127.0.0.1:5186. The original project's servers were observed on 5173 and 5174; do not use those for this demo. Preview builds use http://127.0.0.1:4186.
+## Current behavior
 
-## What was verified and changed
+- Environment parameters are VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Only the new demo URL and a public anon/publishable key are accepted.
+- Browser transport and Content Security Policy restrict Supabase traffic to that project. Edge Functions remain blocked, so copied email integrations cannot send messages.
+- Visitors choose one of eight personas without entering passwords or keys. Supabase Anonymous Sign-Ins must be enabled. Role switching preserves the visitor's private sandbox. Upgrade 03 gives every role a stable demo_profiles directory record, distinct from the visitor Auth profile, plus integration staff linked to metadata and BOMs.
+- The header offers a guided feature tour and role switching. The old isolation banner is removed.
+- SQL setup and seed updates are in supabase-setup/. The user reports running the 50-row seed. The connected-profile/status upgrade (03) is locally validated and has not been executed by this agent on hosted Supabase.
+- Inventory upgrade 04 uses user-supplied metadata/BOM CSV labels and quantities as reference, with explicitly sample opening stock. Original IDs, dates and customer links are excluded. Upgrade 08 replaces imported partner, staff and office names with fictional demo labels, including existing linked records. Each visitor owns separate stock and movement records.
+- Inventory upgrade 07 connects delivery status to transactional BOM stock deductions using the existing tables. Missing quantities and insufficient stock stop delivery; project issue markers prevent duplicate deductions. Hosted execution remains user-managed.
+- Upgrade 09 scopes CPO lead reads/writes to its own creator ID and linked dealer IDs, with matching document/BOM policies. The visitor may still intentionally switch roles within their sandbox.
+- Company/customer details and assets use fictional SolarFlow values. Original logos and copied screenshots/PDFs were removed. Mock documents display a local SVG, not real identity documents.
 
-- The original `.env` Supabase URL/key were blank, but load-test account details remained. `.env` is now comments only.
-- No named Git remote or Supabase project-link files remained. However, old branch configuration contained a credential-bearing GitHub URL, and the copied build still contained the live Supabase endpoint.
-- Removed all three copied GitHub workflows (backup, deployment, keep-alive), the GitHub homepage, deployment scripts/tool, and custom-domain file.
-- Removed the old build and Vite cache, then rebuilt from isolated source.
-- Replaced backend transport with a client that ignores environment credentials, never restores browser sessions or auth URL tokens, blocks every backend fetch, and disables realtime. No old project sign-out request was sent.
-- Added a browser Content Security Policy blocking external connections/resources, a dedicated localhost port, an isolation banner, and an automatic check before dev/build/preview.
-- Started fresh local Git history on `codex/demo-isolated`, without remotes; `.githooks/pre-push` blocks accidental pushes.
-- The original Git directory is archived outside this project at `/Users/mahvishsadafv2/Desktop/solarflow_demo_git_recovery_20260914/original.git`. Its credential-bearing local configuration and FETCH_HEAD were removed before archival. The archive can still contain historical secrets/customer data. Do not publish it or restore it into this demo.
+Use port 5186 for development and 4186 for preview. Other project servers are unrelated.
 
-## Scope and limits
+## Safeguards and limits
 
-Real login, password reset, database reads/writes, uploads, emails and realtime are disabled. The development quotation fixture remains available at `/quotation-preview.html`, using synthetic in-memory records. No live database or storage files were copied. Copied local screenshots/PDFs under `scratch/` and `output/` were removed during the requested branding/data cleanup. New QA artifacts, if generated, use synthetic demo data.
+Run npm run check:isolation, npm run test:isolation, and npm run build after integration changes. Guards reject other Supabase targets, secret keys, unexpected remotes, deployment workflows and project bindings. These checks protect this working copy, not arbitrary future commands or account-wide login state.
 
-This audit verifies this working copy, not account-wide Supabase/GitHub logout. No standard Supabase CLI token file was found, but browser login, OS credential stores and app connectors were not revoked or verified. Global credentials and the original project were left unchanged. A GitHub token was found in the copied Git configuration; revoke/rotate that token in GitHub settings.
+The original Git directory is archived outside this project at /Users/mahvishsadafv2/Desktop/solarflow_demo_git_recovery_20260914/original.git. Credential-bearing local configuration and FETCH_HEAD were removed before archival. Historical secrets/customer data may remain there. Never restore or publish that archive.
 
-These are safeguards against accidents, not a sandbox for arbitrary future commands. Do not point tools, connectors, CLI commands or code at the original project. Changing security guards or running the old project bypasses the protections.
+Global credentials and the original project were left unchanged. Browser/OS account logout was not verified. A token previously found in the copied Git configuration should be revoked in GitHub settings.
 
-For a functional backend, create a distinct demo-only project or local database with synthetic data, its own credentials, schema, storage and auth settings. Review every integration before explicitly replacing the disconnected transport. No backend has been provisioned by this isolation task.
+## Verification scope
 
-## Verification
-
-- `npm run check:isolation`: rejects populated env files, live Supabase URLs/credential patterns in app/build files, project bindings, Git remotes and workflows.
-- `npm run test:isolation`: exercises auth, queries, writes, uploads, email functions and realtime with an instrumented network function, requiring zero network calls.
-- `npm run build`: rebuilds the demo with the transport lock and browser policy.
-
-Final verification on 2026-09-14: the isolation transport test and all 18 existing quotation tests passed. Headless Chrome loaded the main demo and synthetic quotation fixture with zero external requests and zero page errors. An active-tree scan found no token patterns or live Supabase endpoint. Build succeeded (existing Vite plugin deprecation/chunk warnings remain).
-
-Branding cleanup: all original company logo assets were removed and replaced with SolarFlow SVG artwork. Company/customer names, bank/account/registration details, addresses and telephone fixtures use demo placeholders. Old partner artwork was replaced with fictional demo badges. Local storage namespaces and fixture keys were changed to avoid reusing old snapshots.
+Local tests cover the transport allowlist, blocked email functions, quotations, SQL seed counts/idempotency, and cross-visitor RLS. The tour is also checked through a dev-only synthetic UI fixture. Hosted role entry currently reports Anonymous Sign-Ins disabled; end-to-end hosted Auth/Storage/realtime verification remains pending that setting and SQL setup. Personas control the displayed portal, not production permission levels: every visitor may choose Admin within their own sandbox.

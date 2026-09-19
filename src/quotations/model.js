@@ -40,8 +40,8 @@ export function validate(form) {
     const errors = [];
     const required = (key, title, step) => { if (!String(form[key] ?? '').trim()) errors.push(`${STEPS[step]}: ${title} is required`); };
     [['customer_name','Customer name'],['quotation_date','Quotation date'],['owner_name_snapshot','Salesperson name']].forEach(([key,title]) => required(key,title,0));
-    // This isolated demo also accepts non-dialable synthetic numbers 0000000000–9.
-    const validPhone = value => /^(?:(?:91)?[6-9]\d{9}|0{9}\d)$/.test(String(value || '').replace(/[\s()+-]/g,''));
+    // This isolated demo also accepts non-dialable synthetic numbers 0000000000–0000009999.
+    const validPhone = value => /^(?:(?:91)?[6-9]\d{9}|0{6}\d{4})$/.test(String(value || '').replace(/[\s()+-]/g,''));
     if (!validPhone(form.customer_phone)) errors.push('Customer: Enter a valid Indian mobile number');
     // Salesperson phone is profile-derived and optional. Keep it on the document
     // when available, but never block saving, previewing, or issuing a quotation.

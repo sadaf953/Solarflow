@@ -1,3 +1,4 @@
+import {missingStageRequirements,stageRequirements} from '../demo/stageRequirements';
 // ─── CustomerDetailModal.jsx ──────────────────────────────────────────────────
 // Full customer detail: 4-tab layout (Overview, Finance & Bank, Checklist,
 // Notes & History). Section-level editing, payments array editor, generic
@@ -13,11 +14,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
     X, Edit3, Trash2, Save, Send, AlertTriangle, CheckSquare,
     User, Zap, IndianRupee, Building2, FolderOpen, MapPin,
-    LayoutDashboard, History, Plus, ShieldCheck, Lock, Unlock, ClipboardList, Banknote, Tag, Mail, PauseCircle, Check,
-    Eye, Search, Image as ImageIcon, MessageSquare, Calendar
+    LayoutDashboard, History, Plus, ShieldCheck, Lock, Unlock, ClipboardList, Banknote, Tag, Mail, PauseCircle, Check, CheckCircle2,
+    Eye, Search, Image as ImageIcon, MessageSquare, Calendar, Phone, Clock, HardDrive, ExternalLink
 } from 'lucide-react';
 import { PRIMARY_STAGES, STAGE_IDS, SUBSIDY_TAGS, SUBSIDY_TAG_COLORS, LOAN_TAGS, LOAN_TAG_COLORS, ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE, DOC_TYPE_LABELS, DOC_TYPE_FLAG_COLUMN } from '../constants';
-import { logActivity, formatDateToDDMMYYYY, formatINR, parseIndianNumber, fetchAgent2SubAgents, normalizeMeterInstallation, sanitizePhoneNumber } from '../utils';
+import { logActivity, formatDateToDDMMYYYY, formatINR, parseIndianNumber, fetchAgent2SubAgents, normalizeMeterInstallation, sanitizePhoneNumber, getTelephoneHref } from '../utils';
 import { supabase } from '../supabase';
 import HistoryEntryEditor from './HistoryEntryEditor';
 import { AgreementPreview } from './agreement/AgreementPreview';
@@ -49,7 +50,7 @@ import SubsidyStatusTab from './modal-tabs/SubsidyStatusTab';
 import FinalReviewTab from './modal-tabs/FinalReviewTab';
 import HistoryTab from './modal-tabs/HistoryTab';
 import CustomerDocumentsTab from './modal-tabs/CustomerDocumentsTab';
-import { FilePreviewModal, DocGalleryRemarkRow, getStageRemarkFromData } from './modal-tabs/shared';
+import { FilePreviewModal, DocGalleryRemarkRow, getStageRemarkFromData, getChecklistMode, setChecklistMode } from './modal-tabs/shared';
 import { useGlobalPopup } from './GlobalPopup';
 import ConflictResolutionModal from './ConflictResolutionModal';
 import { normalizeInstallationStatus } from '../utils';
@@ -105,8 +106,9 @@ const getChangedFields = (draft = {}, saved = {}) => {
 
 // ─── CustomerDetailModal ──────────────────────────────────────────────────────
 export default function CustomerDetailModal({ customer, onClose, onUpdate, onDelete, user, meta, channel_partners = [], defaultTab }) {
-    const { showAlert, showConfirm } = useGlobalPopup();
+    const { showAlert, showConfirm, showChoice, showImageCropper } = useGlobalPopup();
     const [activeTab, setActiveTab] = useState(() => {
+        if (customer?._autoPrintBom) return STAGE_IDS.MATERIAL_INTEGRATION;
         if (defaultTab) return defaultTab;
         
         // Force completed customers to open on the LEADS tab by default
@@ -118,6 +120,13 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
         }
         return customer?.stage || STAGE_IDS.LEADS;
     });
+    useEffect(() => {
+        if (customer?._autoPrintBom) {
+            setActiveTab(STAGE_IDS.MATERIAL_INTEGRATION);
+        } else if (defaultTab) {
+            setActiveTab(defaultTab === STAGE_IDS.COMPLETED ? STAGE_IDS.LEADS : defaultTab);
+        }
+    }, [defaultTab, customer?.id, customer?._autoPrintBom]);
     const [editingSection, setEditingSection] = useState(null);
     const [isFormDirty, setIsFormDirty] = useState(false);
     const [editData, setEditData] = useState({ ...customer });
@@ -138,6 +147,15 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
     // "a colleague updated this record".
     const lastSelfWriteRef = useRef(0);
     const [subAgents, setSubAgents] = useState([]);
+    const [docChecklistMode, setDocChecklistMode] = useState(() => getChecklistMode());
+
+    useEffect(() => {
+        const handleModeChange = (e) => {
+            if (e.detail?.mode) setDocChecklistMode(e.detail.mode);
+        };
+        window.addEventListener('solarflow-checklist-mode-changed', handleModeChange);
+        return () => window.removeEventListener('solarflow-checklist-mode-changed', handleModeChange);
+    }, []);
 
     useEffect(() => {
         const managerBranch = user?.userType === 'office2' ? user?.channel_partner : '';
@@ -504,8 +522,16 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
     }, [customer?.id]);
 
     const handleFileUpload = async (e, docType = null, replacingDocId = null) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
+
+        if (e.target) e.target.value = '';
+
+        let file = rawFile;
+        if (showImageCropper) {
+            file = await showImageCropper(rawFile, { title: `Crop & Adjust ${getDocTypeLabel(docType) || 'Document'}` });
+            if (!file) return; // User cancelled upload
+        }
 
         setUploading(true);
         try {
@@ -891,122 +917,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
 
     const nextStageLabel = nextStageId ? PRIMARY_STAGES.find(s => s.id === nextStageId)?.label : '';
 
-    const isLeadFieldsFilled = !!(
-        editData.customer_name?.trim() &&
-        editData.phone_number?.toString().trim() &&
-        (editData.email_address?.trim() || editData.email_address?.trim()) &&
-        editData.consumer_no?.toString().trim() &&
-        editData.villages?.trim() &&
-        editData.channel_partner?.trim() &&
-// editData.sub_channel_partner?.trim() && // Sub Channel Partner is optional
-        editData.module_brand?.trim() &&
-        editData.module_wp?.toString().trim() &&
-        editData.no_of_modules?.toString().trim() &&
-        editData.system_capacity_kwp &&
-        editData.sub_divisions?.trim() &&
-        editData.payment_type?.trim()
-    );
-
-    const hasFeasibilityDoc = documents.some(d => d.doc_type === 'feasibilty_document' || d.doc_type === 'feasibility_document') || !!editData.feasibilty_document;
-    const hasSubsidyTokenDoc = documents.some(d => d.doc_type === 'subsidy_token_photo') || !!editData.subsidy_token_photo;
-    const hasApplicationAcknowledgment = documents.some(d => d.doc_type === 'application_acknowledgment') || !!editData.application_acknowledgment;
-    const hasVendorFeasibility = documents.some(d => d.doc_type === 'vendor_feasibility') || !!editData.vendor_feasibility;
-    const hasSiteFeasibility = documents.some(d => d.doc_type === 'site_feasibility') || !!editData.site_feasibility;
-    const isRegistrationFieldsFilled = !!(
-        editData.registration_date &&
-        editData.registration_by?.trim() &&
-        (editData.registration_no?.toString().trim() || editData.feasibility_no?.toString().trim())
-    );
-    const isRegistrationReady = isRegistrationFieldsFilled && hasFeasibilityDoc && hasSubsidyTokenDoc && hasApplicationAcknowledgment;
-
-    const isMaterialOrderFilled = Boolean(
-        editData.roof_shed &&
-        editData.dc_cable && Number(parseIndianNumber(editData.dc_cable)) > 0 &&
-        editData.ac_cable && Number(parseIndianNumber(editData.ac_cable)) > 0 &&
-        String(editData.structure_front_leg_height || '').trim() &&
-        String(editData.structure_rear_leg_height || '').trim() &&
-        editData.invoice_value && Number(parseIndianNumber(editData.invoice_value)) > 0
-    );
-
-    const getMissingStageRequirements = () => {
-        const issues = [];
-        const requireField = (condition, label) => { if (!condition) issues.push(label); };
-
-        switch (editData.stage) {
-            case STAGE_IDS.LEADS:
-                requireField(editData.customer_name?.trim(), 'Customer Name');
-                requireField(editData.phone_number?.toString().trim(), 'Phone Number');
-                requireField(editData.consumer_no?.toString().trim(), 'Consumer Number');
-                requireField(editData.villages?.trim(), 'Village / Address');
-                requireField(editData.channel_partner?.trim(), 'Channel Partner Name');
-                requireField(editData.module_brand?.trim(), 'Module Brand');
-                requireField(editData.module_wp?.toString().trim(), 'Module WP');
-                requireField(editData.no_of_modules?.toString().trim(), 'Number of Modules');
-                requireField(editData.system_capacity_kwp, 'System Capacity');
-                requireField(editData.sub_divisions?.trim(), 'Tehsil / Sub Division');
-                requireField(editData.district?.trim(), 'District');
-                requireField(editData.payment_type?.trim(), 'Payment Type');
-                break;
-            case STAGE_IDS.REGISTRATION:
-                requireField(editData.registration_date, 'Registration Date');
-                requireField(editData.registration_by?.trim(), 'Registration By');
-                requireField(editData.registration_no?.toString().trim() || editData.feasibility_no?.toString().trim(), 'Feasibility No');
-                requireField(hasFeasibilityDoc, 'Feasibility Document');
-                requireField(hasSubsidyTokenDoc, 'Subsidy Token Photo');
-                requireField(hasApplicationAcknowledgment, 'Application Acknowledgment');
-                break;
-            case STAGE_IDS.LOAN:
-                requireField(editData.jansamarth_application_no?.toString().trim(), 'Jansamarth Application No');
-                requireField(hasVendorFeasibility, 'Vendor Feasibility');
-                requireField(hasSiteFeasibility, 'Site Feasibility');
-                break;
-            case STAGE_IDS.MATERIAL_ORDER:
-                requireField(editData.roof_shed, 'Roof / Shed');
-                requireField(editData.dc_cable && Number(parseIndianNumber(editData.dc_cable)) > 0, 'DC Cable Length');
-                requireField(editData.ac_cable && Number(parseIndianNumber(editData.ac_cable)) > 0, 'AC Cable Length');
-                requireField(String(editData.structure_front_leg_height || '').trim(), 'Structure Front Leg Height');
-                requireField(String(editData.structure_rear_leg_height || '').trim(), 'Structure Rear Leg Height');
-                requireField(editData.invoice_value && Number(parseIndianNumber(editData.invoice_value)) > 0, 'Invoice Value');
-                break;
-            case STAGE_IDS.MATERIAL_INTEGRATION:
-                requireField(editData.inverter_make?.trim(), 'Inverter Make');
-                requireField(editData.inverter_serial_no?.trim(), 'Inverter Serial Number');
-                requireField(
-                    Array.isArray(editData.panel_serial_no)
-                        ? editData.panel_serial_no.some(Boolean)
-                        : String(editData.panel_serial_no || '').trim(),
-                    'At Least One Panel Serial Number'
-                );
-                break;
-            case STAGE_IDS.MATERIAL_DELIVERY:
-                requireField(editData.vendor?.trim(), 'Vendor Allotment');
-                requireField(editData.invoice_no?.trim(), 'Invoice Number');
-                requireField(editData.material_delivery_date, 'Delivery Date');
-                requireField(editData.driver_name?.trim(), 'Driver Name');
-                requireField(editData.driver_phone_number?.toString().trim(), 'Driver Phone Number');
-                break;
-            case STAGE_IDS.INSTALLATION_STATUS:
-                // Exact match blocked records the vendor had set to the legacy
-                // value 'Yes' - the admin could not advance them at all.
-                requireField(normalizeInstallationStatus(editData.installation_status) === 'Yes', 'Installation Status must be Installed');
-                break;
-            case STAGE_IDS.GEO_TAG_PHOTO:
-                requireField(editData.geo_tag_status === 'Proceed', 'Geo Tag Photo Status must be Proceed');
-                requireField(editData.geo_tag_image, 'Geo Tag Photograph');
-                break;
-            case STAGE_IDS.METER_INSTALLATION:
-                requireField(normalizeMeterInstallation(editData.meter_installation) === 'Yes', 'Meter Installation Status must be Yes');
-                requireField(editData.installation_date, 'Meter Installation Date');
-                break;
-            case STAGE_IDS.DISCOM_INSPECTION:
-                requireField(editData.discom_inspection === 'Yes', 'Discom Inspection Status must be Yes');
-                break;
-            default:
-                break;
-        }
-
-        return issues;
-    };
+    const getMissingStageRequirements = () => missingStageRequirements(editData.stage, editData);
 
     const showMissingRequirements = (issues) => {
         setValidationIssues(issues);
@@ -1036,25 +947,6 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                 console.error('Error saving BOM during stage advance:', err);
                 setSaving(false);
                 showAlert('Failed to save the Material Integration BOM, so the stage was not advanced: ' + (err.message || 'Unknown error'), { type: 'error' });
-                return;
-            }
-        }
-
-        if (editData.stage === STAGE_IDS.MATERIAL_INTEGRATION) {
-            const { data: bomData } = await supabase
-                .from('bom')
-                .select('paper_prepared_by, paper_prepared_date, material_loaded_by, material_loaded_date')
-                .eq('admin_id', customer.id)
-                .maybeSingle();
-
-            if (!bomData || !bomData.paper_prepared_by || !bomData.paper_prepared_date || !bomData.material_loaded_by || !bomData.material_loaded_date) {
-                const missingMilestones = [];
-                if (!bomData?.paper_prepared_by) missingMilestones.push('Paper Prepared By');
-                if (!bomData?.paper_prepared_date) missingMilestones.push('Paper Prepared Date');
-                if (!bomData?.material_loaded_by) missingMilestones.push('Material Loaded By');
-                if (!bomData?.material_loaded_date) missingMilestones.push('Material Loaded Date');
-                showMissingRequirements(missingMilestones);
-                setSaving(false);
                 return;
             }
         }
@@ -1685,22 +1577,108 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                 {/* Header */}
                 <div className="bg-stone-900 px-6 py-5 flex justify-between items-center flex-shrink-0">
                     <div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                             <h2 className="text-xl font-bold text-white">{customer.customer_name}</h2>
+                            {(customer.phone_number || editData.phone_number) && getTelephoneHref(customer.phone_number || editData.phone_number) && (
+                                <a
+                                    href={getTelephoneHref(customer.phone_number || editData.phone_number)}
+                                    className="inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-700/60 hover:border-emerald-500 px-2.5 py-1 rounded-lg font-bold transition shadow-xs cursor-pointer group"
+                                    title={`Click to call ${customer.phone_number || editData.phone_number}`}
+                                >
+                                    <Phone size={12} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                                    <span>{customer.phone_number || editData.phone_number}</span>
+                                </a>
+                            )}
                             {isCompleted && (
                                 <span className={`flex items-center gap-1 text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-widest ${isFrozen ? 'bg-stone-700 text-stone-400' : 'bg-amber-500/20 text-amber-400'}`}>
                                     {isFrozen ? <><Lock size={9} /> Frozen</> : <><Unlock size={9} /> Unlocked</>}
                                 </span>
                             )}
+                            {(customer.google_drive_link || editData.google_drive_link) && (
+                                <a
+                                    href={customer.google_drive_link || editData.google_drive_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-xs text-blue-300 bg-blue-950/70 hover:bg-blue-900/80 border border-blue-700/60 hover:border-blue-500 px-2.5 py-1 rounded-lg font-bold transition shadow-xs cursor-pointer group"
+                                    title={`Open Google Drive: ${customer.google_drive_link || editData.google_drive_link}`}
+                                >
+                                    <HardDrive size={12} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                                    <span>Google Drive</span>
+                                    <ExternalLink size={10} className="text-blue-400 opacity-70" />
+                                </a>
+                            )}
+                            {(customer.location_link || editData.location_link) && (
+                                <a
+                                    href={customer.location_link || editData.location_link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/80 border border-emerald-700/60 hover:border-emerald-500 px-2.5 py-1 rounded-lg font-bold transition shadow-xs cursor-pointer group"
+                                    title={`Open Location Link: ${customer.location_link || editData.location_link}`}
+                                >
+                                    <MapPin size={12} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                                    <span>Site Location</span>
+                                    <ExternalLink size={10} className="text-emerald-400 opacity-70" />
+                                </a>
+                            )}
                         </div>
-                        {customer.created_at && (
-                            <p className="text-[11px] text-stone-400 font-medium mt-0.5 flex items-center gap-1.5">
-                                <Calendar size={11} className="text-stone-400 flex-shrink-0" />
-                                <span>Lead Created: {new Date(customer.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })} IST</span>
-                            </p>
-                        )}
+                        <div className="flex items-center gap-3 flex-wrap mt-0.5">
+                            {customer.created_at && (
+                                <p className="text-[11px] text-stone-400 font-medium flex items-center gap-1.5">
+                                    <Calendar size={11} className="text-stone-400 flex-shrink-0" />
+                                    <span>Created: {new Date(customer.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                                </p>
+                            )}
+                            {customer.updated_at && customer.updated_at !== customer.created_at && (
+                                <p className="text-[11px] text-amber-400 font-medium flex items-center gap-1.5">
+                                    <Clock size={11} className="text-amber-400 flex-shrink-0" />
+                                    <span>Updated: {new Date(customer.updated_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                                </p>
+                            )}
+                            {customer.completed_at && (
+                                <p className="text-[11px] text-emerald-400 font-medium flex items-center gap-1.5">
+                                    <CheckCircle2 size={11} className="text-emerald-400 flex-shrink-0" />
+                                    <span>Completed: {new Date(customer.completed_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                                </p>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2.5">
+                        {/* Mode Toggle for Document Checklist vs File Storage */}
+                        <div className="hidden sm:inline-flex rounded-xl bg-white/10 p-1 border border-white/10 mr-1">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setChecklistMode('checklist');
+                                    setDocChecklistMode('checklist');
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                    docChecklistMode === 'checklist'
+                                        ? 'bg-amber-500 text-stone-900 shadow-sm'
+                                        : 'text-stone-300 hover:text-white'
+                                }`}
+                                title="Simple Checklist Mode: 1-click verify items directly without needing file attachments"
+                            >
+                                <CheckSquare size={13} />
+                                <span>Checklist</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setChecklistMode('files');
+                                    setDocChecklistMode('files');
+                                }}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                                    docChecklistMode === 'files'
+                                        ? 'bg-amber-500 text-stone-900 shadow-sm'
+                                        : 'text-stone-300 hover:text-white'
+                                }`}
+                                title="File Storage Mode: Upload client documents, photos, and demo attachments"
+                            >
+                                <FolderOpen size={13} />
+                                <span>Documents</span>
+                            </button>
+                        </div>
+
                         {/* Admin unlock/lock toggle for completed cards */}
                         {isCompleted && isAdmin && (
                             <button onClick={() => { setAdminUnlocked(prev => !prev); setEditingSection(null); }}
@@ -1711,8 +1689,15 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                         {isAdmin && <button onClick={() => setShowDeleteConfirm(true)} className="p-2 text-white/30 hover:text-red-400"><Trash2 size={18} /></button>}
                         <button onClick={async () => {
                             if (isFormDirty) {
-                                const shouldSave = await showConfirm('You have unsaved changes. Save them before closing?', { title: 'Unsaved changes', confirmLabel: 'Save & Close', cancelLabel: 'Keep Editing', type: 'success' });
-                                if (!shouldSave || !(await handleSave())) return;
+                                const choice = await showChoice('You have unsaved changes. Would you like to save them before closing?', { title: 'Unsaved changes', confirmLabel: 'Save & Close', discardLabel: 'Discard Changes', cancelLabel: 'Keep Editing', type: 'warning' });
+                                if (choice === 'cancel') return;
+                                if (choice === 'confirm') {
+                                    const saved = await handleSave();
+                                    if (!saved) return;
+                                } else if (choice === 'discard') {
+                                    setIsFormDirty(false);
+                                    setEditData({ ...savedDataRef.current });
+                                }
                             }
                             onClose();
                         }} className="p-2 text-white/30 hover:text-white"><X size={24} /></button>
@@ -1720,28 +1705,39 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                 </div>
 
                 {/* Tabs */}
-                <div className="flex bg-stone-900 px-6 gap-6 border-t border-white/5 flex-shrink-0 overflow-x-auto scrollbar-none whitespace-nowrap">
-                    {[
-                        ...PRIMARY_STAGES.filter(s => {
-                            if (s.id === STAGE_IDS.LOAN && editData.payment_type?.trim().toLowerCase() === 'cash') return false;
-                            if (s.id === STAGE_IDS.CASH && editData.payment_type?.trim().toLowerCase() === 'loan') return false;
-                            if (s.id === STAGE_IDS.COMPLETED || s.id === STAGE_IDS.LOST_PROJECT) return false;
-                            return true;
-                        }).map(s => ({ id: s.id, label: s.label, icon: s.icon })),
-                        { id: 'DOCUMENTS', label: 'Documents', icon: FolderOpen },
-                        { id: 'history', label: 'Notes & History', icon: History },
-                    ].map(tab => (
-                        <button key={tab.id} onClick={async () => {
-                            if (tab.id !== activeTab && isFormDirty) {
-                            const shouldSave = await showConfirm('You have unsaved changes. Save them before continuing?', { title: 'Unsaved changes', confirmLabel: 'Save & Continue', cancelLabel: 'Keep Editing', type: 'success' });
-                            if (!shouldSave || !(await handleSave())) return;
-                            }
-                            setActiveTab(tab.id); setEditingSection(null);
-                        }}
-                            className={`flex items-center gap-2 py-3 text-[10px] font-bold uppercase tracking-widest transition-all border-b-2 flex-shrink-0 ${activeTab === tab.id ? 'text-amber-400 border-amber-400' : 'text-stone-500 border-transparent hover:text-stone-300'}`}>
-                            <tab.icon size={12} /> {tab.label}
-                        </button>
-                    ))}
+                <div className="relative bg-stone-900 border-t border-white/5 flex-shrink-0">
+                    <div className="flex gap-6 overflow-x-auto scrollbar-none whitespace-nowrap px-6 scroll-smooth">
+                        {[
+                            ...PRIMARY_STAGES.filter(s => {
+                                if (s.id === STAGE_IDS.LOAN && editData.payment_type?.trim().toLowerCase() === 'cash') return false;
+                                if (s.id === STAGE_IDS.CASH && editData.payment_type?.trim().toLowerCase() === 'loan') return false;
+                                if (s.id === STAGE_IDS.COMPLETED || s.id === STAGE_IDS.LOST_PROJECT) return false;
+                                return true;
+                            }).map(s => ({ id: s.id, label: s.label, icon: s.icon })),
+                            { id: 'DOCUMENTS', label: 'Documents', icon: FolderOpen },
+                            { id: 'history', label: 'Notes & History', icon: History },
+                        ].map(tab => (
+                            <button key={tab.id} onClick={async () => {
+                                if (tab.id !== activeTab && isFormDirty) {
+                                    const choice = await showChoice('You have unsaved changes. Save them before continuing?', { title: 'Unsaved changes', confirmLabel: 'Save & Continue', discardLabel: 'Discard Changes', cancelLabel: 'Keep Editing', type: 'warning' });
+                                    if (choice === 'cancel') return;
+                                    if (choice === 'confirm') {
+                                        const saved = await handleSave();
+                                        if (!saved) return;
+                                    } else if (choice === 'discard') {
+                                        setIsFormDirty(false);
+                                        setEditData({ ...savedDataRef.current });
+                                    }
+                                }
+                                setActiveTab(tab.id); setEditingSection(null);
+                            }}
+                                className={`flex items-center gap-2 py-3 text-[10px] font-bold uppercase tracking-widest transition-all border-b-2 flex-shrink-0 ${activeTab === tab.id ? 'text-amber-400 border-amber-400' : 'text-stone-500 border-transparent hover:text-stone-300'}`}>
+                                <tab.icon size={12} /> {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Subtle right gradient fade indicating more tabs are scrollable */}
+                    <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-stone-900 to-transparent" />
                 </div>
 
                 {/* Body */}
@@ -1847,6 +1843,9 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                         </div>
                     )}
 
+                    {stageRequirements[activeTab] && <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 mb-4 text-xs text-teal-900">
+                        <strong>Demo essentials: </strong>{stageRequirements[activeTab].map(([,label])=>label).join(' · ')}. Other fields and all photos are optional.
+                    </div>}
                     <CustomerModalTabsRouter {...tabProps} />
 
                     {/* ── DOCUMENTS ── */}
@@ -1891,8 +1890,8 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                                     <PauseCircle size={16} />
                                 </div>
                                 <div>
-                                    <p className="text-xs font-bold text-stone-700">Need to mark as lost project or put on hold?</p>
-                                    <p className="text-[11px] text-stone-500 font-medium">Classify this project as lost with origin stage details & audit notes.</p>
+                                    <p className="text-xs font-bold text-stone-700">Pause or stop this project?</p>
+                                    <p className="text-[11px] text-stone-500 font-medium">Paused projects go to Lost Project. Their previous stage is saved so they can resume later.</p>
                                 </div>
                             </div>
                             <button
@@ -1900,7 +1899,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                                 onClick={handleMoveToLostProject}
                                 className="px-3.5 py-2 bg-white hover:bg-stone-100 text-stone-700 rounded-xl text-xs font-bold border border-stone-200 transition-colors shadow-2xs self-start sm:self-auto cursor-pointer"
                             >
-                                Move to Lost Project
+                                Pause / Move to Lost Project
                             </button>
                         </div>
                     )}

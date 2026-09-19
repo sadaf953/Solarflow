@@ -390,6 +390,8 @@ export const ADMIN_COLUMNS = new Set([
     'bank_branch',
     'bank_details',
     'bank_name',
+    'bom_data',
+    'bom_stock_issued_at',
     'cash_details',
     'channel_partner',
     'completed_at',
@@ -401,6 +403,7 @@ export const ADMIN_COLUMNS = new Set([
     'deleted_at',
     'delivery_batch_id',
     'delivery_status',
+    'demo_scenario_version',
     'digital_certificate',
     'discom_inspection',
     'discom_submission',
@@ -415,6 +418,7 @@ export const ADMIN_COLUMNS = new Set([
     'follow_ups',
     'geo_tag_image',
     'geo_tag_status',
+    'google_drive_link',
     'hold_procurement',
     'house_geo_tag_photo',
     'id',
@@ -429,11 +433,13 @@ export const ADMIN_COLUMNS = new Set([
     'invoice_no',
     'invoice_value',
     'jansamarth_application_no',
+    'lead_creator_profile_id',
     'light_bill',
     'loan_history',
     'loan_by',
     'loan_registration_date',
     'loan_tag',
+    'location_link',
     'material_delivery_date',
     'material_order_notes',
     'meter_installation',
@@ -524,11 +530,18 @@ export const DEFAULT_PAGE_SIZE = 50;
 // Also covers the fields handleMoveStage validates before letting a lead leave
 // the Leads stage (villages, module_brand, sub_divisions) - narrowing the grid
 // query without these would make that check see undefined and falsely block.
-export const CUSTOMER_CARD_COLUMNS = 'id, customer_name, phone_number, email_address, consumer_no, folder_no, stage, channel_partner, sub_channel_partner, payment_type, loan_tag, subsidy_tag, installation_status, system_capacity_kwp, module_brand, module_wp, no_of_modules, villages, full_address, pincode, sub_divisions, district, registration_date, invoice_value, vendor_quote, created_at, updated_at, deleted_at, delivery_batch_id, delivery_status, stages_remarks, vendor, geo_tag_status';
+export const CUSTOMER_CARD_COLUMNS = 'id, customer_name, phone_number, email_address, consumer_no, folder_no, stage, channel_partner, sub_channel_partner, payment_type, loan_tag, subsidy_tag, installation_status, system_capacity_kwp, module_brand, module_wp, no_of_modules, villages, full_address, pincode, sub_divisions, district, registration_date, invoice_value, vendor_quote, created_at, updated_at, deleted_at, delivery_batch_id, delivery_status, stages_remarks, vendor, geo_tag_status, google_drive_link, location_link';
+
+// Safe columns for cpo_leads view in case new columns (google_drive_link, location_link)
+// have not yet been refreshed into the Postgres view definition
+export const CPO_CARD_COLUMNS = 'id, customer_name, phone_number, email_address, consumer_no, folder_no, stage, channel_partner, sub_channel_partner, payment_type, loan_tag, subsidy_tag, installation_status, system_capacity_kwp, module_brand, module_wp, no_of_modules, villages, full_address, pincode, sub_divisions, district, registration_date, invoice_value, vendor_quote, created_at, updated_at, deleted_at, delivery_batch_id, delivery_status, stages_remarks, vendor, geo_tag_status';
+
+export const getCustomerCardColumns = (isCpo = false) => isCpo ? CPO_CARD_COLUMNS : CUSTOMER_CARD_COLUMNS;
+
 
 // Vendor list cards and stage counters do not need the full admin record. The
 // complete record is fetched only when a vendor opens one assignment.
-export const VENDOR_LIST_COLUMNS = 'id, customer_name, phone_number, email_address, consumer_no, folder_no, stage, vendor, deleted_at, installation_status, geo_tag_status, villages, sub_divisions, district, system_capacity_kwp, module_brand, module_wp, no_of_modules, created_at, updated_at';
+export const VENDOR_LIST_COLUMNS = 'id, customer_name, phone_number, email_address, consumer_no, folder_no, stage, vendor, deleted_at, installation_status, geo_tag_status, villages, sub_divisions, district, system_capacity_kwp, module_brand, module_wp, no_of_modules, material_delivery_date, installation_date, vendor_quote, vendor_payment_status, vendor_paid_date, created_at, updated_at';
 
 export const DELIVERY_PICKER_COLUMNS = 'id, customer_name, phone_number, consumer_no, folder_no, stage, channel_partner, sub_channel_partner, system_capacity_kwp, module_wp, no_of_modules, invoice_value, delivery_batch_id, delivery_status, material_delivery_date, driver_name, driver_phone_number, vehicle_number, vendor, created_at, updated_at, deleted_at';
 

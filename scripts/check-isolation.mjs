@@ -1,16 +1,25 @@
+import { parseEnv, validateDemoEnv } from './demo-env.mjs';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const failures = [];
 for (const name of readdirSync('.').filter(name => /^\.env(?:\.|$)/.test(name))) {
-  for (const line of readFileSync(name, 'utf8').split('\n')) {
-    if (line.trim() && !line.trim().startsWith('#') && /=\s*\S/.test(line)) {
-      failures.push(`${name}: populated environment variables are not allowed in this isolated demo`);
-    }
-  }
+  try { validateDemoEnv(parseEnv(readFileSync(name,'utf8'))); }
+  catch (error) { failures.push(`${name}: ${error.message}`); }
 }
-for (const path of ['public/CNAME', 'dist/CNAME', 'supabase/.temp/project-ref', 'supabase/.temp/linked-project.json', '.vercel/project.json', '.netlify/state.json', '.mcp.json']) {
+for (const path of ['public/CNAME', 'dist/CNAME', '.vercel/project.json', '.netlify/state.json', '.mcp.json']) {
   if (existsSync(path)) failures.push(`Unexpected external project binding: ${path}`);
+}
+const approvedSupabaseRef = 'qduonewmquwayrnwyzvc';
+if (existsSync('supabase/.temp/linked-project.json')) {
+  try {
+    const data = JSON.parse(readFileSync('supabase/.temp/linked-project.json', 'utf8'));
+    if (data.ref !== approvedSupabaseRef) failures.push(`Unexpected linked Supabase project: ${data.ref}`);
+  } catch { failures.push('Invalid linked Supabase project file'); }
+}
+if (existsSync('supabase/.temp/project-ref')) {
+  const ref = readFileSync('supabase/.temp/project-ref', 'utf8').trim();
+  if (ref !== approvedSupabaseRef) failures.push(`Unexpected linked Supabase project-ref: ${ref}`);
 }
 function scan(dir) {
   if (!existsSync(dir)) return;
@@ -19,7 +28,7 @@ function scan(dir) {
     if (entry.isSymbolicLink()) { failures.push(`Review symlink: ${path}`); continue; }
     if (entry.isDirectory()) { scan(path); continue; }
     if (!/\.(?:js|jsx|ts|tsx|json|html|yml|yaml|toml|sql|mjs)$/.test(path)) continue;
-    const text = readFileSync(path, 'utf8');
+    const text = readFileSync(path, 'utf8').replaceAll('https://qduonewmquwayrnwyzvc.supabase.co','[APPROVED_DEMO]');
     if (/https?:\/\/[\w.-]+\.supabase\.(?:co|com)|postgres(?:ql)?:\/\/|github_pat_|ghp_[A-Za-z0-9]{20,}|sb_secret_/i.test(text)) failures.push(`Remote backend or credential found: ${path}`);
   }
 }
@@ -28,12 +37,16 @@ if (existsSync('.github/workflows') && readdirSync('.github/workflows').some(n =
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 if (pkg.homepage || pkg.scripts.deploy || pkg.scripts.predeploy) failures.push('Deployment configuration is not allowed');
 try {
-  if (execFileSync('git', ['remote'], { encoding: 'utf8' }).trim()) failures.push('Git remote configured');
+  const remotes = execFileSync('git', ['remote'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
+  if (remotes.some(name => name !== 'origin')) failures.push('Unexpected Git remote');
   const config = execFileSync('git', ['config', '--local', '--list'], { encoding: 'utf8' });
-  if (/https?:\/\/|git@|pushurl=/.test(config)) failures.push('Remote target in local Git configuration');
+  const approvedRemote = 'https://github.com/sadaf953/Solarflow.git';
+  for (const line of config.split('\n')) {
+    if (/https?:\/\/|git@|pushurl=/.test(line) && !['remote.origin.url=','remote.origin.pushurl='].some(prefix => line === prefix + approvedRemote)) failures.push('Unapproved remote target in local Git configuration');
+  }
 } catch { failures.push('Cannot verify local Git configuration'); }
 if (failures.length) {
   console.error('Demo isolation check failed:\n' + failures.join('\n'));
   process.exit(1);
 }
-console.log('Demo isolation checks passed: no credentials, remote bindings, deployment automation or Git remotes.');
+console.log('Demo isolation checks passed: only the approved new project public configuration is permitted; no deployment automation; Git may point only to the new Solarflow repository.');

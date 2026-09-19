@@ -1,6 +1,7 @@
+import {useDemoTourNavigation} from '../demo/tour';
 import { useState, useEffect, useCallback } from 'react';
 import { IndianRupee, Search, RefreshCw, ChevronDown } from 'lucide-react';
-import { LOAN_TAGS, LOAN_TAG_COLORS, CUSTOMER_CARD_COLUMNS, STAGE_IDS } from '../constants';
+import { LOAN_TAGS, LOAN_TAG_COLORS, CUSTOMER_CARD_COLUMNS, getCustomerCardColumns, STAGE_IDS } from '../constants';
 import { normalizeLoanTag } from '../utils';
 import { supabase } from '../supabase';
 
@@ -8,6 +9,7 @@ const PAGE_SIZE = 50;
 
 export default function LoanView({ onSelectCustomer, isChannelPartnerOffice, partnerName, channelPartnerFilter, dealerFilter }) {
     const [activeFilter, setActiveFilter] = useState(null);
+    useDemoTourNavigation((entry)=>{if(entry.view==='loan_tags'){setActiveFilter(entry.tag || null);setSearchTerm('');setPage(0);}});
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [customers, setCustomers] = useState([]);
@@ -31,16 +33,16 @@ export default function LoanView({ onSelectCustomer, isChannelPartnerOffice, par
     // Fetch True Exact Counts via Supabase HEAD queries
     const fetchCounts = useCallback(async () => {
         try {
-            const targetPartner = isChannelPartnerOffice ? partnerName : (channelPartnerFilter?.trim() || null);
+            const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
 
             // 1. Total Count Query for all Loan customers
             let loanStageQuery = supabase
-                .from('admin')
+                .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                 .select('*', { count: 'exact', head: true })
                 .is('deleted_at', null)
                 .eq('stage', STAGE_IDS.LOAN);
             let taggedOutsideLoanQuery = supabase
-                .from('admin')
+                .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                 .select('*', { count: 'exact', head: true })
                 .is('deleted_at', null)
                 .neq('stage', STAGE_IDS.COMPLETED)
@@ -60,7 +62,7 @@ export default function LoanView({ onSelectCustomer, isChannelPartnerOffice, par
             // 2. Parallel Head queries for every specific tag in LOAN_TAGS
             const countPromises = LOAN_TAGS.map(async (tag) => {
                 let tagQuery = supabase
-                    .from('admin')
+                    .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                     .select('*', { count: 'exact', head: true })
                     .is('deleted_at', null)
                     .neq('stage', STAGE_IDS.COMPLETED)
@@ -100,14 +102,14 @@ export default function LoanView({ onSelectCustomer, isChannelPartnerOffice, par
         else setLoadingMore(true);
 
         try {
-            const targetPartner = isChannelPartnerOffice ? partnerName : (channelPartnerFilter?.trim() || null);
+            const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
 
             let query = supabase
-                .from('admin')
+                .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                 // Was select('*'): ~90 columns per row for a card that renders a
                 // handful. CUSTOMER_CARD_COLUMNS was already imported here
                 // and unused. The detail modal fetches the full record on open.
-                .select(CUSTOMER_CARD_COLUMNS)
+                .select(getCustomerCardColumns(isChannelPartnerOffice))
                 .is('deleted_at', null)
                 .neq('stage', STAGE_IDS.COMPLETED)
                 .order('created_at', { ascending: false })
@@ -121,7 +123,7 @@ export default function LoanView({ onSelectCustomer, isChannelPartnerOffice, par
             if (activeFilter) {
                 query = query.ilike('loan_tag', `%${activeFilter}%`);
             } else {
-                query = query.or(`stage.eq.${STAGE_IDS.LOAN},loan_tag.not.is.null`);
+                query = query.not('loan_tag', 'is', null).neq('loan_tag', '');
             }
 
             // Direct Backend Search across name, phone, consumer_no
@@ -143,7 +145,7 @@ export default function LoanView({ onSelectCustomer, isChannelPartnerOffice, par
             if (!error && data) {
                 const visibleData = activeFilter
                     ? data
-                    : data.filter(row => row.stage === STAGE_IDS.LOAN || String(row.loan_tag || '').trim());
+                    : data.filter(row => String(row.loan_tag || '').trim());
                 if (isAppend) {
                     setCustomers(prev => {
                         const existingIds = new Set(prev.map(c => c.id));

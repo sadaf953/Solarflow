@@ -25,7 +25,7 @@ export const DocumentFooter: React.FC<DocumentFooterProps> = ({ footer, assets, 
         {/* Left: Authorized Partner */}
         <div className="ml-5 flex w-[252px] shrink-0 flex-col items-start">
           <span className="mb-1 whitespace-nowrap text-[11.5px] font-extrabold font-sans text-[#0c3882] tracking-tight">
-            Fictional Demo Partner
+            Fictional Demo Aurora Solar
           </span>
           <div className="mb-2">
             <DemoPartnerLogo customLogoUrl={assets?.demoPartnerLogoUrl} className="h-[52px]" />

@@ -77,5 +77,7 @@ export const DEFAULT_LEAD_FORM = {
     vendor_payment_status: 'Pending',
     vendor_paid_date: null,
     vendor_paid_by: null,
+    google_drive_link: '',
+    location_link: '',
     stage: 'LEADS',
 };

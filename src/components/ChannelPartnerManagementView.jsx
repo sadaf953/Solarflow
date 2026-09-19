@@ -7,7 +7,7 @@ import { useGlobalPopup } from './GlobalPopup';
 const normalizeDirectoryLabel = (value) => String(value || '').trim().toLocaleLowerCase();
 
 // Metadata predates case-insensitive duplicate protection, so the same partner
-// can exist as (for example) "Radhe Solar" and "RADHE SOLAR". Keep the rows in
+// can exist as (for example) "Demo Coral Solar" and "Demo Coral Solar". Keep the rows in
 // Supabase untouched, but expose only one directory item. When available, use
 // the already-uppercase row as the canonical UI entry because new entries are
 // stored uppercase.
@@ -100,7 +100,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
                     .select('id, category, label')
                     .in('category', ['channel_partner', 'module_brand', 'registration_by', 'integration_by', 'inverter_make']),
                 supabase
-                    .from('profiles')
+                    .from('demo_profiles')
                     .select('*')
                     .order('created_at', { ascending: false }),
                 fetchAllAdminChannelPartners()
@@ -276,7 +276,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
         setLoadingStampReport(true);
         try {
             const [profRes, recRes] = await Promise.all([
-                supabase.from('profiles').select('id, name, email, status').eq('user_type', 'stamp').order('name'),
+                supabase.from('demo_profiles').select('id, name, email, status').eq('user_type', 'stamp').order('name'),
                 supabase.from('admin')
                     .select('id, customer_name, discom_submission')
                     .eq('discom_submission->>stamp_sent', 'true')
@@ -315,7 +315,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
 
     // Add new Channel Partner
     const handleAddPartner = async () => {
-        // Stored uppercase so the list cannot drift into "Perfect" / "PERFECT"
+        // Stored uppercase so the list cannot drift into "Demo Zephyr Solar" / "Demo Zephyr Solar"
         // pairs again. Leads are unaffected: admin.channel_partner is free text
         // and every comparison against it is case-insensitive.
         const val = newPartner.trim().toUpperCase();
@@ -490,47 +490,23 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
             // No rename branch here any more: the name field is read-only, so
             // admin.vendor can never fall out of step with the login name.
 
-            // Keep the login in step with the directory. This list shows
-            // "No Login in User Mgmt" by matching vendors.email to
-            // profiles.email, so changing the address here without changing the
-            // login flagged a working vendor as having no account - which is
-            // exactly how V2 ended up badged after its email was edited.
-            //
-            // The auth email is what they actually sign in with, so it goes
-            // first: if it cannot be changed we stop and say so, rather than
-            // leaving the directory pointing at an address that cannot log in.
+            // Keep the permanent demo profile aligned with the vendor directory.
             let loginNote = '';
             if (email.toLowerCase() !== String(oldEmail || '').trim().toLowerCase() && oldEmail) {
                 const { data: linked } = await supabase
-                    .from('profiles')
+                    .from('demo_profiles')
                     .select('id')
                     .ilike('email', String(oldEmail).trim())
                     .limit(1);
 
                 if (linked && linked.length > 0) {
                     const profileId = linked[0].id;
-                    const { data: fnData, error: fnErr } = await supabase.functions.invoke('add_user', {
-                        body: { action: 'update_email', user_id: profileId, new_email: email.toLowerCase() },
-                    });
-                    let errMsg = fnData?.error || fnErr?.message;
-                    if (fnErr?.context && typeof fnErr.context.json === 'function') {
-                        try {
-                            const errJson = await fnErr.context.json();
-                            if (errJson?.error) errMsg = errJson.error;
-                        } catch { /* ignore */ }
-                    }
-                    if (errMsg) {
-                        throw new Error(
-                            errMsg + ' The vendor directory was updated, but this vendor must still sign in with '
-                            + oldEmail + '. Fix the login in User Management.'
-                        );
-                    }
                     const pRes = await runWrite(
-                        supabase.from('profiles').update({ email: email.toLowerCase() }).eq('id', profileId).select('id'),
+                        supabase.from('demo_profiles').update({ email: email.toLowerCase() }).eq('id', profileId).select('id'),
                         { action: 'profile email change' }
                     );
                     if (!pRes.ok) throw pRes.error;
-                    loginNote = ' Their login email was updated to match.';
+                    loginNote = ' Their demo profile was updated to match.';
                 }
             }
 
@@ -644,7 +620,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
 
                 // Keep real logins in step so a channel partner's own portal
                 // session reflects the rename immediately.
-                if (category === 'channel_partner') await cascade('profiles', 'channel_partner');
+                if (category === 'channel_partner') await cascade('demo_profiles', 'channel_partner');
 
                 if (category === 'integration_by') await cascade('bom_items', 'integration_by');
             } catch (cascadeErr) {

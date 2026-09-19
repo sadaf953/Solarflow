@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Building2, Mail, Zap, Trash2, Plus, Copy, Check, ClipboardPaste, Layers, Printer, Truck, User, Edit3, IndianRupee, Calendar } from 'lucide-react';
+import { Building2, Mail, Zap, Trash2, Plus, Copy, Check, ClipboardPaste, Layers, Printer, Truck, User, Edit3, IndianRupee, Calendar, AlertTriangle, X } from 'lucide-react';
 import { SectionHeader, EditableDetailItem, fetchVendorNames } from './shared';
 import { sendVendorLeadNotification } from '../../utils/vendorNotification';
 import { formatInputValue } from '../../utils';
+import { isVendorUnavailableOn } from '../../utils/vendorAvailability';
+import VendorCalendarView from '../VendorCalendarView';
 
 const parsePanelSerials = (raw) => {
     if (!raw) return [''];
@@ -56,6 +58,7 @@ export default function MaterialDeliveryTab({
     const [vendorConfirm, setVendorConfirm] = useState({ isOpen: false, vendorName: '' });
     const [localDeliveryStatus, setLocalDeliveryStatus] = useState(null);
     const [showPrintModal, setShowPrintModal] = useState(false);
+    const [showVendorCalendarModal, setShowVendorCalendarModal] = useState(false);
     const printableDeliveryRef = useRef(null);
 
     const panelSerials = useMemo(() => {
@@ -63,6 +66,11 @@ export default function MaterialDeliveryTab({
     }, [editData?.panel_serial_no, customer?.panel_serial_no]);
 
     const filledCount = panelSerials.filter(Boolean).length;
+
+    const activeDeliveryDate = editData?.material_delivery_date || customer?.material_delivery_date;
+    const vendorAvailabilityCheck = useMemo(() => {
+        return isVendorUnavailableOn(editData?.vendor, activeDeliveryDate);
+    }, [editData?.vendor, activeDeliveryDate]);
 
     useEffect(() => {
         // Cached in shared.jsx - this tab re-mounts on every open, and the
@@ -136,6 +144,13 @@ export default function MaterialDeliveryTab({
                     <h3 className="text-[9px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-2">
                         <Building2 size={12} /> Pick a Vendor <span className="text-red-500">*</span>
                     </h3>
+                    <button
+                        type="button"
+                        onClick={() => setShowVendorCalendarModal(true)}
+                        className="text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                    >
+                        <Calendar size={11} /> Check Vendor Schedules
+                    </button>
                 </div>
                 <div className="bg-stone-50 p-4 rounded-[20px] border border-stone-150 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1 min-w-[200px]">
@@ -228,6 +243,18 @@ export default function MaterialDeliveryTab({
                         </div>
                     )}
                 </div>
+
+                {vendorAvailabilityCheck.unavailable && (
+                    <div className="mt-2.5 p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-900 flex items-start gap-2.5 shadow-2xs animate-in fade-in">
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <div>
+                            <span className="font-bold text-rose-950">⚠️ Vendor Availability Conflict: </span>
+                            <span>
+                                <strong>{editData.vendor}</strong> is marked unavailable on <strong>{activeDeliveryDate}</strong> ({vendorAvailabilityCheck.reason}). Please coordinate schedule with the vendor or adjust the delivery date.
+                            </span>
+                        </div>
+                    </div>
+                )}
             </section>            {/* Equipment & Delivery Info (Grid) */}
             <section id="section-equip_details" className="space-y-4">
                 <div className="flex items-center justify-between mb-3 border-b border-stone-100 pb-1.5 mt-4">
@@ -240,14 +267,15 @@ export default function MaterialDeliveryTab({
                             title={canEditDelivery ? undefined : 'Delivery status is set from Delivery Batches'}
                             value={localDeliveryStatus || editData.delivery_status || 'PENDING'}
                             onChange={async (e) => {
+                                const previousStat = localDeliveryStatus || editData.delivery_status || 'PENDING';
                                 const newStat = e.target.value;
                                 setLocalDeliveryStatus(newStat);
                                 setEditData(p => ({ ...p, delivery_status: newStat }));
                                 try {
                                     // A failed save must stop here - otherwise the activity log below
                                     // records a change that never reached the database.
-                                    if (await onUpdate(customer.id, { delivery_status: newStat }) === false) return;
-                                } catch { /* best-effort, ignore failure */ }
+                                    if (await onUpdate(customer.id, { delivery_status: newStat }) === false) throw new Error('Delivery was not saved');
+                                } catch { setLocalDeliveryStatus(previousStat);setEditData(p=>({...p,delivery_status:previousStat})); }
                             }}
                             className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full outline-none cursor-pointer tracking-normal shadow-xs ${
                                 (localDeliveryStatus || editData.delivery_status) === 'DELIVERED' 
@@ -339,7 +367,7 @@ export default function MaterialDeliveryTab({
                 {/* 5 Delivery Metadata Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
                     <EditableDetailItem 
-                        label="INVOICE NO *" 
+                        label="INVOICE NO"
                         field="invoice_no" 
                         value={editData.invoice_no} 
                         onChange={handleChange} 
@@ -361,14 +389,14 @@ export default function MaterialDeliveryTab({
                         isEditing={editingSection === 'equip_details'} 
                     />
                     <EditableDetailItem 
-                        label="DRIVER NAME *" 
+                        label="DRIVER NAME"
                         field="driver_name" 
                         value={editData.driver_name} 
                         onChange={handleChange} 
                         isEditing={editingSection === 'equip_details'} 
                     />
                     <EditableDetailItem 
-                        label="DRIVER PHONE NUMBER *" 
+                        label="DRIVER PHONE NUMBER"
                         field="driver_phone_number" 
                         value={editData.driver_phone_number} 
                         onChange={handleChange} 
@@ -640,6 +668,48 @@ export default function MaterialDeliveryTab({
                             >
                                 <Mail size={14} />
                                 Confirm & Send Email
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Vendor Availability Calendar Modal for Admin */}
+            {showVendorCalendarModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-stone-200 p-6 relative">
+                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-stone-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                                    <Calendar className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-stone-900">Vendor Availability Schedule</h3>
+                                    <p className="text-[11px] text-stone-500">Inspect vendor availability before assigning delivery or installation batches</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowVendorCalendarModal(false)}
+                                className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition cursor-pointer"
+                                title="Close calendar"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <VendorCalendarView 
+                            vendorName={editData.vendor || 'Vendor 1'} 
+                            isAdmin={true} 
+                        />
+
+                        <div className="mt-6 pt-4 border-t border-stone-100 flex justify-end">
+                            <button
+                                type="button"
+                                onClick={() => setShowVendorCalendarModal(false)}
+                                className="px-5 py-2 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl transition cursor-pointer"
+                            >
+                                Close Schedule
                             </button>
                         </div>
                     </div>

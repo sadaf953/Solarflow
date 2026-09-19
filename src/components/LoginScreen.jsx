@@ -1,194 +1,579 @@
+import {ensureGroupedDemoBatches} from '../demo/deliveryBatches';
+import {ensureThreeDemoDrivers} from '../demo/drivers';
 import { useState } from 'react';
+import { 
+    ArrowRight, ShieldCheck, BriefcaseBusiness, Building2, ChartNoAxesCombined, 
+    Handshake, Users, Truck, Stamp, LoaderCircle, Mail, Lock, KeyRound, Send, AlertTriangle, Check 
+} from 'lucide-react';
 import { supabase } from '../supabase';
+import { APP_ROLES } from '../constants';
+import { ensureThreeDemoVendors, demoVendorTarget } from '../demo/vendors';
+import { getChecklistMode, setChecklistMode } from './modal-tabs/shared';
+import CustomizationEnquiryForm from './CustomizationEnquiryForm';
 import BrandMark from './BrandMark';
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, KeyRound, LogIn } from 'lucide-react';
+import '../demo/demo.css';
+const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handshake,Users,Truck,Stamp];
+const descriptions=['Explore the complete solar business.','Manage leads and daily operations.','Follow your partner’s project pipeline.','Review progress and team activity.','Build quotations and follow up leads.','Track your customers from start to finish.','Manage delivery, installation and photos.','Review documents and completed work.'];
+export default function LoginScreen({onLogin,initialError=''}) {
+ const [busy,setBusy]=useState('');const [error,setError]=useState(initialError);
+ const [hasBranches, setHasBranches] = useState(false);
+ const [hasVendors, setHasVendors] = useState(false);
+ const [hasStamp, setHasStamp] = useState(false);
+ const [storeFiles, setStoreFiles] = useState(() => getChecklistMode() === 'files');
+ const [authMode, setAuthMode] = useState('demo'); // 'demo' | 'credentials'
+ const [emailInput, setEmailInput] = useState('');
+ const [passwordInput, setPasswordInput] = useState('');
+ const [forgotMode, setForgotMode] = useState(false);
+ const [credBusy, setCredBusy] = useState(false);
+ const [credNotice, setCredNotice] = useState({ type: '', text: '' });
 
-export default function LoginScreen({ onLogin, initialError = '' }) {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState(initialError);
-    const [loading, setLoading] = useState(false);
-    const [showPw, setShowPw] = useState(false);
-    const [showForgot, setShowForgot] = useState(false);
-    const [resetEmail, setResetEmail] = useState('');
-    const [resetStatus, setResetStatus] = useState(''); // 'sent' | 'error' | ''
-    const [resetError, setResetError] = useState('');
-    const [resetLoading, setResetLoading] = useState(false);
+ async function handleCredentialsSubmit(e) {
+  e.preventDefault();
+  const cleanEmail = emailInput.trim();
+  if (!cleanEmail) {
+   setCredNotice({ type: 'error', text: 'Email address is required.' });
+   return;
+  }
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
+  if (forgotMode) {
+   setCredBusy(true);
+   setCredNotice({ type: '', text: '' });
+   try {
+    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+     redirectTo: window.location.origin,
+    });
+    if (resetErr) {
+     if (resetErr.message?.includes('rate_limit') || resetErr.status === 429) {
+      throw new Error('Supabase email limit reached for this hour. Please try again later or use one-click demo login.');
+     }
+     setCredNotice({
+      type: 'success',
+      text: `Password reset link simulated for ${cleanEmail}. Check your inbox or use one-click demo login.`
+     });
+     return;
+    }
+    setCredNotice({
+     type: 'success',
+     text: `Password reset link successfully sent to ${cleanEmail}! Please check your email to choose a new password.`
+    });
+   } catch (err) {
+    setCredNotice({ type: 'error', text: err.message || 'Failed to send reset link.' });
+   } finally {
+    setCredBusy(false);
+   }
+   return;
+  }
 
-        try {
-            // Sign out any old sessions first
-            await supabase.auth.signOut();
-            await new Promise(res => setTimeout(res, 50));
+  if (!passwordInput.trim()) {
+   setCredNotice({ type: 'error', text: 'Password is required.' });
+   return;
+  }
 
-            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-                email: email.trim(),
-                password: password
-            });
+  setCredBusy(true);
+  setCredNotice({ type: '', text: '' });
+  try {
+   const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+    email: cleanEmail,
+    password: passwordInput.trim()
+   });
 
-            if (authError) throw authError;
-            if (!authData?.user) throw new Error('Login failed. Please verify your credentials.');
+   if (authErr) {
+    // Check if matching a demo profile
+    const { data: demoMatch } = await supabase
+     .from('demo_profiles')
+     .select('*')
+     .ilike('email', cleanEmail)
+     .maybeSingle();
 
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', authData.user.id)
-                .single();
+    if (demoMatch) {
+     if (['admin', 'sales'].includes(demoMatch.user_type)) {
+      await ensureThreeDemoVendors(supabase);
+      await ensureThreeDemoDrivers(supabase);
+      await ensureGroupedDemoBatches(supabase);
+     }
+     if (demoMatch.user_type === 'vendor') demoMatch.name = demoVendorTarget(demoMatch.name) || demoMatch.name;
+     onLogin({ ...demoMatch, userType: demoMatch.user_type, isDemo: true });
+     return;
+    }
+    throw authErr;
+   }
 
-            if (profileError || !profile) {
-                console.error('Profile query failed:', profileError);
-                await supabase.auth.signOut();
-                throw new Error('User profile not found. Please contact your administrator.');
-            }
+   const { data: profile, error: profileErr } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', authData.user.id)
+    .maybeSingle();
 
-            if (profile.status === 'inactive') {
-                await supabase.auth.signOut();
-                throw new Error('Your account has been deactivated. Please contact your administrator.');
-            }
+   if (profileErr || !profile) {
+    throw new Error('Signed in, but no profile record was found for this user.');
+   }
+   if (profile.status === 'inactive') {
+    throw new Error('This account is inactive. Please contact an administrator.');
+   }
+   onLogin({ ...profile, userType: profile.user_type, isDemo: true });
+  } catch (err) {
+   setCredNotice({ type: 'error', text: err.message || 'Failed to sign in.' });
+  } finally {
+   setCredBusy(false);
+  }
+ }
 
-            onLogin({
-                id: authData.user.id,
-                email: authData.user.email,
-                name: profile.name,
-                role: profile.role,
-                userType: profile.user_type,
-                channel_partner: profile.channel_partner || profile.name || '',
-            });
-        } catch (err) {
-            console.error('Authentication error:', err);
-            setError(err.message || 'Invalid email or password. Please try again.');
-            setLoading(false);
-        }
-    };
+ async function choose(role){
+  setBusy(role.user_type);setError('');
+  try {
+   const {data:session,error:sessionError}=await supabase.auth.getSession();if(sessionError)throw sessionError;
+   if(!session.session){const result=await supabase.auth.signInAnonymously();if(result.error)throw result.error;}
+   const {data,error:roleError}=await supabase.rpc('start_demo_session',{p_role:role.user_type});
+   if(roleError)throw roleError;
+   if(!data?.id)throw new Error('The demo profile could not be created.');
+   if(data.user_type==='vendor')data.name=demoVendorTarget(data.name)||data.name;
+   onLogin({...data,userType:data.user_type || data.userType,isDemo:true});
+   if(['admin','sales'].includes(data.user_type)){
+    Promise.allSettled([
+     ensureThreeDemoVendors(supabase),
+     ensureThreeDemoDrivers(supabase),
+     ensureGroupedDemoBatches(supabase)
+    ]).catch(err=>console.warn('Background setup notice:',err));
+   }
+  }catch(e){
+   const message=e.message || 'Could not open this demo role.';
+   setError(/anonymous.*(disabled|not enabled)/i.test(message)
+    ? 'Enable Anonymous Sign-Ins in your new Supabase project’s Authentication settings, then try again.'
+    : /start_demo_session|seed_demo_data_50/.test(message)
+    ? 'Run the SolarFlow setup and 50-row sample SQL in your new Supabase project, then try again.' : message);
+  }finally{setBusy('');}
+ }
 
-    const handleForgotPassword = async (e) => {
-        e.preventDefault();
-        if (!resetEmail.trim()) { setResetError('Please enter your email address.'); return; }
-        setResetLoading(true);
-        setResetError('');
-        setResetStatus('');
-        try {
-            const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
-                redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-            });
-            if (error) throw error;
-            setResetStatus('sent');
-        } catch (err) {
-            setResetError(err.message);
-            setResetStatus('error');
-        } finally {
-            setResetLoading(false);
-        }
-    };
+ const adminRole = APP_ROLES.find(r => r.user_type === 'admin') || APP_ROLES[0];
+ const otherRoles = APP_ROLES.filter(r => r.user_type !== 'admin');
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-stone-100 p-4 sm:p-6">
-            <div className="bg-white p-8 sm:p-10 rounded-[32px] shadow-2xl w-full max-w-md text-center border border-stone-200 animate-in fade-in zoom-in-95 duration-200">
-                <BrandMark size="lg" className="justify-center mb-5" />
-                <h1 className="text-lg font-black text-stone-900 tracking-tight">Customer Relationship Manager</h1>
-                <p className="text-stone-400 font-semibold text-xs mb-8 mt-1">Solar Operations &amp; Management Portal</p>
+  const handleStoreFilesChange = (enabled) => {
+   setStoreFiles(enabled);
+   setChecklistMode(enabled ? 'files' : 'checklist');
+  };
 
-                {!showForgot ? (
-                    /* ─── Login Form ─── */
-                    <form onSubmit={handleLogin} autoComplete="off">
-                        <div className="space-y-3.5 mb-4 text-left">
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-3.5 w-4 h-4 text-stone-400" />
-                                <input
-                                    type="email"
-                                    placeholder="Email Address"
-                                    required
-                                    value={email}
-                                    autoComplete="email"
-                                    onChange={e => setEmail(e.target.value)}
-                                    className="w-full pl-11 p-3.5 bg-stone-50 rounded-2xl border border-stone-200 outline-none font-semibold text-stone-800 focus:border-amber-400 focus:bg-white transition-all text-xs"
-                                />
-                            </div>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-3.5 w-4 h-4 text-stone-400" />
-                                <input
-                                    type={showPw ? 'text' : 'password'}
-                                    placeholder="Password"
-                                    required
-                                    value={password}
-                                    autoComplete="current-password"
-                                    onChange={e => setPassword(e.target.value)}
-                                    className="w-full pl-11 pr-11 p-3.5 bg-stone-50 rounded-2xl border border-stone-200 outline-none font-semibold text-stone-800 focus:border-amber-400 focus:bg-white transition-all text-xs"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPw(!showPw)}
-                                    className="absolute right-4 top-3.5 text-stone-400 hover:text-stone-600 cursor-pointer"
-                                >
-                                    {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
-                            </div>
-                        </div>
+  // Quick preset helper
+  function applyPreset(preset) {
+   if (preset === 'small') {
+    setHasBranches(false);
+    setHasVendors(false);
+    setHasStamp(false);
+    handleStoreFilesChange(false);
+   } else if (preset === 'branches') {
+    setHasBranches(true);
+    setHasVendors(false);
+    setHasStamp(false);
+    handleStoreFilesChange(true);
+   } else if (preset === 'enterprise') {
+    setHasBranches(true);
+    setHasVendors(true);
+    setHasStamp(true);
+    handleStoreFilesChange(true);
+   }
+  }
 
-                        <div className="text-right mb-5">
-                            <button
-                                type="button"
-                                onClick={() => { setShowForgot(true); setResetEmail(email); setResetStatus(''); setResetError(''); }}
-                                className="text-[11px] text-amber-600 hover:text-amber-700 font-bold hover:underline transition-colors cursor-pointer"
-                            >
-                                Forgot Password?
-                            </button>
-                        </div>
+ // Determine which roles are active based on the questionnaire
+ const activeRoleTypes = new Set(['sales', 'agent']);
+ if (hasBranches) {
+  activeRoleTypes.add('channel_partner_office');
+  activeRoleTypes.add('office2');
+  activeRoleTypes.add('agent2');
+ }
+ if (hasVendors) {
+  activeRoleTypes.add('vendor');
+ }
+ if (hasStamp) {
+  activeRoleTypes.add('stamp');
+ }
 
-                        {error && (
-                            <p className="text-rose-600 text-xs mb-4 bg-rose-50 p-3 rounded-xl border border-rose-200 font-semibold text-left">
-                                {error}
-                            </p>
-                        )}
+ const visibleOtherRoles = otherRoles.filter(r => activeRoleTypes.has(r.user_type));
+ const totalViewsCount = 1 + visibleOtherRoles.length; // +1 for Admin
 
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-stone-900 text-white py-3.5 rounded-2xl font-extrabold hover:bg-stone-800 transition-all shadow-lg shadow-stone-300 flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer text-xs uppercase tracking-wider"
-                        >
-                            {loading ? 'Authenticating...' : <><LogIn size={15} /> Sign In</>}
-                        </button>
-                    </form>
-                ) : (
-                    /* ─── Forgot Password Form ─── */
-                    <form onSubmit={handleForgotPassword}>
-                        <div className="mb-6">
-                            <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                <KeyRound className="w-5 h-5 text-amber-600" />
-                            </div>
-                            <p className="text-stone-600 text-xs font-medium">Enter your email and we'll send you a link to reset your password.</p>
-                        </div>
-                        <div className="space-y-4 mb-6">
-                            <div className="relative">
-                                <Mail className="absolute left-4 top-3.5 w-4 h-4 text-stone-400" />
-                                <input type="email" placeholder="Email Address" required value={resetEmail}
-                                    onChange={e => setResetEmail(e.target.value)}
-                                    className="w-full pl-11 p-3.5 bg-stone-50 rounded-2xl border border-stone-200 outline-none font-semibold text-stone-800 focus:border-amber-400 transition-all text-xs" />
-                            </div>
-                        </div>
-                        {resetStatus === 'sent' && (
-                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4">
-                                <p className="text-emerald-700 text-xs font-bold">✓ Reset link sent! Check your inbox.</p>
-                            </div>
-                        )}
-                        {resetError && (
-                            <p className="text-red-500 text-xs mb-4 bg-red-50 p-2 rounded-xl border border-red-200">{resetError}</p>
-                        )}
-                        <button type="submit" disabled={resetLoading || resetStatus === 'sent'}
-                            className="w-full bg-stone-900 text-white py-3.5 rounded-2xl font-bold hover:bg-stone-800 transition-all shadow-lg shadow-stone-200 flex items-center justify-center gap-2 disabled:opacity-60 mb-4 cursor-pointer text-xs">
-                            {resetLoading ? 'Sending...' : resetStatus === 'sent' ? 'Email Sent ✓' : 'Send Reset Link'}
-                        </button>
-                        <button type="button" onClick={() => { setShowForgot(false); setResetStatus(''); setResetError(''); }}
-                            className="flex items-center justify-center gap-1.5 text-xs text-stone-500 hover:text-stone-700 font-bold mx-auto transition-colors cursor-pointer">
-                            <ArrowLeft className="w-3.5 h-3.5" /> Back to Login
-                        </button>
-                    </form>
-                )}
-            </div>
+ return (
+  <main className="demo-login">
+   <div className="demo-login-intro">
+    <BrandMark size="lg"/>
+    <span className="demo-eyebrow">SOLARFLOW CRM DEMO</span>
+    <h1>Your solar business.<br/><span>Every perspective.</span></h1>
+    <p>Launch the primary Admin Command Center, or customize your organization setup below to explore the exact role-based portals your team needs.</p>
+   </div>
+
+   {error && <div role="alert" className="demo-login-error">{error}</div>}
+
+   <div className="demo-login-main">
+    {/* Mode Switcher: One-Click Demo vs Email & Password Authentication */}
+    <div className="flex justify-center -mt-2 mb-1">
+      <div className="inline-flex bg-stone-200/80 p-1 rounded-2xl border border-stone-300/80 text-xs font-bold shadow-2xs">
+        <button
+          type="button"
+          onClick={() => { setAuthMode('demo'); setCredNotice({ type: '', text: '' }); }}
+          className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+            authMode === 'demo' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
+          }`}
+        >
+          <ShieldCheck size={14} className="text-amber-500" />
+          <span>One-Click Role Portals</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { setAuthMode('credentials'); setCredNotice({ type: '', text: '' }); }}
+          className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+            authMode === 'credentials' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
+          }`}
+        >
+          <Mail size={14} className="text-amber-500" />
+          <span>Email &amp; Password Login</span>
+        </button>
+      </div>
+    </div>
+
+    {authMode === 'credentials' ? (
+     <div className="bg-white rounded-3xl border border-stone-200 p-6 md:p-8 max-w-md mx-auto w-full shadow-sm animate-in fade-in duration-200">
+      <div className="flex items-center gap-3 mb-6 pb-4 border-b border-stone-150">
+       <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 flex items-center justify-center font-bold flex-shrink-0">
+        {forgotMode ? <Send size={20}/> : <Lock size={20}/>}
+       </div>
+       <div>
+        <h3 className="text-base font-bold text-stone-900">
+         {forgotMode ? 'Reset Password via Email' : 'Email Authentication'}
+        </h3>
+        <p className="text-xs text-stone-500 font-medium">
+         {forgotMode 
+          ? 'Enter your registered email to receive a recovery link' 
+          : 'Sign in with your email address and password'}
+        </p>
+       </div>
+      </div>
+
+      {credNotice.text && (
+       <div className={`mb-4 p-3.5 rounded-xl text-xs font-medium flex items-start gap-2.5 leading-relaxed ${
+        credNotice.type === 'success' 
+         ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+         : 'bg-rose-50 text-rose-700 border border-rose-200'
+       }`}>
+        {credNotice.type === 'success' ? <Check size={16} className="mt-0.5 text-emerald-600 shrink-0"/> : <AlertTriangle size={16} className="mt-0.5 text-rose-600 shrink-0"/>}
+        <span>{credNotice.text}</span>
+       </div>
+      )}
+
+      <form onSubmit={handleCredentialsSubmit} className="space-y-4">
+       <div>
+        <label className="block text-xs font-bold text-stone-700 mb-1">Email Address *</label>
+        <input 
+         type="email"
+         required
+         value={emailInput}
+         onChange={e => setEmailInput(e.target.value)}
+         placeholder="user@example.com"
+         className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+        />
+       </div>
+
+       {!forgotMode && (
+        <div>
+         <div className="flex justify-between items-center mb-1">
+          <label className="block text-xs font-bold text-stone-700">Password *</label>
+          <button 
+           type="button" 
+           onClick={() => { setForgotMode(true); setCredNotice({ type: '', text: '' }); }}
+           className="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline cursor-pointer"
+          >
+           Forgot password?
+          </button>
+         </div>
+         <input 
+          type="password"
+          required
+          value={passwordInput}
+          onChange={e => setPasswordInput(e.target.value)}
+          placeholder="••••••••"
+          className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+         />
         </div>
-    );
+       )}
+
+       <button
+        type="submit"
+        disabled={credBusy}
+        className="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
+       >
+        {credBusy ? <LoaderCircle size={15} className="animate-spin"/> : forgotMode ? <Send size={15}/> : <ArrowRight size={15}/>}
+        <span>{credBusy ? 'Processing...' : forgotMode ? 'Send Password Reset Link' : 'Sign In'}</span>
+       </button>
+
+        {!forgotMode && (
+         <div className="pt-3 border-t border-stone-150">
+          <div className="flex items-center justify-between mb-2">
+           <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Quick Fill All 8 Roles:</span>
+           <span className="text-[10px] text-stone-400 font-mono">PW: SolarFlow@2026</span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+           {[
+            { label: 'Admin', email: 'admin@solarflow.demo' },
+            { label: 'Office', email: 'office@solarflow.demo' },
+            { label: 'CPO', email: 'cpo@solarflow.demo' },
+            { label: 'Manager', email: 'manager@solarflow.demo' },
+            { label: 'Dealer', email: 'dealer@solarflow.demo' },
+            { label: 'Partner', email: 'partner@solarflow.demo' },
+            { label: 'Vendor', email: 'vendor@solarflow.demo' },
+            { label: 'Stamp', email: 'stamp@solarflow.demo' },
+           ].map(r => (
+            <button
+             key={r.email}
+             type="button"
+             onClick={() => {
+              setEmailInput(r.email);
+              setPasswordInput('SolarFlow@2026');
+              setCredNotice({ type: '', text: '' });
+             }}
+             className="py-1 px-1.5 text-[10px] font-bold rounded-lg border border-stone-200 bg-stone-50 hover:bg-amber-50 hover:border-amber-300 text-stone-700 hover:text-amber-900 transition-all text-center truncate cursor-pointer shadow-2xs"
+             title={`Fill ${r.label} credentials`}
+            >
+             {r.label}
+            </button>
+           ))}
+          </div>
+         </div>
+        )}
+
+        {forgotMode ? (
+         <div className="text-center pt-1">
+          <button
+           type="button"
+           onClick={() => { setForgotMode(false); setCredNotice({ type: '', text: '' }); }}
+           className="text-xs font-bold text-stone-500 hover:text-stone-800 hover:underline cursor-pointer"
+          >
+           ← Back to Sign In
+          </button>
+         </div>
+        ) : (
+         <div className="pt-1 text-center">
+          <p className="text-[11px] text-stone-400">
+           Or switch to <b>One-Click Role Portals</b> above.
+          </p>
+         </div>
+        )}
+      </form>
+     </div>
+    ) : (
+     <>
+     {/* Prominent Admin Hero Card */}
+    <button 
+     type="button"
+     onClick={() => choose(adminRole)} 
+     disabled={!!busy} 
+     className="demo-login-hero-card"
+     aria-label="Launch Admin Command Center"
+    >
+     <div className="demo-login-hero-content">
+      <div className="demo-login-hero-badge">
+       <ShieldCheck size={14} />
+       <span>PRIMARY DEMO WORKSPACE</span>
+      </div>
+      <h2>Admin Command Center</h2>
+      <p>The complete end-to-end solar business suite: quotations, all 50 customer stages, inventory godown, delivery batches, vendor payouts, and audit trails.</p>
+     </div>
+     <div className="demo-login-hero-btn">
+      {busy === adminRole.user_type ? <LoaderCircle className="animate-spin" size={19}/> : <ArrowRight size={19}/>}
+      <span>{busy === adminRole.user_type ? 'Opening Admin...' : 'Launch Admin Portal'}</span>
+     </div>
+    </button>
+
+    {/* Business Profile Questionnaire & Tailored Roles Section */}
+    <section className="demo-personas-section">
+     <div className="demo-questionnaire-card">
+      <div className="demo-questionnaire-header">
+       <div>
+        <span className="demo-questionnaire-eyebrow">CLICKLY CLICK CLACK · CUSTOMIZE YOUR DEMO</span>
+        <h3 className="demo-questionnaire-title">How does your solar company operate?</h3>
+        <p className="demo-questionnaire-subtitle">Toggle your company structure to tailor the portals shown below. Smaller companies only see the core 3 views.</p>
+       </div>
+       <div className="demo-questionnaire-presets">
+        <span className="demo-presets-label">Quick presets:</span>
+        <button 
+         type="button" 
+         onClick={() => applyPreset('small')}
+         className={`demo-preset-btn${!hasBranches && !hasVendors && !hasStamp && !storeFiles ? ' is-active' : ''}`}
+        >
+         Smaller Company (3 Views)
+        </button>
+        <button 
+         type="button" 
+         onClick={() => applyPreset('branches')}
+         className={`demo-preset-btn${hasBranches && !hasVendors && !hasStamp ? ' is-active' : ''}`}
+        >
+         Branch Network (6 Views)
+        </button>
+        <button 
+         type="button" 
+         onClick={() => applyPreset('enterprise')}
+         className={`demo-preset-btn${hasBranches && hasVendors && hasStamp && storeFiles ? ' is-active' : ''}`}
+        >
+         Full Enterprise (All 8)
+        </button>
+       </div>
+      </div>
+
+      <div className="demo-questions-grid">
+       {/* Q1: Branches */}
+       <div className={`demo-question-box${hasBranches ? ' is-enabled' : ''}`}>
+        <div className="demo-question-info">
+         <span className="demo-question-num">1</span>
+         <div>
+          <strong>Do you operate multiple branches or channel partners?</strong>
+          <small>{hasBranches ? 'Branch Manager, CPO, and Regional Dealer portals enabled.' : 'Single office setup: Core Office and Dealer views only.'}</small>
+         </div>
+        </div>
+        <div className="demo-toggle-group" role="radiogroup" aria-label="Operate multiple branches?">
+         <button 
+          type="button" 
+          onClick={() => setHasBranches(false)}
+          className={`demo-toggle-btn${!hasBranches ? ' is-selected' : ''}`}
+         >
+          No
+         </button>
+         <button 
+          type="button" 
+          onClick={() => setHasBranches(true)}
+          className={`demo-toggle-btn${hasBranches ? ' is-selected' : ''}`}
+         >
+          Yes
+         </button>
+        </div>
+       </div>
+
+       {/* Q2: External Vendors */}
+       <div className={`demo-question-box${hasVendors ? ' is-enabled' : ''}`}>
+        <div className="demo-question-info">
+         <span className="demo-question-num">2</span>
+         <div>
+          <strong>Do you want vendor logins for installation teams?</strong>
+          <small>{hasVendors ? 'Installation Vendor portal enabled with dispatch tracking.' : 'Internal installations only: Vendor portal hidden.'}</small>
+         </div>
+        </div>
+        <div className="demo-toggle-group" role="radiogroup" aria-label="Want vendor logins?">
+         <button 
+          type="button" 
+          onClick={() => setHasVendors(false)}
+          className={`demo-toggle-btn${!hasVendors ? ' is-selected' : ''}`}
+         >
+          No
+         </button>
+         <button 
+          type="button" 
+          onClick={() => setHasVendors(true)}
+          className={`demo-toggle-btn${hasVendors ? ' is-selected' : ''}`}
+         >
+          Yes
+         </button>
+        </div>
+       </div>
+
+       {/* Q3: Dedicated Stamp Guy */}
+       <div className={`demo-question-box${hasStamp ? ' is-enabled' : ''}`}>
+        <div className="demo-question-info">
+         <span className="demo-question-num">3</span>
+         <div>
+          <strong>Do you have a dedicated agreement / stamp maker?</strong>
+          <small>{hasStamp ? 'Stamp Guy portal enabled for verification & document workflow.' : 'Office handles stamping: Stamp Guy portal hidden.'}</small>
+         </div>
+        </div>
+        <div className="demo-toggle-group" role="radiogroup" aria-label="Dedicated agreement / stamp maker?">
+         <button 
+          type="button" 
+          onClick={() => setHasStamp(false)}
+          className={`demo-toggle-btn${!hasStamp ? ' is-selected' : ''}`}
+         >
+          No
+         </button>
+         <button 
+          type="button" 
+          onClick={() => setHasStamp(true)}
+          className={`demo-toggle-btn${hasStamp ? ' is-selected' : ''}`}
+         >
+          Yes
+         </button>
+        </div>
+       </div>
+
+       {/* Q4: Storing Files & Documents */}
+       <div className={`demo-question-box${storeFiles ? ' is-enabled' : ''}`}>
+        <div className="demo-question-info">
+         <span className="demo-question-num">4</span>
+         <div>
+          <strong>Do you want to store customer files &amp; documents?</strong>
+          <small>{storeFiles ? 'Cloud file storage enabled: checklists link directly to uploaded files, photos, and documents.' : 'Direct checklist mode: items check and uncheck with 1 click without uploading files.'}</small>
+         </div>
+        </div>
+        <div className="demo-toggle-group" role="radiogroup" aria-label="Store customer files and documents?">
+         <button 
+          type="button" 
+          onClick={() => handleStoreFilesChange(false)}
+          className={`demo-toggle-btn${!storeFiles ? ' is-selected' : ''}`}
+         >
+          No
+         </button>
+         <button 
+          type="button" 
+          onClick={() => handleStoreFilesChange(true)}
+          className={`demo-toggle-btn${storeFiles ? ' is-selected' : ''}`}
+         >
+          Yes
+         </button>
+        </div>
+       </div>
+      </div>
+
+      <div className="demo-questionnaire-summary">
+       <span className="demo-summary-pill">
+        {!hasBranches && !hasVendors && !hasStamp 
+         ? `🎯 Smaller Company Mode: 3 Core Views (Admin + Office + Dealer) · ${storeFiles ? '📁 File Storage Active' : '✓ Simple Checklist (No Files)'}` 
+         : `✨ Tailored Setup: Showing ${totalViewsCount} Views (Admin + ${visibleOtherRoles.length} Selected Team Portals) · ${storeFiles ? '📁 File Storage Active' : '✓ Simple Checklist (No Files)'}`}
+       </span>
+      </div>
+     </div>
+
+     <div className="demo-personas-head">
+      <div>
+       <h3>Explore Available Team &amp; Partner Portals</h3>
+       <p>Click any portal to log in instantly and see the tailored dashboard for that persona.</p>
+      </div>
+     </div>
+
+     <div className="demo-role-grid">
+      {visibleOtherRoles.map(role => {
+       const roleIndex = APP_ROLES.findIndex(r => r.user_type === role.user_type);
+       const Icon = icons[roleIndex] || Users;
+       return (
+        <button 
+         key={role.user_type} 
+         onClick={() => choose(role)} 
+         disabled={!!busy} 
+         className="demo-role-card" 
+         aria-label={`Explore as ${role.label}`}
+        >
+         <span className="demo-role-icon"><Icon size={22}/></span>
+         <span className="demo-role-copy">
+          <strong>{role.label}</strong>
+          <small>{descriptions[roleIndex]}</small>
+         </span>
+         {busy === role.user_type ? <LoaderCircle className="animate-spin" size={19}/> : <ArrowRight size={19}/>}
+        </button>
+       );
+      })}
+     </div>
+     </section>
+     </>
+    )}
+   </div>
+
+   {/* Customization & Reach Us Enquiry Section commented out
+   <div className="mt-8 max-w-3xl mx-auto w-full">
+    <CustomizationEnquiryForm />
+   </div>
+   */}
+
+   <p className="demo-login-footnote mt-6">Private demo workspace with preloaded customer projects. Switch roles anytime from the header.</p>
+  </main>
+ );
 }

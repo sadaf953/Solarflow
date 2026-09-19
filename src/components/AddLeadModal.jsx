@@ -1,11 +1,12 @@
-import { leadSchema } from '../utils/validation';
+import { demoLeadSchema } from '../utils/validation';
 // src/components/AddLeadModal.jsx  -  SolarFlow Demo Energy
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useRef } from 'react';
 import { 
     X, Plus, User, ClipboardList, Paperclip, Eye, 
-    Upload, FileText, Image as ImageIcon, Loader2, Banknote, AlertTriangle, Calendar
+    Upload, FileText, Image as ImageIcon, Loader2, Banknote, AlertTriangle, Calendar,
+    HardDrive, MapPin, Sparkles
 } from 'lucide-react';
 import { DEFAULT_LEAD_FORM } from '../models';
 import { FilePreviewModal } from './modal-tabs/shared';
@@ -31,7 +32,7 @@ function AddLeadMetaSelect({ label, field, value, onChange, options = [] }) {
 }
 
 // Autocomplete component for Channel Partner Name selector (clean single outline)
-function ChannelPartnerAutocomplete({ label, value, onChange, suggestions = [], required = false, isAdmin = false }) {
+function ChannelPartnerAutocomplete({ label, value, onChange, suggestions = [], isAdmin = false }) {
     const [inputValue, setInputValue] = useState(value || '');
     const [showSuggestions, setShowSuggestions] = useState(false);
     const containerRef = useRef(null);
@@ -70,7 +71,7 @@ function ChannelPartnerAutocomplete({ label, value, onChange, suggestions = [], 
     return (
         <div className="space-y-1 relative" ref={containerRef}>
             <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                {label} {required && <span className="text-red-500 font-bold">*</span>}
+                {label}
             </label>
             <div className="relative">
                 <input name="channel_partner" id="channel_partner"
@@ -100,19 +101,26 @@ function ChannelPartnerAutocomplete({ label, value, onChange, suggestions = [], 
     );
 }
 
-// Interactive checklist row with file upload / replace / delete / view
 function AddLeadChecklistItem({ label, field, checked, onToggle, pendingFile, onFileAttach, onFileRemove, onPreview }) {
+    const { showImageCropper } = useGlobalPopup();
     const fileInputRef = useRef(null);
 
     // Unchecked by default; checked only when a file is attached
     const isUploaded = Boolean(pendingFile);
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+    const handleFileChange = async (e) => {
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
+        e.target.value = '';
+
+        let file = rawFile;
+        if (showImageCropper) {
+            file = await showImageCropper(rawFile, { title: `Crop & Adjust ${label || 'Lead Document'}` });
+            if (!file) return; // User cancelled upload
+        }
+
         onFileAttach(field, file);
         if (onToggle) onToggle(field, true);
-        e.target.value = '';
     };
 
     const handleRemove = () => {
@@ -252,6 +260,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                 defaults.sub_channel_partner = user?.name || '';
             } else if (isChannelPartnerOffice) {
                 defaults.channel_partner = partnerName || '';
+                defaults.sub_channel_partner = null;
             }
             setFormData(defaults);
             setPendingFiles({});
@@ -323,6 +332,84 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
         handleChange('system_capacity_kwp', String(kwp));
     };
 
+    const fillSampleIndex = useRef(0);
+    const handleFillTestData = () => {
+        const samples = [
+            {
+                customer_name: 'Rajesh Sharma',
+                phone_number: '9876543210',
+                email_address: 'rajesh.sharma@example.com',
+                consumer_no: '1089423589',
+                villages: 'Bhavnagar Rural Area',
+                full_address: 'Plot 42, Sector 8, Near Sun Temple, Bhavnagar',
+                pincode: '364001',
+                sub_divisions: 'Bhavnagar East Sub-Division',
+                district: 'Bhavnagar',
+                module_brand: meta['module_brand']?.[0] || 'WAAREE',
+                module_wp: '580',
+                no_of_modules: '6',
+                system_capacity_kwp: '3.48',
+                payment_type: 'Loan',
+                bank_name: 'State Bank of India',
+                bank_branch: 'Bhavnagar Main Branch',
+                google_drive_link: 'https://drive.google.com/drive/folders/sample-solarflow-drive',
+                location_link: 'https://maps.google.com/?q=21.7645,72.1519'
+            },
+            {
+                customer_name: 'Priya Patel',
+                phone_number: '9825123456',
+                email_address: 'priya.patel@example.com',
+                consumer_no: '1092837461',
+                villages: 'Anand City West',
+                full_address: 'B-14, Shanti Nagar Society, Station Road, Anand',
+                pincode: '388001',
+                sub_divisions: 'Anand Sub-Division',
+                district: 'Anand',
+                module_brand: meta['module_brand']?.[1] || 'ADANI',
+                module_wp: '545',
+                no_of_modules: '8',
+                system_capacity_kwp: '4.36',
+                payment_type: 'Cash',
+                bank_name: '',
+                bank_branch: '',
+                google_drive_link: 'https://drive.google.com/drive/folders/sample-solarflow-drive',
+                location_link: 'https://maps.google.com/?q=22.5645,72.9289'
+            },
+            {
+                customer_name: 'Amitabh Joshi',
+                phone_number: '9898012345',
+                email_address: 'amitabh.joshi@example.com',
+                consumer_no: '1073829104',
+                villages: 'Varachha Rural',
+                full_address: 'Shop 12, Crystal Heights, Mini Bazar, Surat',
+                pincode: '395006',
+                sub_divisions: 'Surat City Sub-Division',
+                district: 'Surat',
+                module_brand: meta['module_brand']?.[2] || 'GOLDEN SUN',
+                module_wp: '580',
+                no_of_modules: '10',
+                system_capacity_kwp: '5.8',
+                payment_type: 'Loan',
+                bank_name: 'Bank of Baroda',
+                bank_branch: 'Surat Textile Market',
+                google_drive_link: 'https://drive.google.com/drive/folders/sample-solarflow-drive',
+                location_link: 'https://maps.google.com/?q=21.1702,72.8311'
+            }
+        ];
+
+        const sample = samples[fillSampleIndex.current % samples.length];
+        fillSampleIndex.current += 1;
+
+        setIsFormDirty(true);
+        setValidationErrors([]);
+        setFormData(prev => ({
+            ...prev,
+            ...sample,
+            channel_partner: isAgent2 ? (user?.channel_partner || partnerName || '') : ((isAgent || isChannelPartnerOffice) ? partnerName : (prev.channel_partner || 'Demo Aurora Solar')),
+            sub_channel_partner: isChannelPartnerOffice ? null : (isPortalAgent ? user?.name : (prev.sub_channel_partner || 'Demo Dealer'))
+        }));
+    };
+
     const handleFileAttach = (docType, file) => {
         setIsFormDirty(true);
         setPendingFiles(prev => ({ ...prev, [docType]: file }));
@@ -359,18 +446,21 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
         
         const finalData = {
             ...formData,
+            lead_creator_profile_id: user?.demo_profile_id || user?.id || null,
             channel_partner: isAgent2 ? (user?.channel_partner || partnerName || '') : ((isAgent || isChannelPartnerOffice) ? partnerName : (formData.channel_partner || '').trim()),
-            sub_channel_partner: isPortalAgent ? user?.name : (formData.sub_channel_partner || '').trim() || null
+            sub_channel_partner: isChannelPartnerOffice ? null : isPortalAgent ? user?.name : (formData.sub_channel_partner || '').trim() || null,
+            created_at: formData.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
 
         // Ensure string fields are strings to pass Zod schema
-        ['customer_name', 'phone_number', 'email_address', 'consumer_no', 'villages', 'full_address', 'pincode', 'district', 'channel_partner', 'module_brand', 'module_wp', 'no_of_modules', 'system_capacity_kwp', 'sub_divisions', 'bank_name', 'bank_branch'].forEach(key => {
+        ['customer_name', 'phone_number', 'email_address', 'consumer_no', 'villages', 'full_address', 'pincode', 'district', 'channel_partner', 'module_brand', 'module_wp', 'no_of_modules', 'system_capacity_kwp', 'sub_divisions', 'bank_name', 'bank_branch', 'google_drive_link', 'location_link'].forEach(key => {
             if (finalData[key] !== undefined && finalData[key] !== null) {
                 finalData[key] = String(finalData[key]);
             }
         });
 
-        const result = leadSchema.safeParse(finalData);
+        const result = demoLeadSchema.safeParse(finalData);
         if (!result.success) {
             setValidationErrors(result.error.issues.map(err => err.message));
             // Scroll to top
@@ -439,10 +529,19 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             </span>
                         </div>
                         <p className="text-[10px] text-stone-400 font-semibold mt-0.5">
-                            Register a new customer lead with complete details and document attachments.
+                            Name and phone are required. Add other details and optional photos now or later.
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleFillTestData}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition-all cursor-pointer shadow-xs"
+                            title="Pre-fill form with realistic test data for quick testing"
+                        >
+                            <Sparkles size={13} className="text-amber-600" />
+                            <span>Fill Test Data</span>
+                        </button>
                         <button 
                             onClick={handleRequestClose} 
                             className="p-2 hover:bg-stone-100 text-stone-400 hover:text-stone-700 rounded-xl transition cursor-pointer"
@@ -480,10 +579,10 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                         </div>
 
                         <div className="space-y-3">
-                            {/* Customer Name */}
+                            {/* Customer Name * */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    Customer Name <span className="text-red-500 font-bold">*</span>
+                                    Customer Name *
                                 </label>
                                 <input
                                     type="text"
@@ -491,14 +590,14 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     onChange={e => handleChange('customer_name', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="Enter full name"
-                                    required
+
                                 />
                             </div>
 
-                            {/* Phone Number */}
+                            {/* Phone Number * */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    Phone Number <span className="text-red-500 font-bold">*</span>
+                                    Phone Number *
                                 </label>
                                 <input
                                     type="tel"
@@ -509,14 +608,14 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     onChange={e => handleChange('phone_number', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="0000000000 or +910000000000"
-                                    required
+
                                 />
                             </div>
 
                             {/* Email Address */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    Email Address <span className="text-red-500 font-bold">*</span>
+                                    Email Address
                                 </label>
                                 <input
                                     type="email"
@@ -524,14 +623,14 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     onChange={e => handleChange('email_address', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="name@example.com"
-                                    required
+
                                 />
                             </div>
 
                             {/* Consumer No */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    Consumer No <span className="text-red-500 font-bold">*</span>
+                                    Consumer No
                                 </label>
                                 <input
                                     type="text"
@@ -540,14 +639,14 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     onChange={e => handleChange('consumer_no', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="Consumer number"
-                                    required
+
                                 />
                             </div>
 
                             {/* Villages */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    Villages / Address <span className="text-red-500 font-bold">*</span>
+                                    Villages / Address
                                 </label>
                                 <input
                                     type="text"
@@ -555,7 +654,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     onChange={e => handleChange('villages', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="Village or address"
-                                    required
+
                                 />
                             </div>
 
@@ -582,7 +681,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             {/* Tehsil / Sub Division */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    Tehsil / Sub Division <span className="text-red-500 font-bold">*</span>
+                                    Tehsil / Sub Division
                                 </label>
                                 <input
                                     type="text"
@@ -590,14 +689,14 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     onChange={e => handleChange('sub_divisions', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="Tehsil or sub division"
-                                    required
+
                                 />
                             </div>
 
                             {/* District */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    District <span className="text-red-500 font-bold">*</span>
+                                    District
                                 </label>
                                 <input
                                     type="text"
@@ -605,7 +704,36 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     onChange={e => handleChange('district', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="District"
-                                    required
+                                />
+                            </div>
+
+                            {/* Google Drive Link */}
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold flex items-center gap-1.5">
+                                    <HardDrive size={12} className="text-blue-500" />
+                                    Google Drive Link <span className="normal-case text-stone-400 font-medium">(optional)</span>
+                                </label>
+                                <input
+                                    type="url"
+                                    value={formData.google_drive_link || ''}
+                                    onChange={e => handleChange('google_drive_link', e.target.value)}
+                                    className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                                    placeholder="https://drive.google.com/..."
+                                />
+                            </div>
+
+                            {/* Site Location Link */}
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold flex items-center gap-1.5">
+                                    <MapPin size={12} className="text-emerald-500" />
+                                    Site Location Link <span className="normal-case text-stone-400 font-medium">(optional)</span>
+                                </label>
+                                <input
+                                    type="url"
+                                    value={formData.location_link || ''}
+                                    onChange={e => handleChange('location_link', e.target.value)}
+                                    className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                                    placeholder="https://maps.google.com/?q=..."
                                 />
                             </div>
 
@@ -616,7 +744,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             {isAgent2 ? null : (isAgent || isChannelPartnerOffice) ? (
                                 <div className="space-y-1">
                                     <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                        Channel Partner Name <span className="text-red-500 font-bold">*</span>
+                                        Channel Partner Name
                                     </label>
                                     <input
                                         type="text"
@@ -631,17 +759,20 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     value={formData.channel_partner}
                                     onChange={val => handleChange('channel_partner', val)}
                                     suggestions={channel_partners}
-                                    required={true}
                                     isAdmin={user?.userType === 'admin'}
                                 />
                             )}
 
                             {/* A Channel Partner files leads under their own name. CPO and
                                 Manager accounts get a dropdown scoped to their CPO. */}
-                            {isPortalAgent ? (
+                            {isChannelPartnerOffice ? (
+                                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-800">
+                                    <strong>Added by your office</strong><p>This lead belongs to your CPO. Leads added by your dealers appear here automatically.</p>
+                                </div>
+                            ) : isPortalAgent ? (
                                 <div className="space-y-1">
                                     <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                        Dealer Name <span className="text-red-500 font-bold">*</span>
+                                        Dealer Name
                                     </label>
                                     <input
                                         type="text"
@@ -677,13 +808,13 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             {/* MODULE BRAND */}
                             <div className="space-y-1">
                                  <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                     MODULE BRAND <span className="text-red-500 font-bold">*</span>
+                                     MODULE BRAND
                                  </label>
                                  <select
                                      value={formData.module_brand || ''}
                                      onChange={e => handleChange('module_brand', e.target.value)}
                                      className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
-                                     required
+
                                  >
                                      <option value="">Select MODULE BRAND...</option>
                                      {(meta['module_brand'] || []).map(o => <option key={o} value={o}>{o}</option>)}
@@ -693,13 +824,13 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             {/* MODULE WP */}
                             <div className="space-y-1">
                                  <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                     MODULE WP <span className="text-red-500 font-bold">*</span>
+                                     MODULE WP
                                  </label>
                                  <select
                                      value={formData.module_wp || ''}
                                      onChange={e => handleChange('module_wp', e.target.value)}
                                      className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
-                                     required
+
                                  >
                                      <option value="">Select MODULE WP...</option>
                                      {moduleWpOptions.map(o => <option key={o} value={o}>{o}</option>)}
@@ -709,7 +840,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             {/* No of Modules */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    No of Modules <span className="text-red-500 font-bold">*</span>
+                                    No of Modules
                                 </label>
                                 <input
                                     type="number"
@@ -718,14 +849,14 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     onChange={e => handleChange('no_of_modules', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="e.g. 10"
-                                    required
+
                                 />
                             </div>
 
                             {/* System Capacity */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                    System Capacity <span className="text-red-500 font-bold">*</span>
+                                    System Capacity
                                 </label>
                                 <span className="relative block">
                                     <input
@@ -734,7 +865,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                         onChange={e => handleChange('system_capacity_kwp', e.target.value)}
                                         className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 pr-16 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                         placeholder="e.g. 32,940"
-                                        required
+
                                     />
                                     <button
                                         type="button"
@@ -755,7 +886,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             <div className="flex items-center gap-2">
                                 <ClipboardList size={13} className="text-amber-500" />
                                 <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
-                                    Document Checklist
+                                    Document Checklist (optional uploads)
                                 </h3>
                             </div>
                         </div>
@@ -764,7 +895,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             {/* Payment Type Selection at the top */}
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
-                                    Payment Type Selection <span className="text-red-500 font-bold">*</span>
+                                    Payment Type Selection
                                 </label>
                                 {/* The saved value is title-cased by the Zod schema ('Cash'
                                     / 'Loan') while these options come from metadata, which
@@ -784,7 +915,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                         handleChange('payment_type', val);
                                     }}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 font-semibold text-stone-800 transition-all"
-                                    required
+
                                 >
                                     <option value="">Select Payment Type...</option>
                                     {stored && !matched && (

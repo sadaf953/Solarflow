@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { History, Paperclip, IndianRupee, CheckCircle2, Lock, Edit3, X, ClipboardList, Upload, Eye, Loader2 } from 'lucide-react';
 import { LOAN_TAGS, LOAN_TAG_COLORS, isFinalTagValue } from '../../constants';
-import { CheckboxRemarkItem, EditableDetailItem } from './shared';
+import { CheckboxRemarkItem, EditableDetailItem, ChecklistModeToggle } from './shared';
 import { toIndianCommas, formatInputValue, parseIndianNumber } from '../../utils';
 import { createFeasibilityPdf, getMissingFeasibilityFields, mapFeasibilityReport } from '../../feasibilityReport';
 import { useGlobalPopup } from '../GlobalPopup';
@@ -416,18 +416,21 @@ export default function LoanTab({
 
                     {/* 1. Loan Documents Checklist */}
                     <section className="bg-white p-5 rounded-2xl border border-stone-200/70 shadow-xs space-y-3">
-                        <div className="flex items-center justify-between border-b border-stone-100 pb-2">
-                            <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
+                            <h4 className="text-[10px] font-bold text-stone-700 uppercase tracking-widest flex items-center gap-1.5">
                                 <Paperclip size={12} className="text-amber-500" /> Loan Documents
                             </h4>
-                            <span className="text-[9px] font-semibold text-stone-400 uppercase">Checklist</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">Mode:</span>
+                                <ChecklistModeToggle />
+                            </div>
                         </div>
 
                         <div className="flex flex-col gap-2">
                             
 
                             <CheckboxRemarkItem
-                                label="Vendor Feasibility *"
+                                label="Vendor Feasibility"
                                 field="vendor_feasibility"
                                 value={editData.vendor_feasibility}
                                 onChange={handleLocalChange}
@@ -440,7 +443,7 @@ export default function LoanTab({
                                 canDelete={canDeleteDocs}
                             />
                             <CheckboxRemarkItem
-                                label="Site Feasibility *"
+                                label="Site Feasibility"
                                 field="site_feasibility"
                                 value={editData.site_feasibility}
                                 onChange={handleLocalChange}

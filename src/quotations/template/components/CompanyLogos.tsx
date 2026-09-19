@@ -6,15 +6,16 @@ export const SolarFlowLogo: React.FC<LogoProps> = ({ customLogoUrl, className = 
   <img src={customLogoUrl || solarflowLogoBlue} alt="SolarFlow Solar Energy" className={`object-contain ${className}`} />
 );
 
-// These former partner-art slots now show only fictional demo branding.
-const DemoBadge: React.FC<LogoProps> = ({ className = 'h-12' }) => (
-  <div className={`flex flex-col justify-center text-center font-bold text-slate-700 ${className}`}>
-    <span>SolarFlow</span><span className="text-xs tracking-widest">DEMO ONLY</span>
-  </div>
+// Render supplied artwork in both preview and PDF; never substitute duplicate text badges.
+export const DemoQualityBadge: React.FC<LogoProps> = ({ customLogoUrl, className = 'h-12' }) => customLogoUrl ? (
+  <img src={customLogoUrl} alt="GEDA symbol" className={`object-contain ${className}`} />
+) : null;
+export const DemoEnergyBadge: React.FC<LogoProps> = ({ customLogoUrl, className = 'h-12' }) => customLogoUrl ? (
+  <img src={customLogoUrl} alt="Energy emblem" className={`object-contain ${className}`} />
+) : null;
+export const DemoPartnerLogo: React.FC<LogoProps> = ({ customLogoUrl, className = 'h-12' }) => (
+  <img src={customLogoUrl || solarflowLogoBlue} alt="Partner logo" className={`object-contain ${className}`} />
 );
-export const DemoQualityBadge = DemoBadge;
-export const DemoEnergyBadge = DemoBadge;
-export const DemoPartnerLogo = DemoBadge;
-export const DemoQuoteBanner: React.FC<LogoProps> = ({ className = '' }) => (
-  <img src={`${import.meta.env.BASE_URL}demo-banner.svg`} alt="SolarFlow fictional demo banner" className={className} />
+export const DemoQuoteBanner: React.FC<LogoProps> = ({ customLogoUrl, className = '' }) => (
+  <img src={customLogoUrl || `${import.meta.env.BASE_URL}banner.png`} alt="Solar energy banner" className={`w-full object-contain ${className}`} />
 );

@@ -6,8 +6,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { PRIMARY_STAGES, DELIVERY_PICKER_COLUMNS } from '../constants';
-import { toIndianCommas, logActivity, formatInputValue, parseIndianNumber, runWrite } from '../utils';
+import { toIndianCommas, logActivity, formatInputValue, parseIndianNumber, runWrite, getTelephoneHref } from '../utils';
 import { useGlobalPopup } from './GlobalPopup';
+import {filterDeliveryProjects,projectAssignedElsewhere} from '../delivery/projectPicker';
 
 export default function DeliveryBatchesView({ 
     currentUser, 
@@ -24,6 +25,8 @@ export default function DeliveryBatchesView({
     const [statusFilter, setStatusFilter] = useState('ALL'); // 'ALL', 'IN_TRANSIT', 'DELIVERED'
     const [expandedBatchId, setExpandedBatchId] = useState(null);
     const [allCustomers, setAllCustomers] = useState([]);
+    const [projectsLoading,setProjectsLoading]=useState(false);
+    const [projectsError,setProjectsError]=useState('');
     // Drivers directory (Operations -> Manage Drivers). Picking a name here
     // fills in that driver's phone and vehicle automatically.
     const [drivers, setDrivers] = useState([]);
@@ -32,6 +35,7 @@ export default function DeliveryBatchesView({
     // Customers for the batch picker and the manifest.
     // Queries only required columns via DELIVERY_PICKER_COLUMNS to cut network payload.
     const fetchAllCustomers = async () => {
+        setProjectsLoading(true);setProjectsError('');
         try {
             const pageAll = async (buildQuery) => {
                 const pageSize = 1000;
@@ -40,8 +44,7 @@ export default function DeliveryBatchesView({
                 while (true) {
                     const { data, error } = await buildQuery().range(from, from + pageSize - 1);
                     if (error) {
-                        console.error('pageAll error in DeliveryBatchesView:', error);
-                        break;
+                        throw error;
                     }
                     if (!data || data.length === 0) break;
                     rows.push(...data);
@@ -51,11 +54,12 @@ export default function DeliveryBatchesView({
                 return rows;
             };
 
-            const all = await pageAll(() => supabase.from('admin').select('*').is('deleted_at', null));
+            const all = await pageAll(() => supabase.from('admin').select('*').is('deleted_at', null).order('id'));
             setAllCustomers(all);
         } catch (e) {
             console.error('Error fetching customers in DeliveryBatchesView:', e);
-        }
+            setProjectsError(e.message || 'Could not load projects. Please retry.');
+        } finally {setProjectsLoading(false);}
     };
 
     const fetchDrivers = async () => {
@@ -75,7 +79,7 @@ export default function DeliveryBatchesView({
     }, []);
 
     // Wrap onRefreshCustomers to also update local customers list
-    const customers = propCustomers && propCustomers.length > 0 ? propCustomers : allCustomers;
+    const customers = allCustomers.length > 0 ? allCustomers : propCustomers;
     
     // Modal states
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -249,6 +253,7 @@ export default function DeliveryBatchesView({
             selectedProjectIds: []
         });
         setEditingBatch(null);
+        fetchAllCustomers();
         setProjectStageFilter('MATERIAL DELIVERY');
         setProjectSearchQuery('');
         setShowCreateModal(true);
@@ -270,6 +275,9 @@ export default function DeliveryBatchesView({
             selectedProjectIds: batch.project_ids || []
         });
         setEditingBatch(batch);
+        setProjectStageFilter('MATERIAL DELIVERY');
+        setProjectSearchQuery('');
+        fetchAllCustomers();
         setShowCreateModal(true);
     };
 
@@ -568,21 +576,9 @@ export default function DeliveryBatchesView({
         }
     };
 
-    const eligibleProjects = useMemo(() => {
-        return customers.filter(c => {
-            if (c.deleted_at) return false;
-            const isAvailable = !c.delivery_batch_id || (editingBatch && c.delivery_batch_id === editingBatch.batch_no);
-            if (!isAvailable) return false;
-            const matchesQuery = !projectSearchQuery || 
-                (c.customer_name || '').toLowerCase().includes(projectSearchQuery.toLowerCase()) ||
-                (c.phone_number || '').includes(projectSearchQuery) ||
-                (c.villages || '').toLowerCase().includes(projectSearchQuery.toLowerCase()) ||
-                (c.consumer_no || '').includes(projectSearchQuery);
-            
-            const matchesStage = projectStageFilter === 'ALL' || c.stage === projectStageFilter;
-            return matchesQuery && matchesStage;
-        });
-    }, [customers, projectSearchQuery, projectStageFilter]);
+    const eligibleProjects = useMemo(() => filterDeliveryProjects(customers,{
+        selectedIds:batchForm.selectedProjectIds,stage:projectStageFilter,query:projectSearchQuery
+    }),[customers,batchForm.selectedProjectIds,projectStageFilter,projectSearchQuery]);
 
     // Filter Batches by search & status
     const filteredBatches = useMemo(() => {
@@ -804,48 +800,41 @@ export default function DeliveryBatchesView({
                                                     localStorage.setItem("solarflow_local_delivery_batches", JSON.stringify(updatedBatches));
                                                     try {
                                                         const projectIds = linkedProjects.map(p => p.id);
-                                                        let atomicSuccess = false;
+                                                        let rpcSuccess = false;
                                                         try {
-                                                            const { data: rpcData, error: rpcErr } = await supabase.rpc('update_delivery_batch_status_atomic', {
-                                                                p_batch_id: batch.id,
-                                                                p_new_status: newStatus,
-                                                                p_project_ids: projectIds
+                                                            const { data: result, error: failure } = await supabase.rpc('update_delivery_batch_status_atomic', {
+                                                                p_batch_id: batch.id, p_new_status: newStatus, p_project_ids: projectIds
                                                             });
-                                                            if (!rpcErr && rpcData?.success) {
-                                                                atomicSuccess = true;
-                                                                if (rpcData.projects_missing > 0) {
-                                                                    console.warn(`Delivery batch ${batch.batch_no || batch.id}: ${rpcData.projects_missing} of ${rpcData.projects_expected} linked projects were not updated (deleted or missing).`);
-                                                                }
-                                                            }
-                                                        } catch (rpcThrow) {
-                                                            // Atomic RPC unavailable - fall through to the
-                                                            // non-atomic path below, but say so, since this
-                                                            // silently gives up the all-or-nothing guarantee.
-                                                            console.warn('update_delivery_batch_status_atomic unavailable, falling back to non-atomic update:', rpcThrow?.message || rpcThrow);
+                                                            if (!failure && result?.success) rpcSuccess = true;
+                                                        } catch (e) {
+                                                            console.warn('update_delivery_batch_status_atomic RPC unavailable, falling back to direct update', e);
                                                         }
 
-                                                        if (!atomicSuccess) {
-                                                            // Non-atomic fallback: the all-or-nothing guarantee
-                                                            // is already gone here, so at minimum every write must
-                                                            // prove it landed. "Mark All Delivered" flipping the
-                                                            // whole batch on screen over a refused write is exactly
-                                                            // the failure this path existed to avoid.
-                                                            const bRes = await runWrite(
-                                                                supabase.from("delivery_batches").update({ status: newStatus }).eq("id", batch.id).select('id'),
-                                                                { action: 'batch status change' }
+                                                        if (!rpcSuccess) {
+                                                            const todayStr = new Date().toISOString().split('T')[0];
+                                                            const batchRes = await runWrite(
+                                                                supabase.from('delivery_batches').update({ status: newStatus }).eq('id', batch.id).select('id'),
+                                                                { action: 'batch status update' }
                                                             );
-                                                            if (!bRes.ok) throw bRes.error;
+                                                            if (!batchRes.ok) throw batchRes.error;
+
                                                             if (projectIds.length > 0) {
-                                                                const aRes = await runWrite(
-                                                                    supabase.from("admin").update({ delivery_status: newStatus }).in("id", projectIds).select('id'),
-                                                                    { action: 'delivery status change' }
+                                                                const projPatch = {
+                                                                    delivery_status: newStatus,
+                                                                    delivery_batch_id: batch.batch_no,
+                                                                    driver_name: batch.driver_name,
+                                                                    driver_phone_number: batch.driver_phone,
+                                                                    vehicle_number: batch.vehicle_number,
+                                                                    vendor: batch.vendor,
+                                                                    material_delivery_date: newStatus === 'DELIVERED'
+                                                                        ? (batch.dispatch_date || todayStr)
+                                                                        : batch.dispatch_date
+                                                                };
+                                                                const projRes = await runWrite(
+                                                                    supabase.from('admin').update(projPatch).in('id', projectIds).select('id'),
+                                                                    { action: 'batch projects status sync' }
                                                                 );
-                                                                if (!aRes.ok) throw aRes.error;
-                                                                if (aRes.rows.length !== projectIds.length) {
-                                                                    throw new Error(
-                                                                        `The batch status changed, but only ${aRes.rows.length} of ${projectIds.length} customers were updated.`
-                                                                    );
-                                                                }
+                                                                if (!projRes.ok) throw projRes.error;
                                                             }
                                                         }
 
@@ -878,7 +867,20 @@ export default function DeliveryBatchesView({
                                             )}
                                             {batch.driver_name && (
                                                  <span className="flex items-center gap-1">
-                                                     <User size={12} className="text-stone-400" /> {batch.driver_name} {batch.driver_phone ? `(${batch.driver_phone})` : ''}
+                                                     <User size={12} className="text-stone-400" /> {batch.driver_name}
+                                                     {batch.driver_phone && getTelephoneHref(batch.driver_phone) ? (
+                                                         <a
+                                                             href={getTelephoneHref(batch.driver_phone)}
+                                                             onClick={e => e.stopPropagation()}
+                                                             className="text-emerald-600 hover:underline inline-flex items-center gap-0.5 ml-1 font-semibold"
+                                                             title={`Call driver ${batch.driver_phone}`}
+                                                         >
+                                                             <Phone size={10} className="text-emerald-500" />
+                                                             ({batch.driver_phone})
+                                                         </a>
+                                                     ) : batch.driver_phone ? (
+                                                         <span className="text-stone-500 ml-1">({batch.driver_phone})</span>
+                                                     ) : null}
                                                  </span>
                                             )}
                                             {batch.vendor && (
@@ -993,47 +995,46 @@ export default function DeliveryBatchesView({
                                                  setBatches(updatedBatches);
                                                  
                                                  try {
-                                                      const projectIds = linkedProjects.map(p => p.id);
-                                                      let statusAtomicSuccess = false;
-                                                      try {
-                                                          const { data: rpcData, error: rpcErr } = await supabase.rpc('update_delivery_batch_status_atomic', {
-                                                              p_batch_id: batch.id,
-                                                              p_new_status: "DELIVERED",
-                                                              p_project_ids: projectIds
-                                                          });
-                                                          if (!rpcErr && rpcData?.success) {
-                                                              statusAtomicSuccess = true;
-                                                              if (rpcData.projects_missing > 0) {
-                                                                  console.warn(`Delivery batch ${batch.batch_no || batch.id}: ${rpcData.projects_missing} of ${rpcData.projects_expected} linked projects were not updated (deleted or missing).`);
-                                                              }
-                                                          }
-                                                      } catch (stErr) {
-                                                          console.warn('update_delivery_batch_status_atomic fallback:', stErr);
-                                                      }
+                                                     const projectIds = linkedProjects.map(p => p.id);
+                                                     let rpcSuccess = false;
+                                                     try {
+                                                         const { data: result, error: failure } = await supabase.rpc('update_delivery_batch_status_atomic', {
+                                                             p_batch_id: batch.id, p_new_status: 'DELIVERED', p_project_ids: projectIds
+                                                         });
+                                                         if (!failure && result?.success) rpcSuccess = true;
+                                                     } catch (e) {
+                                                         console.warn('update_delivery_batch_status_atomic RPC unavailable, falling back to direct update', e);
+                                                     }
 
-                                                      if (!statusAtomicSuccess) {
-                                                          const bRes = await runWrite(
-                                                              supabase.from("delivery_batches").update({ status: "DELIVERED" }).eq("id", batch.id).select('id'),
-                                                              { action: 'batch status change' }
-                                                          );
-                                                          if (!bRes.ok) throw bRes.error;
-                                                          if (projectIds.length > 0) {
-                                                              const aRes = await runWrite(
-                                                                  supabase.from("admin").update({ delivery_status: "DELIVERED" }).in("id", projectIds).select('id'),
-                                                                  { action: 'delivery status change' }
-                                                              );
-                                                              if (!aRes.ok) throw aRes.error;
-                                                              if (aRes.rows.length !== projectIds.length) {
-                                                                  throw new Error(
-                                                                      `The batch was marked delivered, but only ${aRes.rows.length} of ${projectIds.length} customers were updated.`
-                                                                  );
-                                                              }
-                                                          }
-                                                      }
+                                                     if (!rpcSuccess) {
+                                                         const todayStr = new Date().toISOString().split('T')[0];
+                                                         const batchRes = await runWrite(
+                                                             supabase.from('delivery_batches').update({ status: 'DELIVERED' }).eq('id', batch.id).select('id'),
+                                                             { action: 'batch mark delivered' }
+                                                         );
+                                                         if (!batchRes.ok) throw batchRes.error;
 
-                                                      await logActivity(currentUser?.id || "admin", "update", `Marked delivery batch ${batch.batch_no || batch.id} as DELIVERED (${projectIds.length} projects)`, "");
-                                                      await handleRefresh();
-                                                  } catch (err) {
+                                                         if (projectIds.length > 0) {
+                                                             const projPatch = {
+                                                                 delivery_status: 'DELIVERED',
+                                                                 delivery_batch_id: batch.batch_no,
+                                                                 driver_name: batch.driver_name,
+                                                                 driver_phone_number: batch.driver_phone,
+                                                                 vehicle_number: batch.vehicle_number,
+                                                                 vendor: batch.vendor,
+                                                                 material_delivery_date: batch.dispatch_date || todayStr
+                                                             };
+                                                             const projRes = await runWrite(
+                                                                 supabase.from('admin').update(projPatch).in('id', projectIds).select('id'),
+                                                                 { action: 'batch all projects delivered sync' }
+                                                             );
+                                                             if (!projRes.ok) throw projRes.error;
+                                                         }
+                                                     }
+
+                                                     await logActivity(currentUser?.id || "admin", "update", `Marked delivery batch ${batch.batch_no || batch.id} as DELIVERED (${projectIds.length} projects)`, "");
+                                                     await handleRefresh();
+                                                 } catch (err) {
                                                      setBatches(prev => prev.map(b => b.id === batch.id ? previousBatch : b));
                                                      setLocalStatusOverrides(previousOverrides);
                                                      showAlert("Failed to mark batch delivered: " + (err.message || "Unknown error"), { type: 'error' });
@@ -1079,7 +1080,19 @@ export default function DeliveryBatchesView({
                                                          <td className="py-2.5 font-bold text-stone-400">{idx + 1}</td>
                                                          <td className="py-2.5">
                                                              <p className="font-bold text-stone-900">{proj.customer_name}</p>
-                                                             <p className="text-[10px] text-stone-500">{proj.phone_number || '–'}</p>
+                                                             {getTelephoneHref(proj.phone_number) ? (
+                                                                 <a
+                                                                     href={getTelephoneHref(proj.phone_number)}
+                                                                     onClick={e => e.stopPropagation()}
+                                                                     className="text-[10px] text-emerald-600 hover:underline font-bold inline-flex items-center gap-1"
+                                                                     title={`Call ${proj.phone_number}`}
+                                                                 >
+                                                                     <Phone size={10} className="text-emerald-500" />
+                                                                     {proj.phone_number}
+                                                                 </a>
+                                                             ) : (
+                                                                 <p className="text-[10px] text-stone-500">{proj.phone_number || '–'}</p>
+                                                             )}
                                                          </td>
                                                          <td className="py-2.5">
                                                              <p className="font-semibold text-stone-800">{proj.villages || '–'}</p>
@@ -1106,6 +1119,7 @@ export default function DeliveryBatchesView({
                                                                          // delivery_status left them stranded - still inside the
                                                                          // batch and invisible to the customer picker.
                                                                          const leavingBatch = newStat === 'PENDING';
+                                                                         const todayStr = new Date().toISOString().split('T')[0];
                                                                          const patch = leavingBatch
                                                                              ? {
                                                                                  delivery_status: 'PENDING',
@@ -1115,7 +1129,17 @@ export default function DeliveryBatchesView({
                                                                                  vehicle_number: null,
                                                                                  material_delivery_date: null,
                                                                              }
-                                                                             : { delivery_status: newStat };
+                                                                             : {
+                                                                                 delivery_status: newStat,
+                                                                                 delivery_batch_id: batch.batch_no || proj.delivery_batch_id,
+                                                                                 driver_name: batch.driver_name || proj.driver_name,
+                                                                                 driver_phone_number: batch.driver_phone || proj.driver_phone_number,
+                                                                                 vehicle_number: batch.vehicle_number || proj.vehicle_number,
+                                                                                 vendor: batch.vendor || proj.vendor,
+                                                                                 material_delivery_date: newStat === 'DELIVERED' 
+                                                                                     ? (proj.material_delivery_date || batch.dispatch_date || todayStr)
+                                                                                     : (proj.material_delivery_date || batch.dispatch_date),
+                                                                             };
 
                                                                          const statusRes = await runWrite(
                                                                              supabase.from('admin').update(patch).eq('id', proj.id).select('id'),
@@ -1322,7 +1346,7 @@ export default function DeliveryBatchesView({
                                             <Layers size={14} className="text-amber-500" /> 2. Select Projects to Club on this Truck
                                         </h4>
                                         <p className="text-[10px] text-stone-400">
-                                            Selected: <strong className="text-stone-900">{batchForm.selectedProjectIds.length} Projects</strong>
+                                            Selected: <strong className="text-stone-900">{batchForm.selectedProjectIds.length} {batchForm.selectedProjectIds.length === 1 ? 'Project' : 'Projects'}</strong>
                                         </p>
                                     </div>
 
@@ -1348,14 +1372,19 @@ export default function DeliveryBatchesView({
                                     </div>
                                 </div>
 
+                                <p className="text-xs text-stone-500">Selected projects stay visible across stage filters. Projects on another truck show their batch number; remove them from that batch before reassigning.</p>
+                                {projectsLoading && <p role="status" className="text-xs text-stone-500">Loading projects…</p>}
+                                {projectsError && <p role="alert" className="text-xs text-red-600">{projectsError} <button type="button" onClick={fetchAllCustomers}>Retry</button></p>}
+                                {!projectsLoading && !projectsError && eligibleProjects.length===0 && <p className="text-sm text-stone-500 p-3">No projects match this stage and search. Try All Stages or clear the search.</p>}
                                 {/* Project Checklist Cards */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto p-1 bg-stone-50/60 rounded-2xl border border-stone-200/70">
                                     {eligibleProjects.map(proj => {
                                         const isSelected = batchForm.selectedProjectIds.includes(proj.id);
+                                        const assignedElsewhere=projectAssignedElsewhere(proj,editingBatch);
                                         return (
                                             <div
                                                 key={proj.id}
-                                                onClick={() => toggleProjectSelection(proj.id)}
+                                                onClick={() => {if(!assignedElsewhere || isSelected)toggleProjectSelection(proj.id);}}
                                                 className={`p-3 rounded-xl border transition-all cursor-pointer select-none flex items-start gap-2.5 ${
                                                     isSelected
                                                         ? 'bg-amber-50 border-amber-400 shadow-xs'
@@ -1366,10 +1395,13 @@ export default function DeliveryBatchesView({
                                                     type="checkbox"
                                                     checked={isSelected}
                                                     onChange={() => {}}
+                                                    disabled={assignedElsewhere && !isSelected}
+                                                    aria-label={`Select ${proj.customer_name}`}
                                                     className="mt-0.5 accent-amber-500 w-4 h-4 rounded"
                                                 />
                                                 <div className="min-w-0 flex-1">
                                                     <p className="text-xs font-bold text-stone-900 truncate">{proj.customer_name}</p>
+                                                    {assignedElsewhere && <p className="text-[10px] font-semibold text-amber-700">Assigned to {proj.delivery_batch_id}</p>}
                                                     <p className="text-[10px] text-stone-500 truncate">{proj.villages || 'No village'} · {proj.phone_number}</p>
                                                     <div className="flex items-center justify-between text-[10px] mt-1 pt-1 border-t border-stone-100">
                                                         <span className="font-bold text-amber-800">{proj.system_capacity_kwp || '–'} kWp</span>

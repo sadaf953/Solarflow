@@ -1,13 +1,14 @@
+import { useDemoTourNavigation } from '../demo/tour';
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../supabase";
 import {
     LogOut, Search, Upload, Eye, Loader2, CheckCircle2,
     RefreshCw, X, MessageSquare, ChevronDown, ChevronUp, Save, FileText,
-    SendHorizonal, User, AlertTriangle, Check, AlertCircle, FileCheck, Terminal
+    SendHorizonal, User, AlertTriangle, Check, AlertCircle, FileCheck, Terminal, Phone
 } from "lucide-react";
 import {
     uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, deleteDocument, logActivity,
-    updateAdminRecord, updateDocumentRemark, downloadFileWithSaveAs,
+    updateAdminRecord, updateDocumentRemark, downloadFileWithSaveAs, getTelephoneHref,
 } from "../utils.jsx";
 import { FilePreviewModal } from "./modal-tabs/shared";
 import { useGlobalPopup } from './GlobalPopup';
@@ -113,7 +114,7 @@ function RemarkRow({ customerId, initialRemark, userId, customerName }) {
 }
 
 function CustomerCard({ cust, docs, user, onDocsChange, onCustomerRemoved, onPreviewDoc }) {
-    const { showAlert } = useGlobalPopup();
+    const { showAlert, showImageCropper } = useGlobalPopup();
     const fileInputRef = useRef(null);
     const stampDoc = docs.find(d => d.doc_type === "pm_surya_ghar_stamp");
     const isUploaded = !!stampDoc;
@@ -169,9 +170,16 @@ function CustomerCard({ cust, docs, user, onDocsChange, onCustomerRemoved, onPre
     };
 
     const handleFileChange = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const rawFile = e.target.files?.[0];
+        if (!rawFile) return;
         e.target.value = "";
+
+        let file = rawFile;
+        if (showImageCropper) {
+            file = await showImageCropper(rawFile, { title: 'Crop & Adjust Stamp Document' });
+            if (!file) return; // User cancelled upload
+        }
+
         setUploading(true);
         try {
             // Upload FIRST - deleting the old stamp before the new one existed
@@ -268,11 +276,28 @@ function CustomerCard({ cust, docs, user, onDocsChange, onCustomerRemoved, onPre
                         <h3 className="text-sm font-extrabold text-stone-900 truncate">
                             {cust.customer_name}
                         </h3>
-                        <p className="text-[10px] text-stone-400 font-medium mt-0.5 truncate">
-                            {cust.consumer_no && `Cons: ${cust.consumer_no}`}
-                            {cust.villages && ` • ${cust.villages}`}
-                            {cust.phone_number && ` • Ph: ${cust.phone_number}`}
-                        </p>
+                        <div className="text-[10px] text-stone-400 font-medium mt-0.5 truncate flex items-center gap-1 flex-wrap">
+                            {cust.consumer_no && <span>Cons: {cust.consumer_no}</span>}
+                            {cust.villages && <span>• {cust.villages}</span>}
+                            {cust.phone_number && (
+                                <span className="inline-flex items-center gap-0.5">
+                                    •
+                                    {getTelephoneHref(cust.phone_number) ? (
+                                        <a
+                                            href={getTelephoneHref(cust.phone_number)}
+                                            onClick={e => e.stopPropagation()}
+                                            className="text-emerald-600 hover:underline inline-flex items-center gap-0.5 font-semibold ml-0.5"
+                                            title={`Call ${cust.phone_number}`}
+                                        >
+                                            <Phone size={9} className="text-emerald-500" />
+                                            {cust.phone_number}
+                                        </a>
+                                    ) : (
+                                        <span className="ml-0.5">Ph: {cust.phone_number}</span>
+                                    )}
+                                </span>
+                            )}
+                        </div>
                     </div>
                     <span className={`text-[9px] font-extrabold uppercase px-2.5 py-1 rounded-full border flex-shrink-0 ${
                         isUploaded
@@ -433,7 +458,9 @@ function CustomerCard({ cust, docs, user, onDocsChange, onCustomerRemoved, onPre
     );
 }
 
-export default function StampPortal({ user, onLogout, onOpenDevSwitcher }) {
+export default function StampPortal({ user, onLogout, onOpenDevSwitcher, demoControls }) {
+    useDemoTourNavigation(({view}) => { if (['queue','record'].includes(view)) setView(view); },user.userType);
+
     const { showAlert } = useGlobalPopup();
     // Completed-work ledger: the stamp maker's own record of what they finished
     // and when, grouped by month, so monthly payments can be verified from both
@@ -472,7 +499,7 @@ export default function StampPortal({ user, onLogout, onOpenDevSwitcher }) {
                     // wire, readable in the network tab. Exact match is safe
                     // here: assigned_stamp_maker is written from profiles.name
                     // via the dropdown, which is the same value as user.name.
-                    .eq("discom_submission->>assigned_stamp_maker", (user?.name || '').trim())
+                    .eq(user?.demo_profile_id ? "discom_submission->>assigned_stamp_maker_id" : "discom_submission->>assigned_stamp_maker", user?.demo_profile_id || (user?.name || '').trim())
                     .is("deleted_at", null)
                     .order("created_at", { ascending: false })
                     .range(from, from + pageSize - 1);
@@ -511,7 +538,7 @@ export default function StampPortal({ user, onLogout, onOpenDevSwitcher }) {
         } finally {
             setLoading(false);
         }
-    }, [user?.name]);
+    }, [user?.name, user?.demo_profile_id]);
 
     useEffect(() => {
         fetchCustomers();
@@ -555,7 +582,7 @@ export default function StampPortal({ user, onLogout, onOpenDevSwitcher }) {
         return () => supabase.removeChannel(channel);
         // user?.name is read inside the handler now (assignment check), so it
         // must be a dependency rather than a stale closure.
-    }, [user?.id, user?.name, fetchCustomers]);
+    }, [user?.id, user?.demo_profile_id, user?.name, fetchCustomers]);
 
     const handleDocsChange = useCallback((customerId, updatedDocs) => {
         setCustDocs(prev => ({ ...prev, [customerId]: updatedDocs }));
@@ -657,7 +684,7 @@ export default function StampPortal({ user, onLogout, onOpenDevSwitcher }) {
                 .select("id, customer_name, consumer_no, villages, discom_submission")
                 .eq("discom_submission->>sent_to_stamp_maker", "true")
                 .eq("discom_submission->>stamp_sent", "true")
-                .eq("discom_submission->>assigned_stamp_maker", (user?.name || '').trim())
+                .eq(user?.demo_profile_id ? "discom_submission->>assigned_stamp_maker_id" : "discom_submission->>assigned_stamp_maker", user?.demo_profile_id || (user?.name || '').trim())
                 .is("deleted_at", null);
             if (error) throw error;
             const myName = String(user?.name || '').trim().toLowerCase();
@@ -754,6 +781,7 @@ export default function StampPortal({ user, onLogout, onOpenDevSwitcher }) {
                         <LogOut className="w-4 h-4" />
                     </button>
                 </div>
+            <div className="demo-portal-controls">{demoControls}</div>
             </header>
 
             <main className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 animate-in fade-in duration-300">

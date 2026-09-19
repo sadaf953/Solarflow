@@ -1,3 +1,5 @@
+import {missingStageRequirements} from '../demo/stageRequirements';
+import { useDemoTourNavigation } from '../demo/tour';
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabase';
 import { AgreementPreview } from './agreement/AgreementPreview';
@@ -7,8 +9,9 @@ import {
     Users, CreditCard, Hash, Folder, Tag, ChevronLeft, Plus, Search, 
     ChevronDown, ChevronUp, ClipboardList, Banknote, ShieldAlert, Paperclip, Eye, Download, X,
     ShoppingBag, Ruler, IndianRupee, Layers, Save, ClipboardCheck, Upload,
-    Package, PauseCircle, Truck, Wrench, Camera, Send, Printer, FileText, FolderOpen, Terminal
+    Package, PauseCircle, Truck, Wrench, Camera, Send, Printer, FileText, FolderOpen, Terminal, Calculator
 } from 'lucide-react';
+import ToolboxView from './ToolboxView';
 import { logActivity, toIndianCommas, formatInputValue, parseIndianNumber, uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, updateDocumentRemark, sanitizeAdminUpdate, normalizeMeterInstallation, downloadFileWithSaveAs, downloadDocumentsAsPdf } from '../utils';
 import { DEFAULT_LEAD_FORM } from '../models';
 import { PRIMARY_STAGES, STAGE_IDS, ADMIN_NUMERIC_COLUMNS } from '../constants';
@@ -68,8 +71,40 @@ function DetailRow({ label, value, children }) {
     );
 }
 
-export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
-    const { showAlert, showConfirm } = useGlobalPopup();
+export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoControls }) {
+    useDemoTourNavigation(async ({view,stage,action},isCurrent) => {
+        if (!['menu','workdesk','quotations'].includes(view)) return;
+        setSelectedCust(null); setShowAddLead(false); setView(view); if (stage) setActiveWorkdeskTab(stage);
+        if (view === 'quotations') openQuotations();
+        if (action === 'addLead') setShowAddLead(true);
+        if(action === 'customer'){
+            let query=supabase.from('admin').select('*').is('deleted_at',null).eq('stage',stage);
+            query=user.userType==='agent2' ? query.ilike('sub_channel_partner',user.name).ilike('channel_partner',user.channel_partner || '') : query.ilike('channel_partner',user.name);
+            const {data,error}=await query.order('created_at').limit(1);
+            if(!isCurrent())return;
+            if(error)showAlert(error.message,{type:'error'});
+            else if(data?.[0])handleSelectCustomerForStage(data[0],stage);
+        }
+        if(action === 'printBom'){
+            let query=supabase.from('admin').select('*').is('deleted_at',null).eq('stage',stage || STAGE_IDS.MATERIAL_INTEGRATION);
+            query=user.userType==='agent2' ? query.ilike('sub_channel_partner',user.name).ilike('channel_partner',user.channel_partner || '') : query.ilike('channel_partner',user.name);
+            let {data,error}=await query.order('created_at').limit(1);
+            if (!data?.length) {
+                let fb = supabase.from('admin').select('*').is('deleted_at',null);
+                fb = user.userType==='agent2' ? fb.ilike('sub_channel_partner',user.name).ilike('channel_partner',user.channel_partner || '') : fb.ilike('channel_partner',user.name);
+                const res = await fb.order('created_at').limit(1);
+                data = res.data;
+            }
+            if(!isCurrent())return;
+            if(error)showAlert(error.message,{type:'error'});
+            else if(data?.[0]){
+                handleSelectCustomerForStage(data[0], STAGE_IDS.MATERIAL_INTEGRATION);
+                setShowBomPrint(true);
+            }
+        }
+    },user.userType);
+
+    const { showAlert, showConfirm, showImageCropper } = useGlobalPopup();
     const [view, setView] = useState(() => typeof window !== 'undefined' && window.location.hash.startsWith('#/quotations') ? 'quotations' : 'menu');
     const [activeWorkdeskTab, setActiveWorkdeskTab] = useState(STAGE_IDS.LEADS);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -157,27 +192,26 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                 return;
             }
             const buildQuery = () => {
-                let q = supabase.from('admin').select('*').is('deleted_at', null).order('created_at', { ascending: false });
+                let q = supabase.from('admin').select('*').is('deleted_at', null).order('updated_at', { ascending: false }).order('created_at', { ascending: false });
                 const myName = (user?.name || '').trim();
+                const userId = user?.demo_profile_id || user?.id;
 
                 if (isAgent2) {
-                    // Dealer: both the Dealer name and registered CPO branch must
-                    // match. A stray Dealer name under another CPO must remain
-                    // visible to that CPO, but must not leak into this Dealer view.
+                    // Dealer: match by permanent profile ID first, or name + registered branch
                     const myBranch = (user?.channel_partner || '').trim();
-                    q = q.ilike('sub_channel_partner', myName)
-                        .ilike('channel_partner', myBranch);
+                    if (userId) {
+                        q = q.or(`lead_creator_profile_id.eq.${userId},and(sub_channel_partner.ilike.${myName},channel_partner.ilike.${myBranch})`);
+                    } else {
+                        q = q.ilike('sub_channel_partner', myName)
+                            .ilike('channel_partner', myBranch);
+                    }
                 } else {
-                    // Independent Channel Partner: their own book is filed under
-                    // channel_partner = THEIR NAME. Ignore sub_channel_partner:
-                    // CPs do not sit under CPOs and do not have Dealers.
-                    //
-                    // This used to use `user.channel_partner || user.name`, so a Channel
-                    // Partner who had been given a branch asked for THAT BRANCH's leads
-                    // instead of their own - 10 accounts were pointed at an ownerless
-                    // "Demo Partner" branch and saw almost nothing, while their own
-                    // 1,066 leads stayed invisible. Never scope Agent 1 by branch.
-                    q = q.ilike('channel_partner', myName);
+                    // Independent Channel Partner: match by profile ID or channel_partner name
+                    if (userId) {
+                        q = q.or(`lead_creator_profile_id.eq.${userId},channel_partner.ilike.${myName}`);
+                    } else {
+                        q = q.ilike('channel_partner', myName);
+                    }
                 }
                 return q;
             };
@@ -407,7 +441,8 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
             channel_partner: parentCp,
             sub_channel_partner: subCp,
             application_done_by: user.name,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
         };
 
         // Clean up or format numeric values safely
@@ -430,6 +465,11 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                 insertData[key] = leadData[key];
             }
         });
+
+        // Ensure created_at and updated_at are never null
+        const nowIso = new Date().toISOString();
+        if (!insertData.created_at) insertData.created_at = nowIso;
+        if (!insertData.updated_at) insertData.updated_at = nowIso;
 
         // The quotation branch is retained for the deferred Add to Leads feature.
         const { data: newCustomer, error } = quotation
@@ -509,6 +549,22 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
     const getTelephoneHref = (phone) => {
         const normalized = String(phone || '').replace(/[^\d+]/g, '');
         return normalized && /\d/.test(normalized) ? `tel:${normalized}` : null;
+    };
+
+    const renderPhoneLink = (phone, className = 'font-semibold text-stone-900') => {
+        const href = getTelephoneHref(phone);
+        if (!href) return <span className={className}>{phone || '–'}</span>;
+        return (
+            <a
+                href={href}
+                onClick={(e) => e.stopPropagation()}
+                className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                title={`Click to call ${phone}`}
+            >
+                <Phone size={11} className="text-emerald-500 shrink-0" />
+                <span>{phone}</span>
+            </a>
+        );
     };
 
     // Group by stage
@@ -605,8 +661,16 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
             if (fileInputRef.current) fileInputRef.current.value = '';
             return;
         }
-        const file = e.target.files?.[0];
-        if (!file || !selectedCust?.id) return;
+        const rawFile = e.target.files?.[0];
+        if (!rawFile || !selectedCust?.id) return;
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+        let file = rawFile;
+        if (showImageCropper) {
+            file = await showImageCropper(rawFile, { title: 'Crop & Adjust Customer Document' });
+            if (!file) return; // User cancelled upload
+        }
+
         setUploadingDoc(true);
         try {
             await uploadDocument(file, selectedCust.id, docType || uploadDocType, user?.id);
@@ -767,14 +831,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
         };
 
         if (advance) {
-            const issues = [];
-            const requireField = (condition, label) => { if (!condition) issues.push(label); };
-            requireField(updates.roof_shed, 'Roof / Shed');
-            requireField(Number(parseIndianNumber(updates.dc_cable)) > 0, 'DC Cable Length');
-            requireField(Number(parseIndianNumber(updates.ac_cable)) > 0, 'AC Cable Length');
-            requireField(String(updates.structure_front_leg_height || '').trim(), 'Structure Front Leg Height');
-            requireField(String(updates.structure_rear_leg_height || '').trim(), 'Structure Rear Leg Height');
-            requireField(Number(parseIndianNumber(updates.invoice_value)) > 0, 'Invoice Value');
+            const issues = missingStageRequirements('MATERIAL ORDER', updates);
 
             if (issues.length) {
                 setValidationIssues(issues);
@@ -966,6 +1023,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                         <LogOut className="w-4 h-4" />
                     </button>
                 </div>
+            <div className="demo-portal-controls">{demoControls}</div>
             </header>
                     {/* Menu View (Clean Action Cards) */}
             
@@ -986,17 +1044,27 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                                     }
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => { setActiveWorkdeskTab(priorityWorkdeskTab); setView('workdesk'); }}
-                                className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400 px-4 py-3 text-xs font-black text-stone-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-300 active:scale-[0.98] cursor-pointer"
-                            >
-                                <Layers size={15} /> Open work queue <ChevronRight size={15} className="transition-transform group-hover:translate-x-0.5" />
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => { setActiveWorkdeskTab(priorityWorkdeskTab); setView('workdesk'); }}
+                                    className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-amber-400 px-4 py-3 text-xs font-black text-stone-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-300 active:scale-[0.98] cursor-pointer"
+                                >
+                                    <Layers size={15} /> Open work queue <ChevronRight size={15} className="transition-transform group-hover:translate-x-0.5" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddLead(true)}
+                                    className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-white/15 hover:bg-white/25 px-3.5 py-3 text-xs font-bold text-white transition active:scale-[0.98] cursor-pointer border border-white/20"
+                                >
+                                    <Plus size={15} /> Add customer
+                                </button>
+                            </div>
                         </div>
                     </section>
 
                     <button type="button" onClick={() => { openQuotations(); setView('quotations'); }} className="w-full flex items-center gap-3 rounded-2xl bg-blue-950 text-white p-5 text-left shadow-sm"><FileText size={24} /><span className="flex-1"><strong className="block text-base">Quotation Maker</strong><span className="text-xs text-blue-200">Create, share and follow up on solar quotations</span></span><ChevronRight size={18} /></button>
+                    <button type="button" onClick={() => setView('toolbox')} className="w-full flex items-center gap-3 rounded-2xl bg-amber-500 text-stone-950 p-5 text-left shadow-sm mt-3"><Calculator size={24} /><span className="flex-1"><strong className="block text-base font-bold">Solar Toolbox</strong><span className="text-xs text-amber-950/80">EMI &amp; GST calculators, solar savings, payment receipts &amp; warranty cards</span></span><ChevronRight size={18} /></button>
 
                     <section className="rounded-2xl border border-stone-200/80 bg-white p-4 shadow-sm">
                         <div className="mb-3">
@@ -1205,7 +1273,8 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                             </button>
                         </div>
                     </div>
-                </header>
+                <div className="demo-portal-controls">{demoControls}</div>
+            </header>
 
                 
                 {/* Stage search stays visible at every viewport width. The portal
@@ -1278,8 +1347,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                                         
                                         <div className="space-y-1.5 md:space-y-2 text-[11px] md:text-xs text-stone-600">
                                             <div className="flex items-center gap-2">
-                                                <Phone size={11} className="text-stone-400 shrink-0" />
-                                                <span className="font-semibold">{cust.phone_number || '–'}</span>
+                                                {renderPhoneLink(cust.phone_number)}
                                             </div>
                                             {cust.villages && (
                                                 <div className="flex items-start gap-2">
@@ -1333,7 +1401,24 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
             </div></div>
             )}
 
-            {view === 'quotations' && <QuotationModule embedded user={user} meta={meta} onCreateLead={handleSubmitLead} onViewLead={lead => handleSelectCustomerForStage(lead, lead.stage || STAGE_IDS.LEADS)} onClose={() => setView('menu')} />}
+            {view === 'quotations' && <QuotationModule demoControls={demoControls} embedded user={user} meta={meta} onCreateLead={handleSubmitLead} onViewLead={lead => handleSelectCustomerForStage(lead, lead.stage || STAGE_IDS.LEADS)} onClose={() => setView('menu')} />}
+            {view === 'toolbox' && (
+                <div className="min-h-screen bg-[#FCFBFA]">
+                    <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/95 backdrop-blur px-4 py-3">
+                        <div className="mx-auto flex max-w-7xl items-center justify-between">
+                            <button
+                                type="button"
+                                onClick={() => setView('menu')}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 cursor-pointer"
+                            >
+                                <ChevronLeft size={16} /> Back to Portal
+                            </button>
+                            <div className="text-xs font-bold text-stone-900">Solar Toolbox</div>
+                        </div>
+                    </header>
+                    <ToolboxView currentUser={user} />
+                </div>
+            )}
 
             {/* Unified Add Lead Modal */}
             {showAddLead && (
@@ -1367,7 +1452,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                                 </h3>
                                 <div className="flex flex-wrap items-center gap-2 text-xs text-stone-600 font-semibold pt-0.5">
                                     <span className="flex items-center gap-1">
-                                        <Phone size={12} className="text-stone-400" /> {selectedCust.phone_number || '–'}
+                                        {renderPhoneLink(selectedCust.phone_number, 'text-stone-600 font-semibold')}
                                     </span>
                                     {selectedCust.consumer_no && (
                                         <>
@@ -1514,7 +1599,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                                         </h5>
                                         <div className="divide-y divide-stone-200/50 text-xs">
                                             <div className="flex items-center justify-between py-2"><span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Customer Name</span><span className="font-semibold text-stone-900">{selectedCust.customer_name || '–'}</span></div>
-                                            <div className="flex items-center justify-between py-2"><span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Phone Number</span><span className="font-semibold text-stone-900">{selectedCust.phone_number || '–'}</span></div>
+                                            <div className="flex items-center justify-between py-2"><span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Phone Number</span>{renderPhoneLink(selectedCust.phone_number)}</div>
                                             <div className="flex items-center justify-between py-2"><span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Email</span><span className="font-semibold text-stone-900">{selectedCust.email || selectedCust.email_address || '–'}</span></div>
                                             <div className="flex items-center justify-between py-2"><span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Consumer No</span><span className="font-semibold text-stone-900">{selectedCust.consumer_no || '–'}</span></div>
                                             <div className="flex items-center justify-between py-2"><span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Location</span><span className="font-semibold text-stone-900">{selectedCust.villages || '–'} {selectedCust.sub_divisions ? `(${selectedCust.sub_divisions})` : ''}</span></div>
@@ -1596,7 +1681,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                                             </div>
                                             <div className="flex items-center justify-between py-2">
                                                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Phone Number</span>
-                                                <span className="font-semibold text-stone-900">{selectedCust.phone_number || '–'}</span>
+                                                {renderPhoneLink(selectedCust.phone_number)}
                                             </div>
                                             <div className="flex items-center justify-between py-2">
                                                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Email Address</span>
@@ -1954,7 +2039,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                                             </div>
                                             <div className="flex items-center justify-between py-2">
                                                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Phone Number</span>
-                                                <span className="font-semibold text-stone-900">{selectedCust.phone_number || '–'}</span>
+                                                {renderPhoneLink(selectedCust.phone_number)}
                                             </div>
                                             <div className="flex items-center justify-between py-2">
                                                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Email Address</span>
@@ -2248,7 +2333,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                                         </div>
                                         <div className="flex items-center justify-between py-2">
                                             <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">DRIVER PHONE NUMBER</span>
-                                            <span className="font-semibold text-stone-900">{selectedCust.driver_phone_number || '–'}</span>
+                                            {renderPhoneLink(selectedCust.driver_phone_number)}
                                         </div>
                                         {selectedCust.panel_serial_no && (
                                             <div className="py-2">
@@ -2550,7 +2635,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher }) {
                                             </div>
                                             <div className="flex items-center justify-between py-2">
                                                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Phone Number</span>
-                                                <span className="font-semibold text-stone-900">{selectedCust.phone_number || '–'}</span>
+                                                {renderPhoneLink(selectedCust.phone_number)}
                                             </div>
                                             <div className="flex items-center justify-between py-2">
                                                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Email Address</span>

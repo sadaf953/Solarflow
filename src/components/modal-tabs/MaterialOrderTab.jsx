@@ -46,29 +46,6 @@ export default function MaterialOrderTab({
         }
     };
 
-    const frontLegVal = editData.structure_front_leg_height || '';
-    const rearLegVal = editData.structure_rear_leg_height || '';
-
-    const isAllMandatoryFilled = Boolean(
-        editData.roof_shed &&
-        editData.dc_cable && Number(parseIndianNumber(editData.dc_cable)) > 0 &&
-        editData.ac_cable && Number(parseIndianNumber(editData.ac_cable)) > 0 &&
-        frontLegVal.toString().trim() &&
-        rearLegVal.toString().trim() &&
-        editData.invoice_value && Number(parseIndianNumber(editData.invoice_value)) > 0
-    );
-
-    const validateFields = () => {
-        if (!editData.roof_shed) return 'Roof / Shed is mandatory.';
-        if (!editData.dc_cable || Number(parseIndianNumber(editData.dc_cable)) <= 0) return 'DC Cable length (meters) is mandatory.';
-        if (!editData.ac_cable || Number(parseIndianNumber(editData.ac_cable)) <= 0) return 'AC Cable length (meters) is mandatory.';
-        if (!frontLegVal.toString().trim()) return 'Structure Front Leg Height (ft) is mandatory.';
-        if (!rearLegVal.toString().trim()) return 'Structure Rear Leg Height (ft) is mandatory.';
-        if (!editData.invoice_value || Number(parseIndianNumber(editData.invoice_value)) <= 0) return 'Invoice Value (₹) is mandatory.';
-        return null;
-    };
-
-
     const isEditingOrder = editingSection === 'mat_order';
 
     return (
@@ -131,7 +108,7 @@ export default function MaterialOrderTab({
                         isEditing={isEditingOrder}
                     />
                     <EditableDetailItem
-                        label="DC Cable (Meters) *"
+                        label="DC Cable (Meters)"
                         field="dc_cable"
                         value={editData.dc_cable}
                         onChange={handleLocalChange}
@@ -139,7 +116,7 @@ export default function MaterialOrderTab({
                         isEditing={isEditingOrder}
                     />
                     <EditableDetailItem
-                        label="AC Cable (Meters) *"
+                        label="AC Cable (Meters)"
                         field="ac_cable"
                         value={editData.ac_cable}
                         onChange={handleLocalChange}
@@ -147,7 +124,7 @@ export default function MaterialOrderTab({
                         isEditing={isEditingOrder}
                     />
                     <EditableDetailItem
-                        label="Structure Front Leg Height (ft) *"
+                        label="Structure Front Leg Height (ft)"
                         field="structure_front_leg_height"
                         value={editData.structure_front_leg_height}
                         onChange={handleLocalChange}
@@ -155,7 +132,7 @@ export default function MaterialOrderTab({
                         isEditing={isEditingOrder}
                     />
                     <EditableDetailItem
-                        label="Structure Rear Leg Height (ft) *"
+                        label="Structure Rear Leg Height (ft)"
                         field="structure_rear_leg_height"
                         value={editData.structure_rear_leg_height}
                         onChange={handleLocalChange}

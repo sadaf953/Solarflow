@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+// Configure Zod in jitless mode to prevent new Function() probe from triggering CSP eval warnings
+z.config({ jitless: true });
+
 const emptyToUndefined = (schema) => z.preprocess((val) => {
     if (typeof val === 'string' && val.trim() === '') return undefined;
     return val;
@@ -112,3 +115,13 @@ export const leadSchema = z.object({
 }).passthrough();
 
 export const customerSchema = leadSchema.partial();
+
+// This isolated demo collects only name and phone initially. Optional fields
+// remain in the payload; valid supplied email/pincode still get checked.
+export const demoLeadSchema = leadSchema.partial().extend({
+ customer_name: z.string().trim().min(2,'Customer Name must be at least 2 characters').max(100),
+ phone_number: leadSchema.shape.phone_number,
+ ...Object.fromEntries(['consumer_no','villages','channel_partner','module_brand','module_wp','no_of_modules','system_capacity_kwp','sub_divisions','district'].map(key=>[key,z.string().trim().optional().or(z.literal(''))])),
+ email_address: z.string().trim().email('Invalid email format').optional().or(z.literal('')),
+ payment_type: z.preprocess(v=>v == null || String(v).trim()==='' ? undefined : v,leadSchema.shape.payment_type.optional()),
+}).passthrough();

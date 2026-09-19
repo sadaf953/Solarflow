@@ -22,8 +22,8 @@ export const Page1: React.FC<Page1Props> = ({
 }) => {
   const { company, page1, footer, assets } = data;
   const publicAssetUrl = (fileName: string) => `${import.meta.env.BASE_URL}${fileName}`;
-  const demoQualityLogoUrl = assets?.demoQualityLogoUrl || publicAssetUrl('demo-banner.svg');
-  const demoBannerUrl = assets?.demoBannerUrl || publicAssetUrl('demo-banner.svg');
+  const demoQualityLogoUrl = assets?.demoQualityLogoUrl;
+  const demoBannerUrl = assets?.demoBannerUrl || publicAssetUrl('banner.png');
 
   const isFieldChanged = (key: string) => changedFields.has(key);
 
@@ -185,7 +185,7 @@ export const Page1: React.FC<Page1Props> = ({
             <div className="w-full my-1 rounded overflow-hidden border border-gray-200">
               <img
                 src={assets.screenshot2MiddleBannerUrl}
-                alt="SolarFlow fictional demo banner"
+                alt="Solar energy banner and emblems"
                 className="w-full h-auto object-contain"
                 referrerPolicy="no-referrer"
               />
@@ -194,7 +194,7 @@ export const Page1: React.FC<Page1Props> = ({
             <div>
               <div className="flex items-center justify-between px-2 mb-2">
                 <DemoQualityBadge customLogoUrl={demoQualityLogoUrl} className="h-20" />
-                <DemoEnergyBadge className="h-20" />
+                <DemoEnergyBadge customLogoUrl={assets?.demoEnergyLogoUrl} className="h-20" />
               </div>
               <DemoQuoteBanner customLogoUrl={demoBannerUrl} />
             </div>

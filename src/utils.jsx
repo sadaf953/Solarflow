@@ -156,7 +156,7 @@ export function normalizeAdminValues(updates) {
 // to be checked:
 //
 //     const res = await runWrite(
-//         supabase.from('profiles').update({ name }).eq('id', id).select('id'),
+//         supabase.from('demo_profiles').update({ name }).eq('id', id).select('id'),
 //         { action: 'name change' }
 //     );
 //     if (!res.ok) throw res.error;
@@ -192,6 +192,12 @@ export function sanitizePhoneNumber(value) {
     // Local: a leading 0 on an 11-digit entry is the trunk prefix - drop it.
     if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
     return digits.slice(0, 10);
+}
+
+export function getTelephoneHref(value) {
+    const raw = String(value ?? '').trim();
+    const normalized = raw.replace(/[^\d+]/g, '');
+    return normalized && /\d/.test(normalized) ? `tel:${normalized}` : null;
 }
 
 export function normalizeMeterInstallation(value) {
@@ -592,6 +598,19 @@ export function formatDate(dateStr) {
     return new Date(dateStr).toLocaleDateString('en-IN');
 }
 
+/**
+ * Returns today's date formatted as 'YYYY-MM-DD' in Indian Standard Time (IST, UTC+5:30).
+ * Avoids the UTC-boundary bug of `toISOString().split('T')[0]` between 12:00 AM - 5:30 AM IST.
+ */
+export function getTodayISTDateString(date = new Date()) {
+    try {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(date);
+    } catch {
+        return date.toISOString().split('T')[0];
+    }
+}
+
+
 export function formatDateToDDMMYYYY(dateStr) {
     if (!dateStr) return "";
     const str = String(dateStr);
@@ -704,12 +723,19 @@ export const uploadDocument = async (file, customerId, docType = null, passedUse
             sessionPromise = supabase.auth.getSession().catch(() => null);
         }
 
+        let contentType = processedFile.type || 'application/octet-stream';
+        if (cleanName.endsWith('.png') && (!contentType || contentType === 'image/svg+xml')) {
+            contentType = 'image/png';
+        } else if (/\.(jpe?g)$/i.test(cleanName) && (!contentType || contentType === 'image/svg+xml')) {
+            contentType = 'image/jpeg';
+        }
+
         const uploadPromise = supabase.storage
             .from('customer-documents')
             .upload(filePath, processedFile, {
                 cacheControl: '3600',
                 upsert: true,
-                contentType: processedFile.type || 'application/octet-stream'
+                contentType: contentType
             });
 
         const [uploadRes, sessionData] = await Promise.all([uploadPromise, sessionPromise]);
@@ -731,7 +757,7 @@ export const uploadDocument = async (file, customerId, docType = null, passedUse
             customer_id: customerId,
             file_name: processedFile.name,
             storage_path: filePath,
-            file_type: processedFile.type || (isImage ? 'image/jpeg' : 'application/pdf'),
+            file_type: contentType,
             doc_type: docType,
             uploaded_by: validUserId
         };
@@ -805,6 +831,27 @@ export const getViewUrl = async (storagePath) => {
     if (storagePath.startsWith('mock/') || storagePath.startsWith('http')) {
         return '/demo-document.svg';
     }
+
+    try {
+        const { data: blob, error: dlErr } = await supabase.storage
+            .from('customer-documents')
+            .download(storagePath);
+
+        if (!dlErr && blob) {
+            const ext = storagePath.split('.').pop()?.toLowerCase();
+            let correctType = blob.type;
+            if (ext === 'png' && blob.type !== 'image/png') correctType = 'image/png';
+            if (['jpg', 'jpeg'].includes(ext) && blob.type !== 'image/jpeg') correctType = 'image/jpeg';
+            if (ext === 'webp' && blob.type !== 'image/webp') correctType = 'image/webp';
+            if (ext === 'pdf' && blob.type !== 'application/pdf') correctType = 'application/pdf';
+
+            const finalBlob = correctType !== blob.type ? new Blob([blob], { type: correctType }) : blob;
+            return URL.createObjectURL(finalBlob);
+        }
+    } catch (e) {
+        console.warn('Direct blob preview notice:', e);
+    }
+
     const { data, error } = await supabase.storage
         .from('customer-documents')
         .createSignedUrl(storagePath, 3600);
@@ -818,6 +865,19 @@ export const getDownloadUrl = async (storagePath, fileName) => {
     if (storagePath.startsWith('mock/') || storagePath.startsWith('http')) {
         return '/demo-document.svg';
     }
+
+    try {
+        const { data: blob } = await supabase.storage
+            .from('customer-documents')
+            .download(storagePath);
+
+        if (blob) {
+            return URL.createObjectURL(blob);
+        }
+    } catch (e) {
+        console.warn('Direct blob download notice:', e);
+    }
+
     const { data, error } = await supabase.storage
         .from('customer-documents')
         .createSignedUrl(storagePath, 3600, { download: fileName || true });
@@ -1144,7 +1204,7 @@ export async function fetchAgent2SubAgents(branchName) {
     if (!clean) return [];
     try {
         const { data, error } = await supabase
-            .from('profiles')
+            .from('demo_profiles')
             .select('name')
             // New Channel Partners use agent2. Older accounts used agent,
             // so include both while the saved profiles are being aligned.

@@ -1,6 +1,7 @@
+import {useDemoTourNavigation} from '../demo/tour';
 import { useState, useEffect, useCallback } from 'react';
 import { Tag, Search, RefreshCw, ChevronDown } from 'lucide-react';
-import { SUBSIDY_TAGS, SUBSIDY_TAG_COLORS, CUSTOMER_CARD_COLUMNS, STAGE_IDS } from '../constants';
+import { SUBSIDY_TAGS, SUBSIDY_TAG_COLORS, CUSTOMER_CARD_COLUMNS, getCustomerCardColumns, STAGE_IDS } from '../constants';
 import { normalizeSubsidyTag } from '../utils';
 import { supabase } from '../supabase';
 
@@ -8,12 +9,14 @@ const PAGE_SIZE = 50;
 
 export default function SubsidyView({ onSelectCustomer, isChannelPartnerOffice, partnerName, channelPartnerFilter, dealerFilter }) {
     const [activeFilter, setActiveFilter] = useState(null);
+    useDemoTourNavigation((entry)=>{if(entry.view==='subsidy'){setActiveFilter(entry.tag || null);setSearchTerm('');setPage(0);}});
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [customers, setCustomers] = useState([]);
     const [loadError, setLoadError] = useState(null);
     const [tagCounts, setTagCounts] = useState({});
     const [totalCount, setTotalCount] = useState(0);
+    const [countsLoading, setCountsLoading] = useState(true);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [page, setPage] = useState(0);
@@ -30,12 +33,13 @@ export default function SubsidyView({ onSelectCustomer, isChannelPartnerOffice, 
 
     // Fetch True Exact Counts via Supabase HEAD queries (bypasses 1,000 PostgREST row limits)
     const fetchCounts = useCallback(async () => {
+        setCountsLoading(true);
         try {
-            const targetPartner = isChannelPartnerOffice ? partnerName : (channelPartnerFilter?.trim() || null);
+            const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
 
             // 1. Total Count Query (HEAD exact count)
             let totalQuery = supabase
-                .from('admin')
+                .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                 .select('*', { count: 'exact', head: true })
                 .is('deleted_at', null)
                 .not('subsidy_tag', 'is', null)
@@ -49,7 +53,7 @@ export default function SubsidyView({ onSelectCustomer, isChannelPartnerOffice, 
             // 2. Parallel Head queries for every tag in SUBSIDY_TAGS
             const countPromises = SUBSIDY_TAGS.map(async (tag) => {
                 let tagQuery = supabase
-                    .from('admin')
+                    .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                     .select('*', { count: 'exact', head: true })
                     .is('deleted_at', null)
                     .ilike('subsidy_tag', `%${tag.id}%`);
@@ -79,8 +83,15 @@ export default function SubsidyView({ onSelectCustomer, isChannelPartnerOffice, 
             }
         } catch (err) {
             console.error('Error fetching subsidy counts:', err);
+        } finally {
+            setCountsLoading(false);
         }
     }, [isChannelPartnerOffice, partnerName, channelPartnerFilter, dealerFilter]);
+
+    // Fetch counts when partner or dealer filters change
+    useEffect(() => {
+        fetchCounts();
+    }, [fetchCounts]);
 
     // Fetch Paginated Customer Records with Backend Search
     const fetchCustomers = useCallback(async (pageNum = 0, isAppend = false) => {
@@ -88,14 +99,11 @@ export default function SubsidyView({ onSelectCustomer, isChannelPartnerOffice, 
         else setLoadingMore(true);
 
         try {
-            const targetPartner = isChannelPartnerOffice ? partnerName : (channelPartnerFilter?.trim() || null);
+            const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
 
             let query = supabase
-                .from('admin')
-                // Was select('*'): ~90 columns per row for a card that renders a
-                // handful. CUSTOMER_CARD_COLUMNS was already imported here
-                // and unused. The detail modal fetches the full record on open.
-                .select(CUSTOMER_CARD_COLUMNS)
+                .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
+                .select(getCustomerCardColumns(isChannelPartnerOffice))
                 .is('deleted_at', null)
                 .order('created_at', { ascending: false })
                 .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
@@ -205,7 +213,7 @@ export default function SubsidyView({ onSelectCustomer, isChannelPartnerOffice, 
                         <RefreshCw size={14} className={loading ? "animate-spin text-amber-500" : ""} />
                     </button>
                     <span className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-2 rounded-xl">
-                        Total: <span className="text-stone-900 font-extrabold">{totalCount.toLocaleString('en-IN')}</span> Subsidies
+                        Total: <span className="text-stone-900 font-extrabold">{countsLoading ? '···' : totalCount.toLocaleString('en-IN')}</span> Subsidies
                     </span>
                 </div>
             </div>
@@ -221,7 +229,7 @@ export default function SubsidyView({ onSelectCustomer, isChannelPartnerOffice, 
                     }`}
                 >
                     <p className="text-[9px] font-bold uppercase tracking-widest mb-1 opacity-60">All Subsidies</p>
-                    <p className="text-xl font-black">{totalCount.toLocaleString('en-IN')}</p>
+                    <p className="text-xl font-black">{countsLoading ? '···' : totalCount.toLocaleString('en-IN')}</p>
                 </button>
 
                 {SUBSIDY_TAGS.map(tag => {
@@ -240,7 +248,7 @@ export default function SubsidyView({ onSelectCustomer, isChannelPartnerOffice, 
                                 {tag.label}
                             </p>
                             <p className={`text-xl font-black ${colors.text || 'text-stone-900'}`}>
-                                {count.toLocaleString('en-IN')}
+                                {countsLoading ? '···' : count.toLocaleString('en-IN')}
                             </p>
                         </button>
                     );

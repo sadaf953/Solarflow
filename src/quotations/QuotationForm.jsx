@@ -42,6 +42,20 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
         const stored = writeRecovery(user.id,id,{ form:next,template:templateRef.current,base_updated_at:rowRef.current?.updated_at || null });
         setSaveState(stored ? (navigator.onLine ? 'Unsaved changes' : 'Offline — recovery saved on this device') : 'Unsaved — device recovery unavailable');
     };
+    function changeAsset(key,url) {
+        const next={...templateRef.current,assets:{...templateRef.current.assets,[key]:url}};
+        templateRef.current=next;setTemplate(next);markDirty();
+        const stored=writeRecovery(user.id,id,{form:formRef.current,template:next,base_updated_at:rowRef.current?.updated_at||null});
+        setSaveState(stored?'Unsaved changes':'Unsaved — device recovery unavailable');
+    }
+    async function uploadAsset(key,file) {
+        if(!file)return;
+        if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>1024*1024){setError('Choose a PNG, JPG or WebP image under 1 MB.');return;}
+        try {
+            const url=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read this image.'));reader.readAsDataURL(file);});
+            if(active.current){changeAsset(key,url);setError('');}
+        } catch(err){if(active.current)setError(err.message);}
+    }
     async function save() {
         if (saving.current) return saving.current;
         if (blocked.current) throw new Error('Reopen the quotation to resolve the conflicting changes before saving.');
@@ -49,11 +63,12 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
         const work = async () => {
             do {
                 const captured = formRef.current;
+                const capturedTemplate = templateRef.current;
                 if (active.current) { setSaveState('Saving…'); setError(''); }
-                const saved = await repo.save(id,rowRef.current,captured,templateRef.current,user);
+                const saved = await repo.save(id,rowRef.current,captured,capturedTemplate,user);
                 rowRef.current = saved;
                 onSaved(saved);
-                if (captured === formRef.current) {
+                if (captured === formRef.current && capturedTemplate === templateRef.current) {
                     changed.current = false; onDirty(false); removeRecovery(user.id,id);
                     if (active.current) setSaveState('Saved');
                 }
@@ -82,7 +97,7 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
         if (!changed.current || recovery || blocked.current) return;
         const timer = setTimeout(() => { if (navigator.onLine) void saveRef.current().catch(() => {}); },900);
         return () => clearTimeout(timer);
-    },[form,recovery]);
+    },[form,template,recovery]);
     const fillTestValues = () => {
         const testData = {
             customer_name: 'Test Customer',
@@ -183,6 +198,10 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
                 <h3>Standard notes</h3><ul className="q-standard-notes">{template.page2.notes.map(note => <li key={note}>{note}</li>)}</ul>
                 <h3>Additional notes</h3>{form.custom_notes.map((note,i) => <div key={i} className="q-note"><Field label={`Note ${i + 1}`} type="textarea" maxLength={250} value={note} onChange={v => update('custom_notes',form.custom_notes.map((n,index) => index === i ? v : n))} /><button aria-label={`Remove note ${i + 1}`} onClick={() => update('custom_notes',form.custom_notes.filter((_,index) => index !== i))}><Trash2 size={18} /></button></div>)}
                 {form.custom_notes.length < 5 && <button onClick={() => update('custom_notes',[...form.custom_notes,''])}><Plus size={16} /> Add note</button>}
+                <h3 className="q-summary-title">Banner and emblems</h3>
+                <p className="text-sm text-stone-500">Add your artwork for this quotation. These images are saved with the draft and included in the PDF. PNG, JPG or WebP, up to 1 MB each.</p>
+                <div className="q-form-grid">{[['demoQualityLogoUrl','GEDA symbol'],['demoEnergyLogoUrl','Energy emblem'],['demoBannerUrl','Quotation banner'],['screenshot2MiddleBannerUrl','Combined banner and emblems'],['demoPartnerLogoUrl','Partner logo']].map(([key,label])=><div key={key}><label className="q-field"><span>{label}</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{void uploadAsset(key,e.target.files?.[0]);e.target.value='';}} /></label>{template.assets?.[key]&&<div><img src={template.assets[key]} alt={label} className="max-h-24 max-w-full object-contain my-2"/><button type="button" onClick={()=>changeAsset(key,undefined)}>Remove {label.toLowerCase()}</button></div>}</div>)}</div>
+                <p className="text-xs text-stone-500">A combined banner takes the place of the separate symbols and quotation banner.</p>
                 <h3 className="q-summary-title">Review quotation</h3><dl className="q-summary">{customerFields.map(([key,label]) => <div key={key}><dt>{label}</dt><dd>{form[key] || '—'}</dd></div>)}{[['capacity_kw','System capacity (kWp)'],['project_type','Project type'],['solar_panel_make','Panel make'],['solar_panel_qty','No of Modules'],['panel_wattage','Module Wp'],['inverter_brand','Inverter brand / make'],['geb_geda_charge','GEB / GEDA']].map(([key,label]) => <div key={key}><dt>{label}</dt><dd>{form[key] || '—'}</dd></div>)}</dl>
                 {totals.map((option,i) => <div className="q-option" key={i}><strong>{option.brandName}</strong><p>Base {money(option.baseValue)} · Discount {money(option.discount)} · Subsidy {money(option.subsidy)}</p><p>Net payable <strong>{money(option.netPayableAmount)}</strong> · After subsidy <strong>{money(option.netPriceAfterSubsidy)}</strong></p></div>)}
                 <details><summary>Company, terms, warranty, BOM and bank details</summary><div className="q-template-summary"><h3>{template.company.name} {template.company.tagline}</h3><p>GST: {template.company.gstNo} · CIN: {template.company.cinNo}</p><p>{template.company.email}</p>{[['Terms and conditions',template.page3.termsAndConditions],['Warranties',template.page3.warranties]].map(([title,items]) => <section key={title}><h3>{title}</h3><dl className="q-summary">{items.map(item => <div key={item.sr}><dt>{item.parameter}</dt><dd>{item.remarks}</dd></div>)}</dl></section>)}<h3>Bill of materials</h3>{template.page3.bomItems.map(item => <p key={item.sr}><strong>{item.description}</strong> — {item.qty} {item.unit}, {item.size}, {item.make}</p>)}<h3>Other charges</h3><p>{template.page3.otherChargesText}</p><h3>Bank details</h3><p>{template.page3.bankDetails.accountName}</p><p>{template.page3.bankDetails.bankName} · {template.page3.bankDetails.branchName}</p><p>Account: {template.page3.bankDetails.accountNumber} · IFSC: {template.page3.bankDetails.ifscCode}</p><h3>Offices</h3><p>{template.footer.corporateOffice}</p><p>{template.footer.branchOffice}</p></div></details>

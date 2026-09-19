@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Wrench, Search, RefreshCw, ChevronDown } from 'lucide-react';
 import { normalizeInstallationStatus } from '../utils';
-import { INSTALLATION_TAGS, INSTALLATION_TAG_COLORS, CUSTOMER_CARD_COLUMNS, STAGE_IDS } from '../constants';
+import { INSTALLATION_TAGS, INSTALLATION_TAG_COLORS, CUSTOMER_CARD_COLUMNS, getCustomerCardColumns, STAGE_IDS } from '../constants';
 import { supabase } from '../supabase';
 
 export { normalizeInstallationStatus };
@@ -43,11 +43,11 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
     // Fetch True Exact Counts via Supabase HEAD queries (bypasses 1,000 PostgREST row limits)
     const fetchCounts = useCallback(async () => {
         try {
-            const targetPartner = isChannelPartnerOffice ? partnerName : (channelPartnerFilter?.trim() || null);
+            const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
 
             // 1. Total Count Query (HEAD exact count)
             let totalQuery = supabase
-                .from('admin')
+                .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                 .select('*', { count: 'exact', head: true })
                 .is('deleted_at', null)
                 .neq('stage', STAGE_IDS.COMPLETED)
@@ -62,7 +62,7 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
             // 2. Parallel Head queries for every tag in INSTALLATION_TAGS
             const countPromises = INSTALLATION_TAGS.map(async (tag) => {
                 let tagQuery = supabase
-                    .from('admin')
+                    .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                     .select('*', { count: 'exact', head: true })
                     .is('deleted_at', null)
                     .neq('stage', STAGE_IDS.COMPLETED)
@@ -106,14 +106,14 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
         else setLoadingMore(true);
 
         try {
-            const targetPartner = isChannelPartnerOffice ? partnerName : (channelPartnerFilter?.trim() || null);
+            const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
 
             let query = supabase
-                .from('admin')
+                .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
                 // Was select('*'): ~90 columns per row for a card that renders a
                 // handful. CUSTOMER_CARD_COLUMNS was already imported here
                 // and unused. The detail modal fetches the full record on open.
-                .select(`${CUSTOMER_CARD_COLUMNS}, installation_date, material_delivery_date`)
+                .select(`${getCustomerCardColumns(isChannelPartnerOffice)}, installation_date, material_delivery_date`)
                 .is('deleted_at', null)
                 .neq('stage', STAGE_IDS.COMPLETED)
                 .order('created_at', { ascending: false })

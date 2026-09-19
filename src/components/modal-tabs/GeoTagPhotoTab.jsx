@@ -122,7 +122,7 @@ export default function GeoTagPhotoTab({
                         <ClipboardList className="w-4 h-4 text-amber-500" /> Geo Tag Photo Checklist
                     </h4>
                     <span className="text-[9px] font-bold text-amber-600 uppercase bg-amber-50 px-2 py-0.5 rounded">
-                        Image Upload Mandatory
+                        Optional Photo
                     </span>
                 </div>
                 {!canUploadImage && (
@@ -130,7 +130,7 @@ export default function GeoTagPhotoTab({
                 )}
                 <div className="flex flex-col gap-2">
                     <CheckboxRemarkItem 
-                        label="Geo Tag Image Uploaded *" 
+                        label="Geo Tag Image Uploaded (optional)"
                         field="geo_tag_image" 
                         value={editData.geo_tag_image} 
                         onChange={handleChange} 
@@ -144,11 +144,11 @@ export default function GeoTagPhotoTab({
                     />
                 </div>
 
-                {/* Mandatory Image Note if Proceed is chosen without an image */}
+                {/* Optional photo reminder */}
                 {editData.geo_tag_status === 'Proceed' && !editData.geo_tag_image && (
                     <div className="pt-2 border-t border-stone-100">
                         <p className="text-[11px] font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 text-center">
-                            ⚠️ Geo Tag photograph must be uploaded before you can Save & Move to Discom Submission.
+                            You can upload a site photo later. Set the status to Proceed to move to Discom Submission.
                         </p>
                     </div>
                 )}

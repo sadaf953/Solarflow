@@ -103,6 +103,7 @@ export function createQuotationRepository(client) {
         // A stable lead UUID makes retries idempotent, including two devices converting together.
         async insertConversionLead(row, insertData, user) {
             const fresh = await get(row.id);
+            if (fresh.status === 'lost') throw new Error('Reopen this lost quotation before converting it.');
             let leadId = fresh.converted_lead_id || fresh.id;
             let lead;
             if (!fresh.converted_lead_id) {

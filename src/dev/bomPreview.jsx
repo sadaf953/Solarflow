@@ -15,7 +15,7 @@ const customer = {
     folder_no: 'SF-DEMO-001',
     villages: 'Demo Village',
     sub_divisions: 'Demo District',
-    channel_partner: 'Demo Partner One',
+    channel_partner: 'Demo Aurora Solar One',
     sub_channel_partner: 'Demo Dealer One',
     module_brand: 'SolarFlow',
     module_wp: '545',

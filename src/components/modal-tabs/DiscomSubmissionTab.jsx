@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../supabase';
 import { ClipboardList, Save, FileText, Printer, RotateCcw, AlertTriangle, CheckCircle2, SendHorizonal, Loader2, Upload } from 'lucide-react';
 import { Page1 } from '../agreement/Page1';
-import { CheckboxRemarkItem } from './shared';
+import { CheckboxRemarkItem, ChecklistModeToggle } from './shared';
 import { formatDateToDDMMYYYY } from '../../utils';
 
 export default function DiscomSubmissionTab({
@@ -72,7 +72,7 @@ export default function DiscomSubmissionTab({
         let cancelled = false;
         (async () => {
             const { data, error } = await supabase
-                .from('profiles')
+                .from('demo_profiles')
                 .select('id, name')
                 .eq('user_type', 'stamp')
                 .neq('status', 'inactive')
@@ -249,9 +249,15 @@ export default function DiscomSubmissionTab({
     return (
         <div className="space-y-4 animate-in fade-in duration-300">
             <div className="bg-white p-6 rounded-[24px] border border-stone-100 shadow-sm space-y-4">
-                <h4 className="text-xs font-bold text-stone-700 uppercase tracking-widest flex items-center gap-2">
-                    <ClipboardList className="w-4 h-4 text-amber-500" /> Utility File Checklist
-                </h4>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
+                    <h4 className="text-xs font-bold text-stone-700 uppercase tracking-widest flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4 text-amber-500" /> Utility File Checklist
+                    </h4>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">Mode:</span>
+                        <ChecklistModeToggle />
+                    </div>
+                </div>
                 <div className="flex flex-col gap-2">
                     <CheckboxRemarkItem label="DCR Certificate" field="dcr_certificate" value={editData.dcr_certificate} onChange={handleChange} isEditing={isEditable} documents={documents} onUpload={onFileUpload} onDelete={onFileDelete} onPreview={onFilePreview} onUpdateRemark={onUpdateRemark} canDelete={canDeleteDocs} />
                     <CheckboxRemarkItem label="PCR Certificate" field="pcr_certificate" value={editData.pcr_certificate} onChange={handleChange} isEditing={isEditable} documents={documents} onUpload={onFileUpload} onDelete={onFileDelete} onPreview={onFilePreview} onUpdateRemark={onUpdateRemark} canDelete={canDeleteDocs} />
