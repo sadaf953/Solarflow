@@ -1,3 +1,4 @@
+import {containDialogFocus} from '../utils/dialogFocus';
 // ─── GlobalPopup.jsx ────────────────────────────────────────────────────────
 // A single, app-wide replacement for native alert()/confirm(). Generalizes
 // the custom popup design that already existed locally in StampPortal.jsx
@@ -5,7 +6,7 @@
 // each screen inventing its own or falling back to the plain browser dialog.
 // ────────────────────────────────────────────────────────────────────────────
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, Share2 } from 'lucide-react';
 import ImageCropModal from './ImageCropModal';
 
@@ -21,6 +22,25 @@ const ICONS = {
 
 export function GlobalPopupProvider({ children }) {
     const [popup, setPopup] = useState(null);
+    const dialogRef = useRef(null);
+    useEffect(() => {
+        if (!popup || popup.mode === 'image-cropper') return;
+        const dialog = dialogRef.current;
+        const previousFocus = document.activeElement;
+        dialog.showModal();
+        (dialog.querySelector('[data-safe-dismiss]') || dialog.querySelector('button'))?.focus();
+        return () => {
+            dialog.close();
+            if (previousFocus?.isConnected) previousFocus.focus();
+        };
+    }, [popup]);
+
+    const dismissPopup = () => {
+        if (popup.mode === 'choice') popup.onResolve('cancel');
+        else if (popup.mode === 'confirm') popup.onResolve(false);
+        else if (popup.mode === 'alert') popup.onResolve();
+        else setPopup(null);
+    };
     const popupIcon = popup ? (ICONS[popup.type] || ICONS.warning) : ICONS.warning;
     const PopupIcon = popupIcon.Icon;
 
@@ -133,20 +153,24 @@ export function GlobalPopupProvider({ children }) {
                     onClose={() => popup.onResolve(null)}
                 />
             ) : popup ? (
-                <div
-                    className="fixed inset-0 z-[10000] flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-200"
+                <dialog onKeyDown={containDialogFocus}
+                    ref={dialogRef}
+                    aria-labelledby="global-popup-title"
+                    aria-describedby="global-popup-message"
+                    onCancel={event => { event.preventDefault(); dismissPopup(); }}
+                    className="fixed inset-0 m-0 w-full h-full max-w-none max-h-none border-0 z-[10000] flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-xs animate-in fade-in duration-200"
                     onClick={() => { if (popup.mode === 'alert') popup.onResolve(); else if (popup.mode === 'choice') popup.onResolve('cancel'); }}
                 >
                     <div
-                        className="w-full max-w-sm rounded-[28px] bg-white p-6 shadow-2xl border border-stone-150 animate-in zoom-in-95 duration-200 text-center space-y-4"
+                        className="w-full max-w-sm max-h-full overflow-y-auto rounded-[28px] bg-white p-6 shadow-2xl border border-stone-150 animate-in zoom-in-95 duration-200 text-center space-y-4"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className={`w-12 h-12 rounded-2xl mx-auto flex items-center justify-center ${popupIcon.className}`}>
                             <PopupIcon size={24} />
                         </div>
                         <div>
-                            <h4 className="text-sm font-extrabold text-stone-850">{popup.title}</h4>
-                            <p className="text-xs text-stone-500 font-medium mt-1.5 leading-relaxed whitespace-pre-line">{popup.message}</p>
+                            <h4 id="global-popup-title" className="text-base font-extrabold text-stone-900">{popup.title}</h4>
+                            <p id="global-popup-message" className="text-sm text-stone-600 font-medium mt-1.5 leading-relaxed whitespace-pre-line">{popup.message}</p>
                         </div>
                         {popup.mode === 'download-complete' ? (
                             <div className="space-y-2">
@@ -161,6 +185,7 @@ export function GlobalPopupProvider({ children }) {
                                 )}
                                 <button
                                     type="button"
+                                    data-safe-dismiss
                                     onClick={() => setPopup(null)}
                                     className="w-full py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition cursor-pointer active:scale-[0.98]"
                                 >
@@ -179,6 +204,7 @@ export function GlobalPopupProvider({ children }) {
                                 <div className="flex gap-2">
                                     <button
                                         type="button"
+                                        data-safe-dismiss
                                         onClick={() => popup.onResolve('cancel')}
                                         className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition cursor-pointer active:scale-[0.98]"
                                     >
@@ -205,6 +231,7 @@ export function GlobalPopupProvider({ children }) {
                             <div className="flex gap-2">
                                 <button
                                     type="button"
+                                    data-safe-dismiss
                                     onClick={() => popup.onResolve(false)}
                                     className="flex-1 py-3 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-xl text-xs font-bold transition cursor-pointer active:scale-[0.98]"
                                 >
@@ -220,7 +247,7 @@ export function GlobalPopupProvider({ children }) {
                             </div>
                         )}
                     </div>
-                </div>
+                </dialog>
             ) : null}
         </GlobalPopupContext.Provider>
     );

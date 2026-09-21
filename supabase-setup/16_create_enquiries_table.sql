@@ -29,12 +29,12 @@ create policy "Allow public insert to enquiries"
     to anon, authenticated
     with check (true);
 
--- Allow authenticated users to view enquiries
+-- Anonymous sign-ins also use the authenticated role. Visitors must never be
+-- able to browse contact requests, even after choosing the demo Admin persona.
+-- Enquiry review belongs in the project owner's database dashboard/server.
 drop policy if exists "Allow authenticated read enquiries" on public.enquiries;
-create policy "Allow authenticated read enquiries"
-    on public.enquiries for select
-    to authenticated
-    using (true);
+revoke select, update, delete on public.enquiries from public, anon, authenticated;
+grant insert on public.enquiries to anon, authenticated;
 
 -- Auto-update updated_at timestamp
 create or replace function public.touch_enquiries_updated_at()

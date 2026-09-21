@@ -1,4 +1,3 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 const A4 = [595.28, 841.89];
 const VENDOR = {
@@ -96,6 +95,7 @@ async function embedImage(pdf, source) {
 }
 
 export async function createFeasibilityPdf(data, { stampUrl = null, highlightMapped = false } = {}) {
+    const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib');
     const pdf = await PDFDocument.create();
     const regular = await pdf.embedFont(StandardFonts.Helvetica);
     const bold = await pdf.embedFont(StandardFonts.HelveticaBold);

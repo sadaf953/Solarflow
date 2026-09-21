@@ -150,3 +150,13 @@ Run **10_sample_data_200_and_historical_clients.sql after 09**, then refresh or 
 - Lead ownership is cleanly distributed across CPO, Dealer, and Head Office so role scoping and filtering work out-of-the-box.
 - Idempotent upsert (`on conflict do nothing`) preserves any existing visitor customizations and prevents duplication on reruns.
 
+
+## Enquiry privacy correction (script 16)
+
+Re-run the updated `16_create_enquiries_table.sql` in the approved demo project before publishing. Anonymous sign-ins carry the authenticated database role, so the old read policy exposed contact requests to demo visitors. The corrected script permits submission only; the owner reviews requests through the database dashboard or a trusted server. There is no visitor-facing enquiry review screen. This correction has been prepared locally but not applied to the hosted project by the agent.
+
+## Atomic batch save/delete correction — SQL 07
+
+Re-run the complete updated `07_bom_delivery_stock.sql` in the approved demo database. It now includes `save_delivery_batch_atomic` and `delete_delivery_batch_atomic`, which were missing from the hosted project. They link/unlink customers and save/delete a batch within one transaction, reject stale or conflicting assignments, and preserve delivered batch history. Until applied, the updated frontend shows a setup error for batch save/delete instead of attempting partial writes. Existing status/stock functions are retained.
+
+Locally validated using PGlite with authenticated role and ownership policies: `PGLITE_MODULE=<path to PGlite module> node tests/delivery/batch-sql.mjs`. Hosted application and verification are still pending.

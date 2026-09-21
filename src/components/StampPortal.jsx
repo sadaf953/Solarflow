@@ -786,7 +786,7 @@ export default function StampPortal({ user, onLogout, onOpenDevSwitcher, demoCon
 
             <main className="flex-1 p-4 max-w-md mx-auto w-full space-y-4 animate-in fade-in duration-300">
                 {/* Hero / Welcome Banner */}
-                <div className="bg-gradient-to-br from-stone-900 to-stone-850 text-white p-5 rounded-[24px] shadow-lg relative overflow-hidden">
+                <div className="bg-gradient-to-br from-stone-900 to-stone-800 text-white p-5 rounded-[24px] shadow-lg relative overflow-hidden">
                     <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-[0.07]">
                         <BrandMark variant="white" size="lg" />
                     </div>

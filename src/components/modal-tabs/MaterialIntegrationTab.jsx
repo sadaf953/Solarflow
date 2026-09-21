@@ -4,7 +4,7 @@ import { supabase } from '../../supabase';
 import { SectionHeader, EditableDetailItem } from './shared';
 import BomPrintModal from '../BomPrintModal';
 import { ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE, COMMON_BOM_ITEMS } from '../../constants';
-import bomReference from '../../inventory/reference.json';
+import bomReference from '../../inventory/reference.json' with { type: 'json' };
 import { loadBomForCustomer, getBomTemplateForType } from '../../utils/bom';
 import { useGlobalPopup } from '../GlobalPopup';
 

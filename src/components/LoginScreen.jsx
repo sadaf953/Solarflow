@@ -8,8 +8,8 @@ import {
 import { supabase } from '../supabase';
 import { APP_ROLES } from '../constants';
 import { ensureThreeDemoVendors, demoVendorTarget } from '../demo/vendors';
-import { getChecklistMode, setChecklistMode } from './modal-tabs/shared';
-import CustomizationEnquiryForm from './CustomizationEnquiryForm';
+import { getChecklistMode, setChecklistMode } from '../utils/checklistMode';
+import CustomizationEnquiryForm, { DEFAULT_BASIC_VERSION_URL } from './CustomizationEnquiryForm';
 import BrandMark from './BrandMark';
 import '../demo/demo.css';
 const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handshake,Users,Truck,Stamp];
@@ -20,6 +20,8 @@ export default function LoginScreen({onLogin,initialError=''}) {
  const [hasVendors, setHasVendors] = useState(false);
  const [hasStamp, setHasStamp] = useState(false);
  const [storeFiles, setStoreFiles] = useState(() => getChecklistMode() === 'files');
+ const [showSetup, setShowSetup] = useState(false);
+ const [showEnquiry, setShowEnquiry] = useState(false);
  const [authMode, setAuthMode] = useState('demo'); // 'demo' | 'credentials'
  const [emailInput, setEmailInput] = useState('');
  const [passwordInput, setPasswordInput] = useState('');
@@ -191,61 +193,16 @@ export default function LoginScreen({onLogin,initialError=''}) {
 
  return (
   <main className="demo-login">
-   {/* Top Banner: Want to try our base model? */}
-   <div className="max-w-[940px] mx-auto mb-5 -mt-4 sm:-mt-6">
-     <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-amber-500/10 border border-amber-300/80 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 text-xs shadow-2xs">
-       <div className="flex items-center gap-2 text-stone-800 font-medium">
-         <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-         <span>Want to try our base model?</span>
-       </div>
-       <a 
-         href="https://deeprootsystems.in/solarflow-basic" 
-         target="_blank" 
-         rel="noopener noreferrer"
-         className="inline-flex items-center gap-1 font-bold text-amber-900 hover:text-amber-950 bg-amber-200/80 hover:bg-amber-300/90 px-3 py-1 rounded-xl transition shadow-2xs cursor-pointer text-[11px]"
-       >
-         <span>Explore Base Model</span>
-         <ArrowRight size={12} />
-       </a>
-     </div>
-   </div>
-
    <div className="demo-login-intro">
     <BrandMark size="lg"/>
-    <span className="demo-eyebrow">SOLARFLOW CRM DEMO</span>
-    <h1>Your solar business.<br/><span>Every perspective.</span></h1>
-    <p>Launch the primary Admin Command Center, or customize your organization setup below to explore the exact role-based portals your team needs.</p>
+    <span className="demo-eyebrow">SOLARFLOW · ADVANCED DEMO</span>
+    <h1>From first enquiry.<br/><span>To finished installation.</span></h1>
+    <p>See how your team manages quotations, projects, materials and installation in one place. Start with a ready-to-explore sample workspace.</p>
    </div>
 
    {error && <div role="alert" className="demo-login-error">{error}</div>}
 
    <div className="demo-login-main">
-    {/* Mode Switcher: One-Click Demo vs Email & Password Authentication */}
-    <div className="flex justify-center -mt-2 mb-1">
-      <div className="inline-flex bg-stone-200/80 p-1 rounded-2xl border border-stone-300/80 text-xs font-bold shadow-2xs">
-        <button
-          type="button"
-          onClick={() => { setAuthMode('demo'); setCredNotice({ type: '', text: '' }); }}
-          className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-            authMode === 'demo' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
-          }`}
-        >
-          <ShieldCheck size={14} className="text-amber-500" />
-          <span>One-Click Role Portals</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => { setAuthMode('credentials'); setCredNotice({ type: '', text: '' }); }}
-          className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
-            authMode === 'credentials' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-600 hover:text-stone-900'
-          }`}
-        >
-          <Mail size={14} className="text-amber-500" />
-          <span>Email &amp; Password Login</span>
-        </button>
-      </div>
-    </div>
-
     {authMode === 'credentials' ? (
      <div className="bg-white rounded-3xl border border-stone-200 p-6 md:p-8 max-w-md mx-auto w-full shadow-sm animate-in fade-in duration-200">
       <div className="flex items-center gap-3 mb-6 pb-4 border-b border-stone-150">
@@ -368,7 +325,7 @@ export default function LoginScreen({onLogin,initialError=''}) {
         ) : (
          <div className="pt-1 text-center">
           <p className="text-[11px] text-stone-400">
-           Or switch to <b>One-Click Role Portals</b> above.
+           <button type="button" onClick={() => setAuthMode('demo')}>Back to the no-signup demo</button>
           </p>
          </div>
         )}
@@ -382,28 +339,33 @@ export default function LoginScreen({onLogin,initialError=''}) {
      onClick={() => choose(adminRole)} 
      disabled={!!busy} 
      className="demo-login-hero-card"
-     aria-label="Launch Admin Command Center"
+     aria-label="Try the Advanced Demo"
     >
      <div className="demo-login-hero-content">
       <div className="demo-login-hero-badge">
        <ShieldCheck size={14} />
-       <span>PRIMARY DEMO WORKSPACE</span>
+       <span>NO SIGNUP · SAMPLE DATA INCLUDED</span>
       </div>
-      <h2>Admin Command Center</h2>
-      <p>The complete end-to-end solar business suite: quotations, all 50 customer stages, inventory godown, delivery batches, vendor payouts, and audit trails.</p>
+      <h2>Explore your solar business</h2>
+      <p>Start in the business overview, open a sample project, or create your first quotation. Other team views are available whenever you need them.</p>
      </div>
      <div className="demo-login-hero-btn">
       {busy === adminRole.user_type ? <LoaderCircle className="animate-spin" size={19}/> : <ArrowRight size={19}/>}
-      <span>{busy === adminRole.user_type ? 'Opening Admin...' : 'Launch Admin Portal'}</span>
+      <span>{busy === adminRole.user_type ? 'Opening your demo...' : 'Try the Advanced Demo'}</span>
      </div>
     </button>
 
+    <div className="demo-start-options">
+     <button type="button" aria-expanded={showSetup} aria-controls="demo-company-setup" onClick={() => setShowSetup(!showSetup)}>{showSetup ? 'Hide demo options' : 'Customize demo or explore team roles'} <ArrowRight size={16}/></button>
+     <button type="button" onClick={() => { setAuthMode('credentials'); setCredNotice({type:'',text:''}); }}>Already have demo credentials? Sign in</button>
+    </div>
+    {showSetup && <>
     {/* Business Profile Questionnaire & Tailored Roles Section */}
-    <section className="demo-personas-section">
+    <section className="demo-personas-section" id="demo-company-setup">
      <div className="demo-questionnaire-card">
       <div className="demo-questionnaire-header">
        <div>
-        <span className="demo-questionnaire-eyebrow">CLICKLY CLICK CLACK · CUSTOMIZE YOUR DEMO</span>
+        <span className="demo-questionnaire-eyebrow">OPTIONAL · TAILOR YOUR WORKSPACE</span>
         <h3 className="demo-questionnaire-title">How does your solar company operate?</h3>
         <p className="demo-questionnaire-subtitle">Toggle your company structure to tailor the portals shown below. Smaller companies only see the core 3 views.</p>
        </div>
@@ -494,7 +456,7 @@ export default function LoginScreen({onLogin,initialError=''}) {
          <span className="demo-question-num">3</span>
          <div>
           <strong>Do you have a dedicated agreement / stamp maker?</strong>
-          <small>{hasStamp ? 'Stamp Guy portal enabled for verification & document workflow.' : 'Office handles stamping: Stamp Guy portal hidden.'}</small>
+          <small>{hasStamp ? 'Document coordinator portal enabled for verification & document workflow.' : 'Office handles stamping: Document coordinator portal hidden.'}</small>
          </div>
         </div>
         <div className="demo-toggle-group" role="radiogroup" aria-label="Dedicated agreement / stamp maker?">
@@ -582,16 +544,17 @@ export default function LoginScreen({onLogin,initialError=''}) {
       })}
      </div>
      </section>
+     </>}
      </>
     )}
    </div>
 
-   {/* Customization & Reach Us Enquiry Section */}
-   <div className="mt-8 max-w-3xl mx-auto w-full">
-    <CustomizationEnquiryForm />
+   <div className="demo-next-links">
+    <div><strong>Looking for a simpler CRM?</strong><p>Explore the basic version for leads, quotations and customer tracking.</p><a href={DEFAULT_BASIC_VERSION_URL} target="_blank" rel="noopener noreferrer">Explore Basic Version <ArrowRight size={15}/></a></div>
+    <div><strong>Make it work for your team</strong><p>Tell us about your business when you are ready to discuss setup.</p><button type="button" aria-expanded={showEnquiry} aria-controls="demo-enquiry" onClick={() => setShowEnquiry(!showEnquiry)}>{showEnquiry ? 'Hide setup request' : 'Request a setup'} <ArrowRight size={15}/></button></div>
    </div>
-
-   <p className="demo-login-footnote mt-6">Private demo workspace with preloaded customer projects. Switch roles anytime from the header.</p>
+   <div hidden={!showEnquiry} id="demo-enquiry" className="mt-8 max-w-3xl mx-auto w-full"><CustomizationEnquiryForm initialStoreFiles={storeFiles} /></div>
+   <p className="demo-login-footnote mt-6">Private demo workspace with sample projects. No signup required.</p>
   </main>
  );
 }

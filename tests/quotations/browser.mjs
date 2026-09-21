@@ -13,7 +13,8 @@ try {
     assert.equal(await page.locator('.q-header').count(),0);
     assert.equal(await page.locator('.q-hero').count(),0);
     assert.equal(await page.getByRole('button',{name:'Create Quotation',exact:true}).first().isVisible(),true);
-    assert.equal(await page.getByRole('button',{name:'Add to Leads',exact:true}).first().isDisabled(),true);
+    await page.getByRole('button',{name:'More actions',exact:true}).first().click();
+    assert.equal(await page.getByRole('button',{name:'Convert to Lead',exact:true}).first().isEnabled(),true);
     assert.ok(await page.evaluate(()=>document.querySelector('.q-module').scrollWidth<=innerWidth));
     assert.ok(await page.locator('.q-module.q-module-embedded').count());
     await page.screenshot({path:`${output}/mobile-list.png`,fullPage:true});
@@ -75,7 +76,8 @@ try {
     await page.setViewportSize({width:320,height:700});
     await page.goto('http://127.0.0.1:5186/quotation-preview.html?role=agent2#/quotations');
     await page.getByRole('heading',{name:'Test Customer A'}).waitFor();
-    assert.equal(await page.getByRole('button',{name:'Add to Leads',exact:true}).first().isDisabled(),true);
+    await page.getByRole('button',{name:'More actions',exact:true}).first().click();
+    assert.equal(await page.getByRole('button',{name:'Convert to Lead',exact:true}).first().isEnabled(),true);
     assert.ok(await page.evaluate(()=>document.querySelector('.q-module').scrollWidth<=innerWidth));
     await page.getByRole('button',{name:'Create Quotation',exact:true}).first().click();
     await page.getByLabel('Customer name',{exact:true}).waitFor();
@@ -83,5 +85,5 @@ try {
     await page.screenshot({path:`${output}/dealer-320-editor.png`,fullPage:true});
     for(const role of ['vendor','stamp']){await page.goto(`http://127.0.0.1:5186/quotation-preview.html?role=${role}#/quotations`);await page.getByText('Quotation Maker is unavailable for your role.',{exact:false}).waitFor();}
     assert.deepEqual(errors,[]);
-    console.log(JSON.stringify({result:'pass',checks:['embedded quotation view without duplicate header or marketing hero','download changes draft to issued','mobile list','automatic read-only salesperson name','disabled Add to Leads action','mobile stepper','draft reopen','offline recovery','panel/inverter field separation','three-page PDF','desktop preview','admin desktop list','dealer access at 320px','mobile overflow guards','vendor and stamp UI guards'],draftRoute:route,output},null,2));
+    console.log(JSON.stringify({result:'pass',checks:['embedded quotation view without duplicate header or marketing hero','download changes draft to issued','mobile list','automatic read-only salesperson name','conversion action under More actions','mobile stepper','draft reopen','offline recovery','panel/inverter field separation','three-page PDF','desktop preview','admin desktop list','dealer access at 320px','mobile overflow guards','vendor and stamp UI guards'],draftRoute:route,output},null,2));
 } finally {await browser.close();}

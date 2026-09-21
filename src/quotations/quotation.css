@@ -365,3 +365,16 @@
   .q-editor-actions { margin-inline:-12px; padding-inline:12px; }
   .q-editor-actions button { font-size:11px; padding-inline:6px; }
 }
+
+/* Keep quotation cards focused, with secondary actions revealed on demand. */
+.q-card-primary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.q-card-actions button { min-width:0; }
+.q-module .q-more-actions { margin-top:8px; width:100%; border-color:transparent; background:transparent; color:#57534e; font-size:12px; }
+.q-module .q-more-actions:hover { background:#f5f5f4; }
+.q-card-secondary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding-top:12px; margin-top:4px; border-top:1px solid #e7e5e4; }
+.q-card-secondary button { white-space:normal; font-size:12px; }
+
+/* Keep the chat launcher clear of the quotation editor's sticky actions. */
+body:has(.q-editor-actions) .team-chat-launcher {
+  bottom: calc(6rem + env(safe-area-inset-bottom));
+}

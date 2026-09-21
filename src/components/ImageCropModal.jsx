@@ -1,3 +1,4 @@
+import {percentCropRatio,fitCropRatio,resizeCrop} from '../utils/imageCrop';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
     Crop, RotateCw, RotateCcw, ZoomIn, ZoomOut, Check, X, 
@@ -65,29 +66,13 @@ export default function ImageCropModal({
     const rotateClockwise = () => setRotation(prev => (prev + 90) % 360);
     const rotateCounterClockwise = () => setRotation(prev => (prev + 270) % 360);
 
-    // Aspect ratio changes
-    const handleAspectRatioChange = (ratioId) => {
-        setAspectRatio(ratioId);
-        const preset = ASPECT_RATIOS.find(r => r.id === ratioId);
-        if (!preset || preset.ratio === null) return;
-
-        const targetRatio = preset.ratio;
-        setCrop(prev => {
-            let newWidth = prev.width;
-            let newHeight = newWidth / targetRatio;
-            if (newHeight > 90) {
-                newHeight = 90;
-                newWidth = newHeight * targetRatio;
-            }
-            if (newWidth > 90) {
-                newWidth = 90;
-                newHeight = newWidth / targetRatio;
-            }
-            const newX = Math.max(0, Math.min(100 - newWidth, (100 - newWidth) / 2));
-            const newY = Math.max(0, Math.min(100 - newHeight, (100 - newHeight) / 2));
-            return { x: newX, y: newY, width: newWidth, height: newHeight };
-        });
-    };
+    // Crop coordinates refer to the unrotated image shown beneath the overlay.
+    const selectedRatio = ASPECT_RATIOS.find(p => p.id === aspectRatio)?.ratio;
+    const percentageRatio = percentCropRatio(naturalSize.width, naturalSize.height, rotation, selectedRatio);
+    useEffect(() => {
+        if (percentageRatio) setCrop(previous => fitCropRatio(previous, percentageRatio));
+    }, [percentageRatio]);
+    const handleAspectRatioChange = setAspectRatio;
 
     // Drag / resize logic for crop box
     const handleMouseDown = (e, type) => {
@@ -108,8 +93,11 @@ export default function ImageCropModal({
         const rect = containerRef.current.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return;
 
-        const deltaX = ((e.clientX - dragStart.mouseX) / rect.width) * 100;
-        const deltaY = ((e.clientY - dragStart.mouseY) / rect.height) * 100;
+        const angle = rotation * Math.PI / 180;
+        const screenX = (e.clientX - dragStart.mouseX) / zoom;
+        const screenY = (e.clientY - dragStart.mouseY) / zoom;
+        const deltaX = ((screenX * Math.cos(angle) + screenY * Math.sin(angle)) / imageRef.current.clientWidth) * 100;
+        const deltaY = ((-screenX * Math.sin(angle) + screenY * Math.cos(angle)) / imageRef.current.clientHeight) * 100;
         const init = dragStart.crop;
 
         if (dragType === 'move') {
@@ -118,22 +106,10 @@ export default function ImageCropModal({
             nextX = Math.max(0, Math.min(100 - init.width, nextX));
             nextY = Math.max(0, Math.min(100 - init.height, nextY));
             setCrop(prev => ({ ...prev, x: nextX, y: nextY }));
-        } else if (dragType === 'se') {
-            let nextWidth = Math.max(15, Math.min(100 - init.x, init.width + deltaX));
-            let nextHeight = Math.max(15, Math.min(100 - init.y, init.height + deltaY));
-            const activePreset = ASPECT_RATIOS.find(r => r.id === aspectRatio);
-            if (activePreset?.ratio) {
-                nextHeight = nextWidth / activePreset.ratio;
-            }
-            setCrop(prev => ({ ...prev, width: nextWidth, height: nextHeight }));
-        } else if (dragType === 'nw') {
-            let nextX = Math.max(0, Math.min(init.x + init.width - 15, init.x + deltaX));
-            let nextY = Math.max(0, Math.min(init.y + init.height - 15, init.y + deltaY));
-            let nextWidth = init.width - (nextX - init.x);
-            let nextHeight = init.height - (nextY - init.y);
-            setCrop({ x: nextX, y: nextY, width: nextWidth, height: nextHeight });
+        } else if (dragType === 'se' || dragType === 'nw') {
+            setCrop(resizeCrop(init, deltaX, deltaY, dragType, percentageRatio));
         }
-    }, [isDragging, dragType, dragStart, aspectRatio]);
+    }, [isDragging, dragType, dragStart, percentageRatio, rotation, zoom]);
 
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
@@ -168,36 +144,19 @@ export default function ImageCropModal({
                 img.onerror = rej;
             });
 
-            // 1. Create canvas for rotation
-            const isRotated90or270 = rotation === 90 || rotation === 270;
-            const rotWidth = isRotated90or270 ? naturalSize.height : naturalSize.width;
-            const rotHeight = isRotated90or270 ? naturalSize.width : naturalSize.height;
-
-            const rotCanvas = document.createElement('canvas');
-            rotCanvas.width = rotWidth;
-            rotCanvas.height = rotHeight;
-            const rotCtx = rotCanvas.getContext('2d');
-
-            rotCtx.translate(rotWidth / 2, rotHeight / 2);
-            rotCtx.rotate((rotation * Math.PI) / 180);
-            rotCtx.drawImage(img, -naturalSize.width / 2, -naturalSize.height / 2);
-
-            // 2. Crop from rotated canvas
-            const cropPixelX = (crop.x / 100) * rotWidth;
-            const cropPixelY = (crop.y / 100) * rotHeight;
-            const cropPixelW = (crop.width / 100) * rotWidth;
-            const cropPixelH = (crop.height / 100) * rotHeight;
-
+            // Crop the same source rectangle as the overlay, then rotate it.
+            const sourceX = crop.x / 100 * naturalSize.width;
+            const sourceY = crop.y / 100 * naturalSize.height;
+            const sourceW = crop.width / 100 * naturalSize.width;
+            const sourceH = crop.height / 100 * naturalSize.height;
+            const quarterTurn = rotation % 180 !== 0;
             const finalCanvas = document.createElement('canvas');
-            finalCanvas.width = Math.max(1, Math.round(cropPixelW));
-            finalCanvas.height = Math.max(1, Math.round(cropPixelH));
+            finalCanvas.width = Math.max(1, Math.round(quarterTurn ? sourceH : sourceW));
+            finalCanvas.height = Math.max(1, Math.round(quarterTurn ? sourceW : sourceH));
             const finalCtx = finalCanvas.getContext('2d');
-
-            finalCtx.drawImage(
-                rotCanvas,
-                cropPixelX, cropPixelY, cropPixelW, cropPixelH,
-                0, 0, finalCanvas.width, finalCanvas.height
-            );
+            finalCtx.translate(finalCanvas.width / 2, finalCanvas.height / 2);
+            finalCtx.rotate(rotation * Math.PI / 180);
+            finalCtx.drawImage(img, sourceX, sourceY, sourceW, sourceH, -sourceW / 2, -sourceH / 2, sourceW, sourceH);
 
             // 3. Export to File
             const isJpeg = file?.type === 'image/jpeg' || (file?.name && /\.(jpe?g)$/i.test(file.name));

@@ -5,7 +5,7 @@ import { demoLeadSchema } from '../utils/validation';
 import { useState, useEffect, useRef } from 'react';
 import { 
     X, Plus, User, ClipboardList, Paperclip, Eye, 
-    Upload, FileText, Image as ImageIcon, Loader2, Banknote, AlertTriangle, Calendar,
+    Upload, FileText, Image as ImageIcon, Loader2, Banknote, AlertTriangle,
     HardDrive, MapPin, Sparkles
 } from 'lucide-react';
 import { DEFAULT_LEAD_FORM } from '../models';
@@ -20,7 +20,7 @@ function AddLeadMetaSelect({ label, field, value, onChange, options = [] }) {
         <div className="space-y-1">
             <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">{label}</label>
             <select
-                value={value || ''}
+                aria-label={label} value={value || ''}
                 onChange={e => onChange(field, e.target.value)}
                 className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
             >
@@ -76,7 +76,7 @@ function ChannelPartnerAutocomplete({ label, value, onChange, suggestions = [], 
             <div className="relative">
                 <input name="channel_partner" id="channel_partner"
                     type="text"
-                    value={inputValue}
+                    aria-label={label} value={inputValue}
                     onChange={handleInputChange}
                     onFocus={() => setShowSuggestions(true)}
                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
@@ -155,7 +155,7 @@ function AddLeadChecklistItem({ label, field, checked, onToggle, pendingFile, on
                             Attached
                         </span>
                     ) : (
-                        <span className="text-[9px] font-bold text-stone-400 bg-stone-100 px-1.5 py-0.2 rounded">
+                        <span className="text-[9px] font-bold text-stone-600 bg-stone-100 px-1.5 py-0.2 rounded">
                             Not Attached
                         </span>
                     )}
@@ -226,6 +226,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
     const [pendingFiles, setPendingFiles] = useState({}); // { [doc_type]: File }
     const [previewDoc, setPreviewDoc] = useState(null); // { doc, url }
     const [saving, setSaving] = useState(false);
+    const [showOptional, setShowOptional] = useState(false);
     const [validationErrors, setValidationErrors] = useState([]);
     const [isFormDirty, setIsFormDirty] = useState(false);
 
@@ -264,20 +265,47 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
             }
             setFormData(defaults);
             setPendingFiles({});
+            setShowOptional(false);
+            setValidationErrors([]);
             setSaving(false);
             setIsFormDirty(false);
         }
     }, [isOpen, user, isAgent, isAgent2, isChannelPartnerOffice, partnerName, initialValues]);
 
-    // Esc closes the form through the same guard. Declared before the early
-    // return below so the hook runs on every render.
     const requestCloseRef = useRef(null);
+    const formDialogRef = useRef(null);
+    const closingRef = useRef(false);
     useEffect(() => {
-        if (!isOpen) return undefined;
-        const onKeyDown = (e) => { if (e.key === 'Escape') requestCloseRef.current?.(); };
-        window.addEventListener('keydown', onKeyDown);
-        return () => window.removeEventListener('keydown', onKeyDown);
+        if (!isOpen) return;
+        const previousFocus = document.activeElement;
+        formDialogRef.current?.querySelector('#new-lead-name')?.focus();
+        return () => { if (previousFocus?.isConnected) previousFocus.focus(); };
     }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKeyDown = event => {
+            // Let the file preview or a native confirmation handle its own keys.
+            if (previewDoc || document.querySelector('dialog[open]') || event.defaultPrevented) return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!saving) requestCloseRef.current?.();
+            }
+            if (event.key !== 'Tab') return;
+            const controls = [...formDialogRef.current.querySelectorAll('button, input, select, textarea, summary, a[href], [tabindex]')]
+                .filter(element => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (!first) { event.preventDefault(); return; }
+            if (!formDialogRef.current.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+                event.preventDefault(); (event.shiftKey ? last : first).focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault(); first.focus();
+            }
+        };
+        document.addEventListener('keydown', onKeyDown, true);
+        return () => document.removeEventListener('keydown', onKeyDown, true);
+    }, [isOpen, previewDoc, saving]);
 
     // Protect against accidental browser refresh or tab close when new lead form has unsaved edits
     useEffect(() => {
@@ -334,6 +362,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
 
     const fillSampleIndex = useRef(0);
     const handleFillTestData = () => {
+        setShowOptional(true);
         const samples = [
             {
                 customer_name: 'Rajesh Sharma',
@@ -462,6 +491,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
 
         const result = demoLeadSchema.safeParse(finalData);
         if (!result.success) {
+            if (result.error.issues.some(issue => !['customer_name', 'phone_number'].includes(issue.path[0]))) setShowOptional(true);
             setValidationErrors(result.error.issues.map(err => err.message));
             // Scroll to top
             const bodyEl = document.querySelector('.modal-body');
@@ -494,16 +524,19 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
     };
 
     const handleRequestClose = async () => {
+        if (saving || closingRef.current) return;
         if (!isFormDirty) {
             onClose();
             return;
         }
+        closingRef.current = true;
         const shouldDiscard = await showConfirm('This new lead has unsaved changes.', {
             title: 'Close without saving?',
             confirmLabel: 'Discard Lead',
             cancelLabel: 'Keep Editing',
             type: 'warning'
         });
+        closingRef.current = false;
         if (shouldDiscard) onClose();
     };
     requestCloseRef.current = handleRequestClose;
@@ -515,21 +548,18 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4">
-            <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div ref={formDialogRef} role="dialog" aria-modal="true" aria-labelledby="add-lead-title" aria-describedby="add-lead-help" className="bg-white rounded-[28px] shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                 {/* Modal Header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 bg-white sticky top-0 z-10">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-stone-100 bg-white sticky top-0 z-10">
                     <div>
                         <div className="flex items-center gap-2">
-                            <h2 className="text-base font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
+                            <h2 id="add-lead-title" className="text-base font-black text-stone-900 uppercase tracking-wider flex items-center gap-2">
                                 <Plus size={18} className="text-amber-500" /> Add New Lead
                             </h2>
-                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
-                                <Calendar size={11} className="text-amber-600 flex-shrink-0" />
-                                <span>{new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })} IST</span>
-                            </span>
+
                         </div>
-                        <p className="text-[10px] text-stone-400 font-semibold mt-0.5">
-                            Name and phone are required. Add other details and optional photos now or later.
+                        <p id="add-lead-help" className="text-xs text-stone-600 mt-1">
+                            Start with a name and phone number. Everything else can wait.
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -537,14 +567,16 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             type="button"
                             onClick={handleFillTestData}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition-all cursor-pointer shadow-xs"
-                            title="Pre-fill form with realistic test data for quick testing"
+                            title="Fill a fictional customer and optional details for this demo"
                         >
                             <Sparkles size={13} className="text-amber-600" />
-                            <span>Fill Test Data</span>
+                            <span>Use sample customer</span>
                         </button>
                         <button 
                             onClick={handleRequestClose} 
-                            className="p-2 hover:bg-stone-100 text-stone-400 hover:text-stone-700 rounded-xl transition cursor-pointer"
+                            aria-label="Close Add Lead"
+                            disabled={saving}
+                            className="p-2 hover:bg-stone-100 text-stone-600 hover:text-stone-700 rounded-xl transition cursor-pointer"
                         >
                             <X size={18} />
                         </button>
@@ -554,7 +586,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                 {/* Modal Scrollable Body */}
                 <div className="flex-1 overflow-y-auto p-5 space-y-5 modal-body">
                     {validationErrors.length > 0 && (
-                        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl p-4 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
                             <div className="flex items-center gap-2 text-red-800 font-bold text-xs uppercase tracking-wide">
                                 <AlertTriangle className="w-4 h-4 text-red-500" />
                                 Please fix the following errors
@@ -573,7 +605,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                     <section>
                         <div className="flex items-center gap-2 mb-3 pb-1.5 border-b border-stone-100">
                             <User size={13} className="text-amber-500" />
-                            <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                            <h3 className="text-[10px] font-bold text-stone-600 uppercase tracking-widest">
                                 Customer Info
                             </h3>
                         </div>
@@ -581,11 +613,12 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                         <div className="space-y-3">
                             {/* Customer Name * */}
                             <div className="space-y-1">
-                                <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
+                                <label htmlFor="new-lead-name" className="text-xs text-stone-600 font-bold block">
                                     Customer Name *
                                 </label>
                                 <input
                                     type="text"
+                                    id="new-lead-name" aria-required="true" autoComplete="name"
                                     value={formData.customer_name || ''}
                                     onChange={e => handleChange('customer_name', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
@@ -596,11 +629,11 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
 
                             {/* Phone Number * */}
                             <div className="space-y-1">
-                                <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
+                                <label htmlFor="new-lead-phone" className="text-xs text-stone-600 font-bold block">
                                     Phone Number *
                                 </label>
                                 <input
-                                    type="tel"
+                                    type="tel" id="new-lead-phone" aria-required="true" autoComplete="tel"
                                     // 16 = "+" plus the E.164 maximum of 15 digits.
                                     // At 10 a +91 number could not be typed at all.
                                     maxLength={16}
@@ -612,6 +645,12 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                 />
                             </div>
 
+                        </div>
+                    </section>
+                    <details open={showOptional} onToggle={event => setShowOptional(event.currentTarget.open)} className="rounded-2xl border border-stone-200 p-4">
+                        <summary className="cursor-pointer text-sm font-bold text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600">Optional details &amp; documents</summary>
+                        <p className="text-xs text-stone-500 mt-2 mb-4">Add address, team assignment, system details or documents now. Closing this section keeps your entries.</p>
+                        <section><div className="space-y-3">
                             {/* Email Address */}
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
@@ -619,7 +658,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                 </label>
                                 <input
                                     type="email"
-                                    value={formData.email_address || ''}
+                                    aria-label="Email Address" value={formData.email_address || ''}
                                     onChange={e => handleChange('email_address', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="name@example.com"
@@ -635,7 +674,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                 <input
                                     type="text"
                                     inputMode="numeric"
-                                    value={formData.consumer_no || ''}
+                                    aria-label="Consumer No" value={formData.consumer_no || ''}
                                     onChange={e => handleChange('consumer_no', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="Consumer number"
@@ -650,7 +689,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                 </label>
                                 <input
                                     type="text"
-                                    value={formData.villages || ''}
+                                    aria-label="Villages / Address" value={formData.villages || ''}
                                     onChange={e => handleChange('villages', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="Village or address"
@@ -660,10 +699,10 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
 
                             {/* Tehsil / Sub Division */}
                             <div className="space-y-1 md:col-span-2">
-                                <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">Full Address <span className="normal-case text-stone-400">(optional)</span></label>
+                                <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">Full Address <span className="normal-case text-stone-600">(optional)</span></label>
                                 <textarea
                                     rows={3}
-                                    value={formData.full_address || ''}
+                                    aria-label="Full Address (optional)" value={formData.full_address || ''}
                                     onChange={e => handleChange('full_address', e.target.value)}
                                     className="w-full resize-y bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="Complete installation address"
@@ -671,8 +710,8 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             </div>
 
                             <div className="space-y-1">
-                                <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">Pincode <span className="normal-case text-stone-400">(optional)</span></label>
-                                <input type="text" inputMode="numeric" maxLength={6} value={formData.pincode || ''}
+                                <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">Pincode <span className="normal-case text-stone-600">(optional)</span></label>
+                                <input type="text" inputMode="numeric" maxLength={6} aria-label="Pincode (optional)" value={formData.pincode || ''}
                                     onChange={e => handleChange('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="6-digit pincode" />
@@ -685,7 +724,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                 </label>
                                 <input
                                     type="text"
-                                    value={formData.sub_divisions || ''}
+                                    aria-label="Tehsil / Sub Division" value={formData.sub_divisions || ''}
                                     onChange={e => handleChange('sub_divisions', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="Tehsil or sub division"
@@ -700,7 +739,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                 </label>
                                 <input
                                     type="text"
-                                    value={formData.district || ''}
+                                    aria-label="District" value={formData.district || ''}
                                     onChange={e => handleChange('district', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="District"
@@ -711,11 +750,11 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold flex items-center gap-1.5">
                                     <HardDrive size={12} className="text-blue-500" />
-                                    Google Drive Link <span className="normal-case text-stone-400 font-medium">(optional)</span>
+                                    Google Drive Link <span className="normal-case text-stone-600 font-medium">(optional)</span>
                                 </label>
                                 <input
                                     type="url"
-                                    value={formData.google_drive_link || ''}
+                                    aria-label="Google Drive Link (optional)" value={formData.google_drive_link || ''}
                                     onChange={e => handleChange('google_drive_link', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
                                     placeholder="https://drive.google.com/..."
@@ -726,11 +765,11 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                             <div className="space-y-1">
                                 <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold flex items-center gap-1.5">
                                     <MapPin size={12} className="text-emerald-500" />
-                                    Site Location Link <span className="normal-case text-stone-400 font-medium">(optional)</span>
+                                    Site Location Link <span className="normal-case text-stone-600 font-medium">(optional)</span>
                                 </label>
                                 <input
                                     type="url"
-                                    value={formData.location_link || ''}
+                                    aria-label="Site Location Link (optional)" value={formData.location_link || ''}
                                     onChange={e => handleChange('location_link', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
                                     placeholder="https://maps.google.com/?q=..."
@@ -781,15 +820,15 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                         readOnly
                                         className="w-full bg-stone-100 border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-stone-700 cursor-not-allowed"
                                     />
-                                    <p className="text-[10px] text-stone-400 italic">Set automatically to your account.</p>
+                                    <p className="text-[10px] text-stone-600 italic">Set automatically to your account.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-1">
                                     <label className="text-[10px] text-stone-500 uppercase tracking-wide font-bold block">
-                                        Dealer Name <span className="normal-case text-stone-400 font-medium">(optional)</span>
+                                        Dealer Name <span className="normal-case text-stone-600 font-medium">(optional)</span>
                                     </label>
                                     <select
-                                        value={formData.sub_channel_partner || ''}
+                                        aria-label="Dealer Name (optional)" value={formData.sub_channel_partner || ''}
                                         onChange={e => handleChange('sub_channel_partner', e.target.value)}
                                         className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     >
@@ -800,7 +839,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                         {subAgentOptions.map(name => <option key={name} value={name}>{name}</option>)}
                                     </select>
                                     {subAgentOptions.length === 0 && (
-                                        <p className="text-[10px] text-stone-400 italic">No Channel Partners are registered under this CPO yet - add them in User Management first.</p>
+                                        <p className="text-[10px] text-stone-600 italic">No Channel Partners are registered under this CPO yet - add them in User Management first.</p>
                                     )}
                                 </div>
                             )}
@@ -811,7 +850,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                      MODULE BRAND
                                  </label>
                                  <select
-                                     value={formData.module_brand || ''}
+                                     aria-label="Module Brand" value={formData.module_brand || ''}
                                      onChange={e => handleChange('module_brand', e.target.value)}
                                      className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
 
@@ -827,7 +866,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                      MODULE WP
                                  </label>
                                  <select
-                                     value={formData.module_wp || ''}
+                                     aria-label="Module Wp" value={formData.module_wp || ''}
                                      onChange={e => handleChange('module_wp', e.target.value)}
                                      className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
 
@@ -845,7 +884,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                 <input
                                     type="number"
                                     min="1"
-                                    value={formData.no_of_modules || ''}
+                                    aria-label="No of Modules" value={formData.no_of_modules || ''}
                                     onChange={e => handleChange('no_of_modules', e.target.value)}
                                     className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                     placeholder="e.g. 10"
@@ -861,7 +900,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                 <span className="relative block">
                                     <input
                                         type="text"
-                                        value={formData.system_capacity_kwp || ''}
+                                        aria-label="System Capacity" value={formData.system_capacity_kwp || ''}
                                         onChange={e => handleChange('system_capacity_kwp', e.target.value)}
                                         className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 pr-16 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 transition-all"
                                         placeholder="e.g. 32,940"
@@ -871,7 +910,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                         type="button"
                                         onClick={autoCalcCapacity}
                                         title="Calculate from Module Wp x No of Modules"
-                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-amber-500 hover:bg-amber-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white transition cursor-pointer"
+                                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-lg bg-amber-500 hover:bg-amber-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-stone-950 transition cursor-pointer"
                                     >
                                         Auto
                                     </button>
@@ -885,7 +924,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                         <div className="flex items-center justify-between mb-3 pb-1.5 border-b border-stone-100">
                             <div className="flex items-center gap-2">
                                 <ClipboardList size={13} className="text-amber-500" />
-                                <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">
+                                <h3 className="text-[10px] font-bold text-stone-600 uppercase tracking-widest">
                                     Document Checklist (optional uploads)
                                 </h3>
                             </div>
@@ -909,7 +948,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     const matched = ptOptions.find(o => String(o).trim().toLowerCase() === stored.toLowerCase());
                                     return (
                                 <select
-                                    value={matched ?? stored}
+                                    aria-label="Payment Type Selection" value={matched ?? stored}
                                     onChange={(e) => {
                                         const val = e.target.value;
                                         handleChange('payment_type', val);
@@ -935,7 +974,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                         <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Bank Name</label>
                                         <input
                                             type="text"
-                                            value={formData.bank_name || ''}
+                                            aria-label="Bank Name" value={formData.bank_name || ''}
                                             onChange={e => handleChange('bank_name', e.target.value)}
                                             placeholder="Enter bank name"
                                             className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -945,7 +984,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                         <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Bank Branch</label>
                                         <input
                                             type="text"
-                                            value={formData.bank_branch || ''}
+                                            aria-label="Bank Branch" value={formData.bank_branch || ''}
                                             onChange={e => handleChange('bank_branch', e.target.value)}
                                             placeholder="Enter bank branch"
                                             className="w-full bg-white border border-stone-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-800 focus:outline-none focus:ring-1 focus:ring-blue-400"
@@ -1046,12 +1085,13 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     />
                                 </div>
                             ) : (
-                                <p className="text-xs text-stone-400 italic py-2">
+                                <p className="text-xs text-stone-600 italic py-2">
                                     Please select a Payment Type above to display the Document Checklist.
                                 </p>
                             )}
                         </div>
                     </section>
+                    </details>
                 </div>
 
                 {/* Modal Footer */}
@@ -1068,7 +1108,7 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                         type="button"
                         onClick={handleSave}
                         disabled={saving}
-                        className="px-5 py-2.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl transition shadow-md shadow-amber-500/10 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                        className="px-5 py-2.5 text-xs font-bold text-stone-950 bg-amber-500 hover:bg-amber-600 rounded-xl transition shadow-md shadow-amber-500/10 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
                         {saving ? (
                             <>

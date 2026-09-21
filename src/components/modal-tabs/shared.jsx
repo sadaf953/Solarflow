@@ -1,3 +1,5 @@
+import { getChecklistMode, setChecklistMode } from '../../utils/checklistMode';
+export { getChecklistMode, setChecklistMode } from '../../utils/checklistMode';
 import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, Plus, Edit3, X, Paperclip, Eye, Upload, FileText, Image as ImageIcon, Download, MessageSquare, Check, Sparkles, Phone, CheckSquare, FolderOpen } from 'lucide-react';
 import { formatINR, toIndianCommas, parseIndianNumber, formatInputValue, getTelephoneHref } from '../../utils';
@@ -391,7 +393,7 @@ export function FilePreviewModal({ file, fileUrl, onClose, onDownload, onUpdateR
                         >
                             <Download size={12} /> Download
                         </button>
-                        <button onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer">
+                        <button aria-label="Close file preview" onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer">
                             <X size={16} className="text-stone-400" />
                         </button>
                     </div>
@@ -570,24 +572,6 @@ function DocRemarkRow({ doc, onUpdateRemark, isEditing }) {
 // rule instead of re-implementing (or skipping) it.
 export const RETURNED_DOCUMENT_PREFIX = '[RETURNED]';
 export const isReturnedDocument = (doc) => String(doc?.remark || '').trim().toUpperCase().startsWith(RETURNED_DOCUMENT_PREFIX);
-
-export const getChecklistMode = () => {
-    try {
-        const stored = localStorage.getItem('solarflow_checklist_mode');
-        // Default to clean simple checklist mode when opened:
-        // "when they open it it should show checklsit simple checlist , you click that its checked thats all"
-        return stored === 'files' ? 'files' : 'checklist';
-    } catch {
-        return 'checklist';
-    }
-};
-
-export const setChecklistMode = (mode) => {
-    try {
-        localStorage.setItem('solarflow_checklist_mode', mode);
-        window.dispatchEvent(new CustomEvent('solarflow-checklist-mode-changed', { detail: { mode } }));
-    } catch {}
-};
 
 export function ChecklistModeToggle({ className = '', onFillAllDemoDocs = null, isFilling = false }) {
     const [mode, setMode] = React.useState(() => getChecklistMode());

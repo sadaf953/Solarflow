@@ -109,4 +109,64 @@ begin
 end $update_delivery_batch_status_atomic$;
 revoke all on function public.bom_stock_document(uuid),public.get_inventory_bom_lines(),public.set_bom_stock_quantity(uuid,integer,numeric,jsonb),public.issue_delivered_bom_stock(),public.update_delivery_batch_status_atomic(uuid,text,uuid[]) from public,anon;
 grant execute on function public.bom_stock_document(uuid),public.get_inventory_bom_lines(),public.set_bom_stock_quantity(uuid,integer,numeric,jsonb),public.update_delivery_batch_status_atomic(uuid,text,uuid[]) to authenticated;
+-- Save and disband are transactions too: never persist a batch without its links.
+create or replace function public.save_delivery_batch_atomic(p_batch jsonb,p_selected_project_ids uuid[],p_removed_project_ids uuid[])
+returns jsonb language plpgsql security invoker set search_path='' as $save_batch$
+declare u uuid:=auth.uid(); b public.delivery_batches; bid uuid:=(p_batch->>'id')::uuid;
+ selected uuid[]:=coalesce(p_selected_project_ids,'{}'); removed uuid[]:=coalesce(p_removed_project_ids,'{}');
+ expected_removed uuid[]; batch_number text:=nullif(trim(p_batch->>'batch_no'),''); n integer;
+begin
+ if u is null then raise exception 'Sign in to the demo first';end if;
+ perform pg_advisory_xact_lock(hashtextextended(u::text,0));
+ if bid is null or batch_number is null then raise exception 'Batch ID and number are required';end if;
+ if cardinality(selected)=0 or cardinality(selected)<>(select count(distinct id) from unnest(selected) id) then raise exception 'Choose at least one distinct project';end if;
+ select * into b from public.delivery_batches where id=bid and demo_session_id=u for update;
+ if found then
+  if b.batch_no<>batch_number then raise exception 'Batch number cannot change';end if;
+  if b.status='DELIVERED' then raise exception 'Delivered batches cannot be edited';end if;
+  select coalesce(array_agg(id order by id),'{}') into expected_removed from unnest(b.project_ids) id where not(id=any(selected));
+ else expected_removed:='{}';end if;
+ if expected_removed is distinct from array(select id from unnest(removed) id order by id) then raise exception 'Batch projects changed. Refresh and retry.';end if;
+ if coalesce(p_batch->>'status','IN_TRANSIT') not in ('PENDING','IN_TRANSIT') then raise exception 'Save the batch before marking it Delivered';end if;
+ -- Lock project rows before checking ownership, prior assignment and issued stock.
+ perform id from public.admin where id=any(selected||removed) and demo_session_id=u for update;
+ select count(*) into n from public.admin where id=any(selected) and demo_session_id=u and deleted_at is null
+  and (nullif(delivery_batch_id,'') is null or delivery_batch_id=batch_number)
+  and bom_stock_issued_at is null and delivery_status is distinct from 'DELIVERED';
+ if n<>cardinality(selected) then raise exception 'A project is unavailable, assigned elsewhere, or already delivered. Refresh the project list.';end if;
+ select count(*) into n from public.admin where id=any(removed) and demo_session_id=u and deleted_at is null
+  and delivery_batch_id=batch_number and bom_stock_issued_at is null;
+ if n<>cardinality(removed) then raise exception 'A removed project changed. Refresh and retry.';end if;
+ insert into public.delivery_batches(id,demo_session_id,batch_no,dispatch_date,driver_name,driver_phone,vehicle_number,rent_amount,car_rent_paid,vendor,notes,status,project_ids)
+ values(bid,u,batch_number,p_batch->>'dispatch_date',p_batch->>'driver_name',p_batch->>'driver_phone',p_batch->>'vehicle_number',p_batch->>'rent_amount',coalesce(p_batch->>'car_rent_paid','No'),p_batch->>'vendor',p_batch->>'notes',coalesce(p_batch->>'status','IN_TRANSIT'),selected)
+ on conflict(id) do update set dispatch_date=excluded.dispatch_date,driver_name=excluded.driver_name,driver_phone=excluded.driver_phone,
+ vehicle_number=excluded.vehicle_number,rent_amount=excluded.rent_amount,car_rent_paid=excluded.car_rent_paid,vendor=excluded.vendor,
+ notes=excluded.notes,status=excluded.status,project_ids=excluded.project_ids,updated_at=now();
+ update public.admin set delivery_batch_id=batch_number,material_delivery_date=p_batch->>'dispatch_date',driver_name=p_batch->>'driver_name',
+ driver_phone_number=p_batch->>'driver_phone',vehicle_number=p_batch->>'vehicle_number',vendor=p_batch->>'vendor',delivery_status=coalesce(p_batch->>'status','IN_TRANSIT')
+ where id=any(selected) and demo_session_id=u;
+ update public.admin set delivery_batch_id=null,delivery_status='PENDING' where id=any(removed) and demo_session_id=u and delivery_batch_id=batch_number;
+ return jsonb_build_object('success',true);
+end $save_batch$;
+
+create or replace function public.delete_delivery_batch_atomic(p_batch_id uuid,p_project_ids uuid[])
+returns jsonb language plpgsql security invoker set search_path='' as $delete_batch$
+declare u uuid:=auth.uid(); b public.delivery_batches; n integer;
+begin
+ if u is null then raise exception 'Sign in to the demo first';end if;
+ perform pg_advisory_xact_lock(hashtextextended(u::text,0));
+ select * into b from public.delivery_batches where id=p_batch_id and demo_session_id=u for update;
+ if not found then raise exception 'Batch unavailable. Refresh and retry.';end if;
+ if b.status='DELIVERED' then raise exception 'Delivered batches cannot be disbanded';end if;
+ if array(select unnest(coalesce(p_project_ids,'{}'::uuid[])) order by 1) is distinct from array(select unnest(b.project_ids) order by 1) then raise exception 'Batch projects changed. Refresh and retry.';end if;
+ perform id from public.admin where id=any(b.project_ids) and demo_session_id=u for update;
+ select count(*) into n from public.admin where id=any(b.project_ids) and demo_session_id=u and delivery_batch_id=b.batch_no and bom_stock_issued_at is null;
+ if n<>cardinality(b.project_ids) then raise exception 'Batch links changed or stock was issued. Refresh and review the projects.';end if;
+ update public.admin set delivery_batch_id=null,delivery_status='PENDING' where id=any(b.project_ids) and demo_session_id=u and delivery_batch_id=b.batch_no;
+ delete from public.delivery_batches where id=b.id and demo_session_id=u;
+ return jsonb_build_object('success',true);
+end $delete_batch$;
+revoke all on function public.save_delivery_batch_atomic(jsonb,uuid[],uuid[]),public.delete_delivery_batch_atomic(uuid,uuid[]) from public,anon;
+grant execute on function public.save_delivery_batch_atomic(jsonb,uuid[],uuid[]),public.delete_delivery_batch_atomic(uuid,uuid[]) to authenticated;
+
 commit;

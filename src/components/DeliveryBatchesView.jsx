@@ -1,3 +1,6 @@
+import {containDialogFocus} from '../utils/dialogFocus';
+import {loadDeliveryBatches} from '../delivery/load';
+import {updateDeliveryStatus,saveDeliveryBatch,deleteDeliveryBatch,removeDeliveryProject} from '../delivery/status';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Truck, Plus, Search, Filter, Calendar, User, Phone, MapPin, 
@@ -16,9 +19,11 @@ export default function DeliveryBatchesView({
     onRefreshCustomers,
     onOpenCustomerModal
 }) {
-    const { showAlert } = useGlobalPopup();
+    const { showAlert, showConfirm } = useGlobalPopup();
     const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
+    const loadRequest = useRef(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [monthFilter, setMonthFilter] = useState('');
     const [appliedMonthFilter, setAppliedMonthFilter] = useState('');
@@ -103,6 +108,17 @@ export default function DeliveryBatchesView({
     const [projectSearchQuery, setProjectSearchQuery] = useState('');
     const [projectStageFilter, setProjectStageFilter] = useState('MATERIAL DELIVERY');
     const [saving, setSaving] = useState(false);
+    const batchDialogRef = useRef(null);
+    const batchTriggerRef = useRef(null);
+    useEffect(() => {
+        if (!showCreateModal) return;
+        const dialog = batchDialogRef.current;
+        const previousFocus = batchTriggerRef.current || document.activeElement;
+        dialog.showModal();
+        dialog.querySelector('input')?.focus();
+        return () => { dialog.close(); if (previousFocus?.isConnected) previousFocus.focus(); };
+    }, [showCreateModal]);
+
     const [vendorsList, setVendorsList] = useState([]);
 
     // Fetch vendors for dropdown
@@ -119,35 +135,24 @@ export default function DeliveryBatchesView({
         fetchVendors();
     }, []);
 
-    // Load Batches from Database or LocalStorage
+    // Load current batch data from the database; never silently substitute cached records.
     useEffect(() => {
         if (projectStageFilter === 'ALL') fetchAllCustomers(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [projectStageFilter]);
 
     const fetchBatches = async () => {
+        const requestId = ++loadRequest.current;
         setLoading(true);
+        setLoadError(false);
         try {
-            const { data, error } = await supabase
-                .from('delivery_batches')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (!error && data) {
-                setBatches(data);
-                localStorage.setItem('solarflow_local_delivery_batches', JSON.stringify(data));
-            } else {
-                console.error('Failed to fetch delivery batches from the database:', error);
-                const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                const localStored = localStorage.getItem('solarflow_local_delivery_batches');
-                const parsed = localStored ? JSON.parse(localStored).filter(b => uuidRe.test(String(b.id))) : [];
-                setBatches(parsed);
-                localStorage.setItem('solarflow_local_delivery_batches', JSON.stringify(parsed));
-            }
-        } catch (err) {
-            console.error('Failed to load delivery batches:', err);
+            const data = await loadDeliveryBatches(supabase);
+            if (requestId === loadRequest.current) setBatches(data);
+        } catch (error) {
+            console.error('Failed to load delivery batches:', error);
+            if (requestId === loadRequest.current) setLoadError(true);
         } finally {
-            setLoading(false);
+            if (requestId === loadRequest.current) setLoading(false);
         }
     };
 
@@ -191,53 +196,9 @@ export default function DeliveryBatchesView({
         };
     }, []);
 
-    // Save Batches Helper
-    // Returns true only if the write to the real shared database actually
-    // succeeded - callers (like handleSaveBatch) must check this before
-    // doing anything that assumes the batch genuinely exists in the
-    // database, such as marking customer records as "already batched".
-    //
-    // Only `changedBatch` (the one record actually being created/edited)
-    // is sent to Supabase - never the whole local `updatedBatches` list.
-    // Upserting the entire list previously caused
-    // "operator does not exist: uuid = text" whenever any older,
-    // locally-cached batch (from before the id-format bug was fixed, or
-    // loaded from the localStorage fallback) was still sitting in local
-    // state with a non-UUID id - mixing valid and invalid ids in one
-    // upsert call trips Postgres before it even gets to check individual
-    // rows. `updatedBatches` is still used for the local UI state and
-    // localStorage cache, which have no such type constraint.
-    const saveBatchesState = async (updatedBatches, previousBatches, changedBatch) => {
-        // React state updates optimistically for responsiveness, but the
-        // localStorage cache must NOT be written until the database has accepted
-        // it. It used to be written first and never rolled back, so a batch that
-        // failed to save stayed in the cache - and fetchBatches falls back to
-        // that cache whenever the database read fails, resurrecting a batch that
-        // never existed as though it were real.
-        setBatches(updatedBatches);
-        try {
-            const upsertRes = await runWrite(
-                supabase.from('delivery_batches').upsert([changedBatch]).select('id'),
-                { action: 'batch save' }
-            );
-            if (!upsertRes.ok) throw upsertRes.error;
-            localStorage.setItem('solarflow_local_delivery_batches', JSON.stringify(updatedBatches));
-            return true;
-        } catch (e) {
-            console.error('Failed to sync delivery batch to the database:', e);
-            const reverted = previousBatches ?? batches;
-            setBatches(reverted);
-            // Keep the cache consistent with what actually persisted.
-            try {
-                localStorage.setItem('solarflow_local_delivery_batches', JSON.stringify(reverted));
-            } catch { /* cache is best-effort */ }
-            showAlert('Failed to save this batch to the shared database: ' + (e.message || 'Unknown error') + '. Nothing was saved - please try again.', { type: 'error' });
-            return false;
-        }
-    };
-
     // Open Create Modal
     const handleOpenCreateModal = () => {
+        if (loading || loadError) return;
         const randNum = Math.floor(1000 + Math.random() * 9000);
         const today = new Date().toISOString().split('T')[0];
         setBatchForm({
@@ -361,7 +322,6 @@ export default function DeliveryBatchesView({
                 updated_at: new Date().toISOString()
             };
 
-            const previousBatches = batches;
             let updatedBatches;
             if (editingBatch) {
                 updatedBatches = batches.map(b => b.id === editingBatch.id ? batchPayload : b);
@@ -373,81 +333,8 @@ export default function DeliveryBatchesView({
                 ? (editingBatch.project_ids || []).filter(id => !validProjectIds.includes(id))
                 : [];
 
-            // Attempt atomic RPC save (single PostgreSQL transaction)
-            let atomicSuccess = false;
-            try {
-                const { data: rpcData, error: rpcErr } = await supabase.rpc('save_delivery_batch_atomic', {
-                    p_batch: batchPayload,
-                    p_selected_project_ids: validProjectIds,
-                    p_removed_project_ids: removedProjectIds
-                });
-                if (!rpcErr && rpcData?.success) {
-                    atomicSuccess = true;
-                } else if (rpcErr) {
-                    console.warn('save_delivery_batch_atomic RPC fallback:', rpcErr);
-                }
-            } catch (rpcEx) {
-                console.warn('save_delivery_batch_atomic exception:', rpcEx);
-            }
-
-            // If atomic RPC is not yet deployed in DB, run standard fallback
-            if (!atomicSuccess) {
-                const didSave = await saveBatchesState(updatedBatches, previousBatches, batchPayload);
-                if (!didSave) {
-                    setSaving(false);
-                    return;
-                }
-
-                // Bulk update selected projects in admin table with shared delivery metadata
-                const customerUpdates = {
-                    delivery_batch_id: batchPayload.batch_no,
-                    material_delivery_date: batchPayload.dispatch_date,
-                    driver_name: batchPayload.driver_name,
-                    driver_phone_number: batchPayload.driver_phone,
-                    vehicle_number: batchPayload.vehicle_number,
-                    vendor: batchPayload.vendor,
-                    delivery_status: 'IN_TRANSIT'
-                };
-
-                // Unchecked before: the batch row saved while the customer links
-                // silently did not, leaving customers stranded outside the batch
-                // that claims them - the original delivery-batch bug class.
-                // Checking `error` alone could not detect this: an RLS-refused
-                // UPDATE matches zero rows and returns error: null. Requiring
-                // every id back also catches a PARTIAL link, which would strand
-                // some customers outside the batch that claims them.
-                if (validProjectIds.length > 0) {
-                    const linkRes = await runWrite(
-                        supabase.from('admin').update(customerUpdates).in('id', validProjectIds).select('id'),
-                        { action: 'batch link' }
-                    );
-                    if (!linkRes.ok) throw linkRes.error;
-                    if (linkRes.rows.length !== validProjectIds.length) {
-                        throw new Error(
-                            `Only ${linkRes.rows.length} of ${validProjectIds.length} customers could be linked to this batch.`
-                        );
-                    }
-                }
-
-                if (removedProjectIds.length > 0) {
-                    const unlinkRes = await runWrite(
-                        supabase.from('admin').update({
-                            delivery_batch_id: null,
-                            delivery_status: 'PENDING'
-                        }).in('id', removedProjectIds).select('id'),
-                        { action: 'batch unlink' }
-                    );
-                    if (!unlinkRes.ok) throw unlinkRes.error;
-                    if (unlinkRes.rows.length !== removedProjectIds.length) {
-                        throw new Error(
-                            `Only ${unlinkRes.rows.length} of ${removedProjectIds.length} customers could be removed from this batch.`
-                        );
-                    }
-                }
-            } else {
-                setBatches(updatedBatches);
-                localStorage.setItem('solarflow_local_delivery_batches', JSON.stringify(updatedBatches));
-            }
+            await saveDeliveryBatch(supabase, batchPayload, validProjectIds, removedProjectIds);
+            setBatches(updatedBatches);
 
             await handleRefresh();
             setShowCreateModal(false);
@@ -459,91 +346,23 @@ export default function DeliveryBatchesView({
         }
     };
 
-    // Disband / Delete Batch
+    // The database removes the batch and its project links in one transaction.
     const handleDeleteBatch = async (batchId) => {
-        if (!window.confirm('Are you sure you want to disband this delivery batch? The projects will remain intact.')) return;
-        const batchToDelete = batches.find(b => b.id === batchId);
-        const previousBatches = batches;
-        const updatedBatches = batches.filter(b => b.id !== batchId);
-
-        setBatches(updatedBatches);
-        localStorage.setItem('solarflow_local_delivery_batches', JSON.stringify(updatedBatches));
-        // Only attempt the real delete for batches that were actually
-        // persisted with a real UUID - a leftover locally-cached batch
-        // from before the id-format fix has no matching row to delete.
-        const isPersistedBatch = batchToDelete
-            && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(batchToDelete.id));
-
-        if (!isPersistedBatch) {
-            // Say so rather than skipping quietly: the batch vanishing from the
-            // screen looked identical to a real delete, so there was no way to
-            // tell "deleted" apart from "there was never anything to delete".
-            showAlert(
-                'This batch only ever existed in your browser - it was never saved to the shared database, so there was nothing to delete there. It has been removed locally.',
-                { title: 'Removed locally', type: 'warning' }
-            );
-        }
-
-        if (isPersistedBatch) {
-            let deleteAtomicSuccess = false;
-            try {
-                const { data: rpcData, error: rpcErr } = await supabase.rpc('delete_delivery_batch_atomic', {
-                    p_batch_id: batchToDelete.id,
-                    p_project_ids: batchToDelete.project_ids || []
-                });
-                if (!rpcErr && rpcData?.success) {
-                    deleteAtomicSuccess = true;
-                } else if (rpcErr) {
-                    console.warn('delete_delivery_batch_atomic RPC fallback:', rpcErr);
-                }
-            } catch (delRpcEx) {
-                console.warn('delete_delivery_batch_atomic exception:', delRpcEx);
-            }
-
-            if (!deleteAtomicSuccess) {
-                const delRes = await runWrite(
-                    supabase.from('delivery_batches').delete().eq('id', batchToDelete.id).select('id'),
-                    { action: 'batch deletion' }
-                );
-                const error = delRes.ok ? null : delRes.error;
-                if (error) {
-                    console.error('Failed to delete delivery batch from the database:', error);
-                    setBatches(previousBatches);
-                    localStorage.setItem('solarflow_local_delivery_batches', JSON.stringify(previousBatches));
-                    showAlert('Failed to delete this batch from the shared database: ' + error.message + '. Nothing was changed - please try again.', { type: 'error' });
-                    return;
-                }
-
-                // Clear delivery_batch_id from linked projects
-                if (batchToDelete?.project_ids?.length > 0) {
-                    // Unchecked before: deleting a batch could leave its customers
-                    // still pointing at a batch row that no longer exists.
-                    // `throw` here had no enclosing try - the only one closes
-                    // above - so a failure became an unhandled rejection and the
-                    // user was told nothing while the batch was already gone
-                    // from the UI and localStorage.
-                    const clearRes = await runWrite(
-                        supabase.from('admin')
-                            .update({
-                                delivery_batch_id: null,
-                                delivery_status: 'PENDING'
-                            })
-                            .in('id', batchToDelete.project_ids)
-                            .select('id'),
-                        { action: 'batch unlink' }
-                    );
-                    if (!clearRes.ok || clearRes.rows.length !== batchToDelete.project_ids.length) {
-                        showAlert(
-                            'The batch was deleted, but '
-                            + `${batchToDelete.project_ids.length - (clearRes.rows?.length || 0)} customer(s) still point at it. `
-                            + 'Refresh and check the batch list before creating a new one.',
-                            { type: 'error' }
-                        );
-                    }
-                }
-            }
-        }
-        await handleRefresh();
+        if (saving) return;
+        const batch = batches.find(item => item.id === batchId);
+        if (!batch) return;
+        if (!await showConfirm('Remove this batch and release its projects? Customer records will be kept.', {
+            title: 'Disband delivery batch?', confirmLabel: 'Disband batch', cancelLabel: 'Keep batch', type: 'warning'
+        })) return;
+        setSaving(true);
+        try {
+            await deleteDeliveryBatch(supabase, batch.id, batch.project_ids || []);
+            const updated = batches.filter(item => item.id !== batchId);
+            setBatches(updated);
+            await handleRefresh();
+        } catch (error) {
+            showAlert('Could not disband batch: ' + error.message, {type: 'error'});
+        } finally { setSaving(false); }
     };
 
     // Filter projects for the creation selector
@@ -651,7 +470,8 @@ export default function DeliveryBatchesView({
                 </div>
 
                 <button
-                    onClick={handleOpenCreateModal}
+                    onClick={event => { batchTriggerRef.current = event.currentTarget; handleOpenCreateModal(); }}
+                    disabled={loading || loadError || saving}
                     className="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 shadow-md shadow-stone-900/10 cursor-pointer self-start sm:self-auto"
                 >
                     <Plus size={16} /> Create Delivery Batch
@@ -662,25 +482,25 @@ export default function DeliveryBatchesView({
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
                 <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-2xs space-y-1">
                     <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Total Batches</span>
-                    <p className="text-2xl font-black text-stone-900">{metrics.totalBatches}</p>
+                    <p className="text-2xl font-black text-stone-900">{loading || loadError ? '—' : metrics.totalBatches}</p>
                     <span className="text-[11px] text-stone-500 font-medium">Recorded dispatch trips</span>
                 </div>
 
                 <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-2xs space-y-1">
                     <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">In Transit</span>
-                    <p className="text-2xl font-black text-amber-600">{metrics.inTransit}</p>
+                    <p className="text-2xl font-black text-amber-600">{loading || loadError ? '—' : metrics.inTransit}</p>
                     <span className="text-[11px] text-stone-500 font-medium">Active truck runs</span>
                 </div>
 
                 <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-2xs space-y-1">
                     <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Clubbed Sites</span>
-                    <p className="text-2xl font-black text-stone-900">{metrics.totalProjects}</p>
+                    <p className="text-2xl font-black text-stone-900">{loading || loadError ? '—' : metrics.totalProjects}</p>
                     <span className="text-[11px] text-stone-500 font-medium">Projects in delivery</span>
                 </div>
 
                 <div className="bg-white p-4 rounded-2xl border border-stone-200/80 shadow-2xs space-y-1">
                     <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Batched Capacity</span>
-                    <p className="text-2xl font-black text-stone-900">{metrics.totalKwp} <span className="text-xs font-bold text-stone-400">kWp</span></p>
+                    <p className="text-2xl font-black text-stone-900">{loading || loadError ? '—' : metrics.totalKwp} <span className="text-xs font-bold text-stone-400">kWp</span></p>
                     <span className="text-[11px] text-stone-500 font-medium">Total solar payload</span>
                 </div>
             </div>
@@ -692,7 +512,7 @@ export default function DeliveryBatchesView({
                     <input
                         type="text"
                         placeholder="Search batch #, driver, vehicle..."
-                        value={searchQuery}
+                        aria-label="Search delivery batches" value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-stone-800 placeholder-stone-400 outline-none focus:bg-white focus:border-amber-400 transition"
                     />
@@ -704,7 +524,7 @@ export default function DeliveryBatchesView({
                         <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mr-1">Dispatch Month</span>
                         <input
                             type="month"
-                            value={monthFilter}
+                            aria-label="Dispatch Month" value={monthFilter}
                             onChange={(e) => setMonthFilter(e.target.value)}
                             className="bg-stone-50 border border-stone-200 rounded-xl px-2 py-1.5 text-xs font-medium text-stone-800 outline-none focus:bg-white focus:border-amber-400 transition"
                         />
@@ -753,6 +573,12 @@ export default function DeliveryBatchesView({
                     <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                     <p className="text-xs font-bold">Loading delivery batches...</p>
                 </div>
+            ) : loadError ? (
+                <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-stone-800 space-y-3">
+                    <h3 className="font-bold">Delivery batches couldn’t be loaded</h3>
+                    <p className="text-sm">We couldn’t confirm the latest trips. Your saved records haven’t been changed. Try again before editing or dispatching a batch.</p>
+                    <button type="button" onClick={handleRefresh} className="rounded-xl bg-stone-900 text-white px-4 py-3 text-sm font-bold">Retry loading batches</button>
+                </div>
             ) : filteredBatches.length === 0 ? (
                 <div className="bg-white border border-stone-200 rounded-3xl p-12 text-center text-stone-400 space-y-3">
                     <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mx-auto">
@@ -792,58 +618,25 @@ export default function DeliveryBatchesView({
                                             </span>
                                             <select
                                                 value={batch.status || 'IN_TRANSIT'}
+                                                disabled={saving}
+                                                aria-label={`Delivery status for ${batch.batch_no}`}
                                                 onChange={async (e) => {
+                                                    if (saving) return;
+                                                    setSaving(true);
                                                     const newStatus = e.target.value;
                                                     const previousBatch = batch;
                                                     const updatedBatches = batches.map(b => b.id === batch.id ? { ...b, status: newStatus } : b);
                                                     setBatches(updatedBatches);
-                                                    localStorage.setItem("solarflow_local_delivery_batches", JSON.stringify(updatedBatches));
                                                     try {
                                                         const projectIds = linkedProjects.map(p => p.id);
-                                                        let rpcSuccess = false;
-                                                        try {
-                                                            const { data: result, error: failure } = await supabase.rpc('update_delivery_batch_status_atomic', {
-                                                                p_batch_id: batch.id, p_new_status: newStatus, p_project_ids: projectIds
-                                                            });
-                                                            if (!failure && result?.success) rpcSuccess = true;
-                                                        } catch (e) {
-                                                            console.warn('update_delivery_batch_status_atomic RPC unavailable, falling back to direct update', e);
-                                                        }
-
-                                                        if (!rpcSuccess) {
-                                                            const todayStr = new Date().toISOString().split('T')[0];
-                                                            const batchRes = await runWrite(
-                                                                supabase.from('delivery_batches').update({ status: newStatus }).eq('id', batch.id).select('id'),
-                                                                { action: 'batch status update' }
-                                                            );
-                                                            if (!batchRes.ok) throw batchRes.error;
-
-                                                            if (projectIds.length > 0) {
-                                                                const projPatch = {
-                                                                    delivery_status: newStatus,
-                                                                    delivery_batch_id: batch.batch_no,
-                                                                    driver_name: batch.driver_name,
-                                                                    driver_phone_number: batch.driver_phone,
-                                                                    vehicle_number: batch.vehicle_number,
-                                                                    vendor: batch.vendor,
-                                                                    material_delivery_date: newStatus === 'DELIVERED'
-                                                                        ? (batch.dispatch_date || todayStr)
-                                                                        : batch.dispatch_date
-                                                                };
-                                                                const projRes = await runWrite(
-                                                                    supabase.from('admin').update(projPatch).in('id', projectIds).select('id'),
-                                                                    { action: 'batch projects status sync' }
-                                                                );
-                                                                if (!projRes.ok) throw projRes.error;
-                                                            }
-                                                        }
+                                                        await updateDeliveryStatus(supabase, batch.id, newStatus, projectIds);
 
                                                         await logActivity(currentUser?.id || "admin", "update", `Changed delivery batch ${batch.batch_no || batch.id} status to ${newStatus}`, "");
                                                         await handleRefresh();
                                                     } catch (err) {
                                                         setBatches(prev => prev.map(b => b.id === batch.id ? previousBatch : b));
                                                         showAlert("Failed to update batch status: " + (err.message || "Unknown error"), { type: 'error' });
-                                                    }
+                                                    } finally { setSaving(false); }
                                                 }}
                                                 className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full outline-none cursor-pointer appearance-none ${
                                                     batch.status === 'DELIVERED' 
@@ -892,7 +685,7 @@ export default function DeliveryBatchesView({
                                             <div className="flex items-center gap-1.5 font-medium text-stone-500">
                                                  <span className="text-[10px] uppercase font-bold text-stone-400">Car Rent Paid:</span>
                                                  <select
-                                                     value={batch.car_rent_paid || 'No'}
+                                                     aria-label={`Car rent paid for ${batch.batch_no}`} value={batch.car_rent_paid || 'No'}
                                                      onChange={async (e) => {
                                                          const val = e.target.value;
                                                          const userIdentifier = currentUser?.name || currentUser?.email || "Admin";
@@ -946,7 +739,7 @@ export default function DeliveryBatchesView({
 
                                          <button
                                              type="button"
-                                             onClick={() => handleOpenEditModal(batch)}
+                                             onClick={event => { batchTriggerRef.current = event.currentTarget; handleOpenEditModal(batch); }}
                                              className="p-1.5 text-stone-500 hover:text-stone-900 hover:bg-stone-100 rounded-xl transition cursor-pointer"
                                              title="Edit Batch Logistics"
                                          >
@@ -955,6 +748,7 @@ export default function DeliveryBatchesView({
 
                                          <button
                                              type="button"
+                                             disabled={saving}
                                              onClick={() => handleDeleteBatch(batch.id)}
                                              className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
                                              title="Disband Batch"
@@ -964,7 +758,7 @@ export default function DeliveryBatchesView({
 
                                          <button
                                              type="button"
-                                             onClick={() => setExpandedBatchId(isExpanded ? null : batch.id)}
+                                             aria-label={`${isExpanded ? "Hide" : "Show"} projects for ${batch.batch_no}`} aria-expanded={isExpanded} onClick={() => setExpandedBatchId(isExpanded ? null : batch.id)}
                                              className="ml-1 p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition cursor-pointer"
                                          >
                                              {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -983,8 +777,10 @@ export default function DeliveryBatchesView({
                                      <div className="flex items-center gap-3">
                                          <button
                                              type="button"
-                                             disabled={isAllDelivered}
+                                             disabled={saving || isAllDelivered}
                                              onClick={async () => {
+                                                 if (saving) return;
+                                                 setSaving(true);
                                                  const previousBatch = batch;
                                                  const previousOverrides = { ...localStatusOverrides };
                                                  const newOverrides = { ...localStatusOverrides };
@@ -996,41 +792,7 @@ export default function DeliveryBatchesView({
                                                  
                                                  try {
                                                      const projectIds = linkedProjects.map(p => p.id);
-                                                     let rpcSuccess = false;
-                                                     try {
-                                                         const { data: result, error: failure } = await supabase.rpc('update_delivery_batch_status_atomic', {
-                                                             p_batch_id: batch.id, p_new_status: 'DELIVERED', p_project_ids: projectIds
-                                                         });
-                                                         if (!failure && result?.success) rpcSuccess = true;
-                                                     } catch (e) {
-                                                         console.warn('update_delivery_batch_status_atomic RPC unavailable, falling back to direct update', e);
-                                                     }
-
-                                                     if (!rpcSuccess) {
-                                                         const todayStr = new Date().toISOString().split('T')[0];
-                                                         const batchRes = await runWrite(
-                                                             supabase.from('delivery_batches').update({ status: 'DELIVERED' }).eq('id', batch.id).select('id'),
-                                                             { action: 'batch mark delivered' }
-                                                         );
-                                                         if (!batchRes.ok) throw batchRes.error;
-
-                                                         if (projectIds.length > 0) {
-                                                             const projPatch = {
-                                                                 delivery_status: 'DELIVERED',
-                                                                 delivery_batch_id: batch.batch_no,
-                                                                 driver_name: batch.driver_name,
-                                                                 driver_phone_number: batch.driver_phone,
-                                                                 vehicle_number: batch.vehicle_number,
-                                                                 vendor: batch.vendor,
-                                                                 material_delivery_date: batch.dispatch_date || todayStr
-                                                             };
-                                                             const projRes = await runWrite(
-                                                                 supabase.from('admin').update(projPatch).in('id', projectIds).select('id'),
-                                                                 { action: 'batch all projects delivered sync' }
-                                                             );
-                                                             if (!projRes.ok) throw projRes.error;
-                                                         }
-                                                     }
+                                                     await updateDeliveryStatus(supabase, batch.id, 'DELIVERED', projectIds);
 
                                                      await logActivity(currentUser?.id || "admin", "update", `Marked delivery batch ${batch.batch_no || batch.id} as DELIVERED (${projectIds.length} projects)`, "");
                                                      await handleRefresh();
@@ -1038,7 +800,7 @@ export default function DeliveryBatchesView({
                                                      setBatches(prev => prev.map(b => b.id === batch.id ? previousBatch : b));
                                                      setLocalStatusOverrides(previousOverrides);
                                                      showAlert("Failed to mark batch delivered: " + (err.message || "Unknown error"), { type: 'error' });
-                                                 }
+                                                 } finally { setSaving(false); }
                                              }}
                                              className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition shadow-xs border ${
                                                  isAllDelivered 
@@ -1050,7 +812,7 @@ export default function DeliveryBatchesView({
                                          </button>
                                          <button
                                              type="button"
-                                             onClick={() => setExpandedBatchId(isExpanded ? null : batch.id)}
+                                             aria-expanded={isExpanded} onClick={() => setExpandedBatchId(isExpanded ? null : batch.id)}
                                              className="text-amber-700 hover:text-amber-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
                                          >
                                          {isExpanded ? 'Hide project details' : `View ${linkedProjects.length} drop-off locations`}
@@ -1106,65 +868,35 @@ export default function DeliveryBatchesView({
                                                          </td>
                                                          <td className="py-2.5">
                                                              <select
-                                                                 value={(localStatusOverrides[proj.id] || proj.delivery_status || 'PENDING')}
+                                                                 disabled={saving} aria-label={`Delivery status for ${proj.customer_name}`} value={(localStatusOverrides[proj.id] || proj.delivery_status || 'PENDING')}
                                                                  onChange={async (e) => {
+                                                                     if (saving) return;
                                                                      const newStat = e.target.value;
+                                                                     if (newStat === 'PENDING' && batch.project_ids.length === 1 && !await showConfirm('This is the last project. Return it to Pending and disband the empty batch?', {title: 'Remove last project?', confirmLabel: 'Remove and disband', cancelLabel: 'Keep batch'})) return;
+                                                                     setSaving(true);
                                                                      const previousStat = localStatusOverrides[proj.id] || proj.delivery_status || 'PENDING';
                                                                      setLocalStatusOverrides(prev => ({ ...prev, [proj.id]: newStat }));
                                                                      try {
-                                                                         // Back to PENDING means the client leaves the batch entirely:
-                                                                         // clear the link, drop the driver/vehicle details that came
-                                                                         // from the batch, and remove them from project_ids so they
-                                                                         // become available for a new batch again. Updating only
-                                                                         // delivery_status left them stranded - still inside the
-                                                                         // batch and invisible to the customer picker.
-                                                                         const leavingBatch = newStat === 'PENDING';
-                                                                         const todayStr = new Date().toISOString().split('T')[0];
-                                                                         const patch = leavingBatch
-                                                                             ? {
-                                                                                 delivery_status: 'PENDING',
-                                                                                 delivery_batch_id: null,
-                                                                                 driver_name: null,
-                                                                                 driver_phone_number: null,
-                                                                                 vehicle_number: null,
-                                                                                 material_delivery_date: null,
-                                                                             }
-                                                                             : {
-                                                                                 delivery_status: newStat,
-                                                                                 delivery_batch_id: batch.batch_no || proj.delivery_batch_id,
-                                                                                 driver_name: batch.driver_name || proj.driver_name,
-                                                                                 driver_phone_number: batch.driver_phone || proj.driver_phone_number,
-                                                                                 vehicle_number: batch.vehicle_number || proj.vehicle_number,
-                                                                                 vendor: batch.vendor || proj.vendor,
-                                                                                 material_delivery_date: newStat === 'DELIVERED' 
-                                                                                     ? (proj.material_delivery_date || batch.dispatch_date || todayStr)
-                                                                                     : (proj.material_delivery_date || batch.dispatch_date),
-                                                                             };
-
-                                                                         const statusRes = await runWrite(
-                                                                             supabase.from('admin').update(patch).eq('id', proj.id).select('id'),
-                                                                             { action: 'delivery status change' }
-                                                                         );
-                                                                         if (!statusRes.ok) throw statusRes.error;
-
-                                                                         if (leavingBatch) {
-                                                                             const remaining = (batch.project_ids || []).filter(id => id !== proj.id);
-                                                                             const batchRes = await runWrite(
-                                                                                 supabase.from('delivery_batches')
-                                                                                     .update({ project_ids: remaining })
-                                                                                     .eq('id', batch.id)
-                                                                                     .select('id'),
-                                                                                 { action: 'batch update' }
+                                                                         if (newStat === 'PENDING') {
+                                                                             await removeDeliveryProject(supabase, batch, proj.id);
+                                                                         } else {
+                                                                             // One database statement: the stock trigger succeeds or
+                                                                             // rolls back together with this project's status.
+                                                                             const todayStr = new Date().toISOString().split('T')[0];
+                                                                             const statusRes = await runWrite(
+                                                                                 supabase.from('admin').update({
+                                                                                     delivery_status: newStat,
+                                                                                     material_delivery_date: proj.material_delivery_date || batch.dispatch_date || todayStr,
+                                                                                 }).eq('id', proj.id).eq('delivery_batch_id', batch.batch_no).select('id'),
+                                                                                 { action: 'delivery status change' }
                                                                              );
-                                                                             if (!batchRes.ok) throw batchRes.error;
-                                                                             await logActivity(currentUser?.id || 'admin', 'update',
-                                                                                 `Removed ${proj.customer_name || proj.id} from delivery batch ${batch.batch_no || batch.id} (set back to Pending)`, '', proj.id);
+                                                                             if (!statusRes.ok) throw statusRes.error;
                                                                          }
                                                                          await handleRefresh();
                                                                      } catch (err) {
                                                                          setLocalStatusOverrides(prev => ({ ...prev, [proj.id]: previousStat }));
                                                                          showAlert("Failed to update delivery status: " + (err.message || "Unknown error"), { type: 'error' });
-                                                                     }
+                                                                     } finally { setSaving(false); }
                                                                  }}
                                                                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md outline-none cursor-pointer ${
                                                                      (localStatusOverrides[proj.id] || proj.delivery_status || 'PENDING') === 'DELIVERED' 
@@ -1200,25 +932,25 @@ export default function DeliveryBatchesView({
 
             {/* Modal 1: Create / Edit Delivery Batch Modal */}
             {showCreateModal && (
-                <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+                <dialog onKeyDown={containDialogFocus} ref={batchDialogRef} aria-labelledby="batch-dialog-title" aria-describedby="batch-dialog-help" onCancel={event => { event.preventDefault(); if (!saving) setShowCreateModal(false); }} className="delivery-editor-dialog">
                     <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Header */}
                         <div className="px-6 py-4 bg-stone-900 text-white flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
                                 <Truck className="w-5 h-5 text-amber-400" />
                                 <div>
-                                    <h3 className="text-sm font-black uppercase tracking-wider">
+                                    <h3 id="batch-dialog-title" className="text-sm font-black uppercase tracking-wider">
                                         {editingBatch ? 'Edit Delivery Batch' : 'Create Material Delivery Batch'}
                                     </h3>
-                                    <p className="text-[10px] text-stone-400 font-medium">
+                                    <p id="batch-dialog-help" className="text-[10px] text-stone-300 font-medium">
                                         Group 2–10 projects into a single vehicle dispatch run.
                                     </p>
                                 </div>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setShowCreateModal(false)}
-                                className="text-stone-400 hover:text-white p-1 rounded-lg transition"
+                                aria-label="Close delivery batch" disabled={saving} onClick={() => setShowCreateModal(false)}
+                                className="text-stone-300 hover:text-white p-1 rounded-lg transition"
                             >
                                 <X size={20} />
                             </button>
@@ -1234,13 +966,13 @@ export default function DeliveryBatchesView({
                                 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                                     <div>
-                                        <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                                        <label className="text-[9px] font-bold text-stone-600 uppercase tracking-wider block mb-1">
                                             Batch Number / Trip Title <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="text"
                                             required
-                                            value={batchForm.batch_no}
+                                            aria-label="Batch Number / Trip Title" value={batchForm.batch_no}
                                             onChange={e => setBatchForm(p => ({ ...p, batch_no: e.target.value }))}
                                             placeholder="e.g. BATCH-24AUG-001"
                                             className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400"
@@ -1248,25 +980,25 @@ export default function DeliveryBatchesView({
                                     </div>
 
                                     <div>
-                                        <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                                        <label className="text-[9px] font-bold text-stone-600 uppercase tracking-wider block mb-1">
                                             Dispatch / Delivery Date <span className="text-red-500">*</span>
                                         </label>
                                         <input
                                             type="date"
                                             required
-                                            value={batchForm.dispatch_date}
+                                            aria-label="Dispatch / Delivery Date" value={batchForm.dispatch_date}
                                             onChange={e => setBatchForm(p => ({ ...p, dispatch_date: e.target.value }))}
                                             className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-800 outline-none focus:border-amber-400"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                                        <label className="text-[9px] font-bold text-stone-600 uppercase tracking-wider block mb-1">
                                             Driver Name <span className="text-red-500">*</span>
                                         </label>
                                         <select
                                             required
-                                            value={batchForm.driver_name}
+                                            aria-label="Driver Name" value={batchForm.driver_name}
                                             onChange={e => {
                                                 const picked = drivers.find(d => d.name === e.target.value);
                                                 setBatchForm(p => ({
@@ -1291,43 +1023,43 @@ export default function DeliveryBatchesView({
                                     </div>
 
                                     <div>
-                                        <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                                        <label className="text-[9px] font-bold text-stone-600 uppercase tracking-wider block mb-1">
                                             Driver Phone Number
                                         </label>
                                         <input
                                             type="tel"
                                             readOnly
-                                            value={batchForm.driver_phone}
+                                            aria-label="Driver Phone Number" value={batchForm.driver_phone}
                                             placeholder="Fills in from the selected driver"
                                             className="w-full bg-stone-100 border border-stone-200 rounded-xl px-3 py-2 text-xs font-semibold text-stone-600 outline-none cursor-not-allowed"
                                         />
                                     </div>
 
                                     <div>
-                                        <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                                        <label className="text-[9px] font-bold text-stone-600 uppercase tracking-wider block mb-1">
                                             Vehicle / Truck Registration Number
                                         </label>
                                         <input
                                             type="text"
                                             readOnly
-                                            value={batchForm.vehicle_number}
+                                            aria-label="Vehicle / Truck Registration Number" value={batchForm.vehicle_number}
                                             placeholder="Fills in from the selected driver"
                                             className="w-full bg-stone-100 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-600 outline-none cursor-not-allowed"
                                         />
-                                        <p className="text-[9px] text-stone-400 font-medium mt-1">
+                                        <p className="text-[9px] text-stone-600 font-medium mt-1">
                                             Phone and vehicle come from the driver's record. To change them, edit the driver in Operations → Drivers.
                                         </p>
                                     </div>
 
                                     <div>
-                                        <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                                        <label className="text-[9px] font-bold text-stone-600 uppercase tracking-wider block mb-1">
                                             Rent Amount <span className="text-red-500">*</span>
                                         </label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-xs font-bold">₹</span>
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-600 text-xs font-bold">₹</span>
                                             <input
                                                 type="text"
-                                                value={formatInputValue(batchForm.rent_amount)}
+                                                aria-label="Rent Amount" value={formatInputValue(batchForm.rent_amount)}
                                                 onChange={e => setBatchForm(p => ({ ...p, rent_amount: parseIndianNumber(e.target.value) }))}
                                                 placeholder="0"
                                                 className="w-full bg-white border border-stone-200 rounded-xl pl-6 pr-3 py-2 text-xs font-bold text-stone-800 outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
@@ -1345,24 +1077,24 @@ export default function DeliveryBatchesView({
                                         <h4 className="text-xs font-black uppercase tracking-wider text-stone-800 flex items-center gap-1.5">
                                             <Layers size={14} className="text-amber-500" /> 2. Select Projects to Club on this Truck
                                         </h4>
-                                        <p className="text-[10px] text-stone-400">
+                                        <p className="text-[10px] text-stone-600">
                                             Selected: <strong className="text-stone-900">{batchForm.selectedProjectIds.length} {batchForm.selectedProjectIds.length === 1 ? 'Project' : 'Projects'}</strong>
                                         </p>
                                     </div>
 
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2 min-w-0">
                                         <input
                                             type="text"
                                             placeholder="Filter projects..."
-                                            value={projectSearchQuery}
+                                            aria-label="Filter projects" value={projectSearchQuery}
                                             onChange={e => setProjectSearchQuery(e.target.value)}
-                                            className="bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1 text-xs outline-none focus:bg-white focus:border-amber-400 w-44"
+                                            className="bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1 text-xs outline-none focus:bg-white focus:border-amber-400 w-44 max-w-full"
                                         />
                                         
                                         <select
-                                            value={projectStageFilter}
+                                            aria-label="Project stage" value={projectStageFilter}
                                             onChange={e => setProjectStageFilter(e.target.value)}
-                                            className="bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 text-xs font-bold text-stone-700 outline-none"
+                                            className="bg-stone-50 border border-stone-200 rounded-lg px-2 py-1 text-xs font-bold text-stone-700 outline-none max-w-full"
                                         >
                                             <option value="MATERIAL DELIVERY">Material Delivery (Current Stage)</option>
                                             <option value="MATERIAL INTEGRATION">Material Integration</option>
@@ -1405,7 +1137,7 @@ export default function DeliveryBatchesView({
                                                     <p className="text-[10px] text-stone-500 truncate">{proj.villages || 'No village'} · {proj.phone_number}</p>
                                                     <div className="flex items-center justify-between text-[10px] mt-1 pt-1 border-t border-stone-100">
                                                         <span className="font-bold text-amber-800">{proj.system_capacity_kwp || '–'} kWp</span>
-                                                        <span className="text-stone-400 font-semibold">{proj.stage}</span>
+                                                        <span className="text-stone-600 font-semibold">{proj.stage}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1416,12 +1148,12 @@ export default function DeliveryBatchesView({
 
                             {/* Section C: Optional Notes */}
                             <div>
-                                <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1">
+                                <label className="text-[9px] font-bold text-stone-600 uppercase tracking-wider block mb-1">
                                     Transit Notes / Gate Instructions (Optional)
                                 </label>
                                 <textarea
                                     rows={2}
-                                    value={batchForm.notes}
+                                    aria-label="Transit Notes / Gate Instructions (optional)" value={batchForm.notes}
                                     onChange={e => setBatchForm(p => ({ ...p, notes: e.target.value }))}
                                     placeholder="Add any special transport notes, security gate passes, or route instructions..."
                                     className="w-full bg-white border border-stone-200 rounded-xl p-2.5 text-xs text-stone-800 outline-none focus:border-amber-400"
@@ -1447,7 +1179,7 @@ export default function DeliveryBatchesView({
                             </div>
                         </form>
                     </div>
-                </div>
+                </dialog>
             )}
 
             {/* Modal 2: Master Gate Pass & Delivery Challan Printable Sheet */}

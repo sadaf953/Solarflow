@@ -167,7 +167,7 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
             if (active.current) setBusy(false);
         }
     };
-    return <div className="q-editor">
+    return <div className="q-editor" data-demo-editor="quotation">
         <div className="q-stepper" aria-label="Quotation steps">{STEPS.map((title,i) => <button key={title} aria-current={step === i ? 'step' : undefined} onClick={() => setStep(i)}><span>{i + 1}</span><small>{title}</small></button>)}</div>
         <div className="q-save-state" role="status">{saveState}</div>
         {error && <div className="q-error" role="alert">{error}</div>}
@@ -175,7 +175,7 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
         <div className="q-panel">
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
                 <p className="q-eyebrow" style={{margin:0}}>STEP {step + 1} OF 4</p>
-                <button type="button" onClick={fillTestValues} style={{background:'#fef3c7',borderColor:'#f59e0b',color:'#92400e',fontSize:12,padding:'4px 10px',minHeight:32}}>⚡ Fill Test Values</button>
+                <button type="button" onClick={fillTestValues} style={{background:'#fef3c7',borderColor:'#f59e0b',color:'#92400e',fontSize:12,padding:'4px 10px',minHeight:32}}>Use sample details</button>
             </div>
             <h2>{STEPS[step]}</h2>
             {step === 0 && <div className="q-grid">{customerFields.map(([key,label,type,maxLength,readOnly]) => <Field key={key} label={label} type={type} maxLength={maxLength} readOnly={readOnly} value={form[key]} onChange={value => update(key,value)} />)}</div>}

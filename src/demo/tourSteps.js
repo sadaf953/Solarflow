@@ -48,6 +48,17 @@ export const workflowTour = [
  admin('43. Adding and managing users','User Management lets Admin add team members, assign any of the 8 roles, map users to branch channel partners, and manage authentication. Click "+ Create User" to onboard staff, set passwords directly, or dispatch password recovery links via email.','users',{action:'createUser'}),
 ];
 
+// Chapter starts refer to the complete workflow, including its opening step.
+export const workflowChapters = [
+ {title:'Sales & customer setup', start:0},
+ {title:'Registration & finance', start:6},
+ {title:'Materials & delivery', start:11},
+ {title:'Installation & vendor payments', start:21},
+ {title:'Electricity approvals & documents', start:26},
+ {title:'Subsidy & final payments', start:32},
+ {title:'Completion & team management', start:38},
+];
+
 export function tourSteps(role){
  if(['channel_partner_office','office2'].includes(role)) return [
   step('Your office and linked dealers','Only leads created by this CPO and its linked dealers are visible. Other offices and unrelated dealers stay outside this view.',role,'dashboard'),
@@ -85,3 +96,14 @@ export function tourSteps(role){
 
  return workflowTour;
 }
+
+// A short, read-only introduction. Each stage opens an existing example;
+// moving between examples never advances or saves a customer record.
+export const quickTour = [
+ admin('Your business at a glance', 'See active projects, completed installations and your project pipeline. This six-step tour opens sample records; Next only navigates.', 'dashboard'),
+ admin('Turn an enquiry into a quotation', 'Choose Preview on a sample quotation to see the proposal your customer receives. Close the preview before continuing.', 'quotations'),
+ customer('Meet a sample customer', 'Review the customer details and current stage. This is where your team keeps the project together. No edits are needed for this tour.', 'LEADS'),
+ customer('Plan the materials', 'Review this example’s roof or shed details and material requirements. Your team prepares the order here before arranging delivery.', 'MATERIAL ORDER'),
+ customer('Follow installation progress', 'This example is at the installation stage. Review the assigned work and installation details without changing its status.', 'INSTALLATION STATUS'),
+ customer('Track the final subsidy step', 'This example is at the subsidy stage. Review its progress, then finish the tour to explore freely. The full walkthrough is available from the tour menu.', 'SUBSIDY STATUS'),
+];

@@ -58,7 +58,7 @@ const getMonthBounds = (monthValue, timestamp = false) => {
 };
 
 import {
-    LayoutDashboard, Activity, UserCog, Menu, X,
+    LayoutDashboard, Activity, UserCog, Menu, X, ChevronDown,
     Search, Plus, Download, LogOut, Trash2, Users, Tag, IndianRupee, Wrench, CreditCard, Terminal, Truck, Calendar, UserCheck, Calculator
 } from 'lucide-react';
 
@@ -69,6 +69,7 @@ const NavBtn = ({ view, stage, icon: Icon, label, count, redBadge, currentView, 
         : currentView === view;
     return (
         <button
+            aria-current={isActive ? "page" : undefined}
             onClick={() => {
                 if (view === 'stages') { setCurrentView('stages'); setSelectedStage(stage); }
                 else setCurrentView(view);
@@ -87,7 +88,47 @@ const NavBtn = ({ view, stage, icon: Icon, label, count, redBadge, currentView, 
     );
 };
 
-export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoControls }) {
+const STAGE_GUIDANCE = {
+    LEADS: 'New enquiries start here. Open a customer card to review contact details and follow-up notes, or choose Add Lead.',
+    REGISTRATION: 'Review the customer’s registration details and application progress.',
+    LOAN: 'Follow the customer’s loan application and payment progress.',
+    CASH: 'Track payments for customers funding their system without a loan.',
+    'MATERIAL ORDER': 'Review the roof or shed requirements and order details before preparing materials.',
+    'MATERIAL INTEGRATION': 'Prepare the bill of materials (BOM): the equipment and quantities needed for this installation.',
+    'MATERIAL DELIVERY': 'Check which materials are ready for dispatch and which have reached the customer’s site.',
+    'INSTALLATION STATUS': 'Follow installation progress and review the assigned team’s updates.',
+    'GEO TAG PHOTO': 'Review site photos that include location information.',
+    'DISCOM SUBMISSION': 'Track documents submitted to the electricity distribution company (DISCOM).',
+    'METER INSTALLATION': 'Follow the electricity meter installation and record its details.',
+    'DISCOM INSPECTION': 'Track the electricity company’s inspection and approval.',
+    'SUBSIDY STATUS': 'Follow the subsidy application through to payment.',
+    'FINAL REVIEW': 'Review the project’s details and outstanding work before marking it complete.',
+    COMPLETED: 'Browse completed projects and their saved history.',
+    'LOST PROJECT': 'Review projects that did not go ahead and the recorded reasons.',
+};
+
+const STAGE_GROUPS = [
+    { label: 'Enquiry & finance', stages: ['LEADS', 'REGISTRATION', 'LOAN', 'CASH'] },
+    { label: 'Materials & installation', stages: ['MATERIAL ORDER', 'MATERIAL INTEGRATION', 'MATERIAL DELIVERY', 'INSTALLATION STATUS', 'GEO TAG PHOTO'] },
+    { label: 'Approvals & subsidy', stages: ['DISCOM SUBMISSION', 'METER INSTALLATION', 'DISCOM INSPECTION', 'SUBSIDY STATUS', 'FINAL REVIEW'] },
+    { label: 'Closed projects', stages: ['COMPLETED', 'LOST PROJECT'] },
+];
+
+function SidebarGroup({ label, activeKey, defaultOpen = false, children }) {
+    const [open, setOpen] = useState(defaultOpen || !!activeKey);
+    useEffect(() => { if (activeKey) setOpen(true); }, [activeKey]);
+    const id = `nav-${label.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+    return <div className="pt-2">
+        <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}
+            className={`w-full flex items-center justify-between gap-2 px-3 py-3 rounded-lg text-xs font-semibold text-left hover:bg-stone-100 ${activeKey ? 'text-emerald-800' : 'text-stone-600'}`}>
+            <span>{label}{!open && activeKey && <span className="ml-2 text-emerald-700">•</span>}</span>
+            <ChevronDown aria-hidden="true" className={`w-4 h-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+        <div id={id} hidden={!open} className="ml-2 pl-1 border-l border-stone-200">{children}</div>
+    </div>;
+}
+
+export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoControls, onStartDemoTour }) {
     const [userMgmtAction, setUserMgmtAction] = useState(null);
     useDemoTourNavigation(async ({view,stage,action},isCurrent) => {
         if (!['dashboard','stages','quotations','inventory','delivery_batches','installation_payments','loan_tags','subsidy','activity','users','channel_partner_mgmt'].includes(view)) return;
@@ -147,6 +188,33 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
     const [globalResults, setGlobalResults] = useState([]);
     const [showGlobalDrop, setShowGlobalDrop] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const navigationDialogRef = useRef(null);
+    useEffect(() => {
+        if (!sidebarOpen || window.matchMedia('(min-width: 768px)').matches) return;
+        const panel = navigationDialogRef.current;
+        const previousFocus = document.activeElement;
+        const main = panel.parentElement.querySelector('main');
+        main?.setAttribute('inert', '');
+        const controls = () => [...panel.querySelectorAll('button, a[href], [tabindex]')].filter(el => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+        controls()[0]?.focus();
+        const onKeyDown = event => {
+            if (event.key === 'Escape') { event.preventDefault(); setSidebarOpen(false); }
+            if (event.key !== 'Tab') return;
+            const items = controls(), first = items[0], last = items.at(-1);
+            if (!panel.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) { event.preventDefault(); (event.shiftKey ? last : first)?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        };
+        const onResize = () => { if (window.matchMedia('(min-width: 768px)').matches) setSidebarOpen(false); };
+        document.addEventListener('keydown', onKeyDown);
+        window.addEventListener('resize', onResize);
+        return () => {
+            document.removeEventListener('keydown', onKeyDown);
+            window.removeEventListener('resize', onResize);
+            main?.removeAttribute('inert');
+            if (previousFocus?.isConnected) previousFocus.focus();
+        };
+    }, [sidebarOpen]);
+
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [showAddLead, setShowAddLead] = useState(false);
     const globalSearchRef = useRef(null);
@@ -1210,9 +1278,9 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         currentView === 'dashboard' ? 'Business Dashboard'
             : currentView === 'quotations' ? 'Quotation Maker'
             : currentView === 'delivery_batches' ? 'Material Delivery Batches'
-            : currentView === 'subsidy' ? 'Subsidy Tag Tracking'
-                : currentView === 'loan_tags' ? 'Loan Tag Tracking'
-                : currentView === 'installation_tags' ? 'Installation Tag Tracking'
+            : currentView === 'subsidy' ? 'Subsidy tracking'
+                : currentView === 'loan_tags' ? 'Loan tracking'
+                : currentView === 'installation_tags' ? 'Installation tracking'
                 : currentView === 'attendance' ? 'Staff Attendance'
                 : currentView === 'channel_partner_mgmt' ? 'Operations'
                     : currentView === 'installation_payments' ? 'Installation Payments'
@@ -1227,10 +1295,10 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
             {sidebarOpen && <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
             {/* ── Sidebar ── */}
-            <aside className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-stone-100 flex flex-col h-screen max-h-screen overflow-hidden transform transition-transform duration-300 ${sidebarOpen ? 'flex' : 'hidden'} md:flex`}>
+            <aside ref={navigationDialogRef} role={sidebarOpen ? "dialog" : undefined} aria-modal={sidebarOpen || undefined} aria-label="Main navigation" className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-stone-100 flex flex-col h-screen max-h-screen overflow-hidden transform transition-transform duration-300 ${sidebarOpen ? 'flex' : 'hidden'} md:flex`}>
                 <div className="p-5 border-b border-stone-100 flex justify-between items-center shrink-0">
                     <BrandMark size="md" />
-                    <button className="md:hidden text-stone-400" onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
+                    <button aria-label="Close navigation" className="md:hidden text-stone-400" onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
                 </div>
 
                 <div 
@@ -1239,16 +1307,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     style={{ minHeight: 0, maxHeight: 'calc(100vh - 150px)', WebkitOverflowScrolling: 'touch' }}
                 >
                     <NavBtn view="dashboard" icon={LayoutDashboard} label="Dashboard" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    {canSeeDeliveryBatches && (
-                        <NavBtn view="delivery_batches" icon={Truck} label="Delivery Batches" count={deliveryBatchesCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    )}
-                    <NavBtn view="subsidy" icon={Tag} label="Subsidy Tags" count={subsidyTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    {['sales'].includes(user.userType) && <NavBtn view="inventory" icon={Wrench} label="Godown / Inventory" currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />}
-                    <NavBtn view="loan_tags" icon={IndianRupee} label="Loan Tags" count={loanTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    <NavBtn view="installation_tags" icon={Wrench} label="Installation Tags" count={installationTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-
-
-
                     {['admin', 'sales'].includes(user.userType) && <button onClick={() => { openQuotations(); setCurrentView('quotations'); setSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold ${currentView === 'quotations' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-4 h-4" /> Quotation Maker</button>}
                     <button
                         onClick={() => { setCurrentView('toolbox'); setSidebarOpen(false); }}
@@ -1263,16 +1321,26 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                         <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded-md font-bold">8 Tools</span>
                     </button>
 
-                    {/* Project Stages - identical for every role */}
-                    <div className="text-[9px] uppercase font-bold text-stone-300 px-3 pt-4 pb-2 tracking-widest">Project Stages</div>
-                    {PRIMARY_STAGES.map(s => (
-                        <NavBtn key={s.id} view="stages" stage={s.id} icon={s.icon} label={s.label} count={stageCounts[s.id] || 0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    ))}
+                    <p className="px-3 pt-4 pb-1 text-[10px] uppercase font-bold text-stone-500 tracking-widest">Project workflow</p>
+                    {STAGE_GROUPS.map((group, index) => <SidebarGroup key={group.label} label={group.label} defaultOpen={index === 0}
+                        activeKey={currentView === 'stages' && group.stages.includes(selectedStage) ? selectedStage : null}>
+                        {PRIMARY_STAGES.filter(stage => group.stages.includes(stage.id)).map(s => (
+                            <NavBtn key={s.id} view="stages" stage={s.id} icon={s.icon} label={s.label} count={stageCounts[s.id] || 0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                        ))}
+                    </SidebarGroup>)}
+                    <SidebarGroup label="Tracking & logistics" activeKey={['delivery_batches', 'subsidy', 'loan_tags', 'installation_tags', ...(user.userType === 'sales' ? ['inventory'] : [])].includes(currentView) ? currentView : null}>
+                    {canSeeDeliveryBatches && (
+                        <NavBtn view="delivery_batches" icon={Truck} label="Delivery Batches" count={deliveryBatchesCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                    )}
+                    <NavBtn view="subsidy" icon={Tag} label="Subsidy tracking" count={subsidyTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                    {['sales'].includes(user.userType) && <NavBtn view="inventory" icon={Wrench} label="Godown / Inventory" currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />}
+                    <NavBtn view="loan_tags" icon={IndianRupee} label="Loan tracking" count={loanTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                    <NavBtn view="installation_tags" icon={Wrench} label="Installation tracking" count={installationTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                    </SidebarGroup>
 
                     {/* System - admin only */}
                     {user.userType === 'admin' && (
-                        <>
-                            <div className="text-[9px] uppercase font-bold text-stone-300 px-3 pt-5 pb-2 tracking-widest">System</div>
+                        <SidebarGroup label="Team & administration" activeKey={['attendance', 'channel_partner_mgmt', 'vendor_availability', 'installation_payments', 'activity', 'inventory', 'users', 'trash'].includes(currentView) ? currentView : null}>
                             <NavBtn view="attendance" icon={UserCheck} label="Staff Attendance" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="channel_partner_mgmt" icon={Users} label="Operations" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="vendor_availability" icon={Calendar} label="Vendor Availability" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
@@ -1281,7 +1349,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                             <NavBtn view="inventory" icon={Wrench} label="Godown / Inventory" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="users" icon={UserCog} label="User Management" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="trash" icon={Trash2} label="Trash" count={trashCount} redBadge currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                        </>
+                        </SidebarGroup>
                     )}
 
                     {/* Partner Office - main CPO account only */}
@@ -1318,11 +1386,11 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
             </aside>
 
             {/* ── Main ── */}
-            <main className="flex-1 md:ml-64 flex flex-col min-h-screen">
+            <main className="demo-dashboard-main flex-1 min-w-0 md:ml-64 flex flex-col min-h-screen">
                 {/* Header */}
-                <header className="h-16 bg-white/90 backdrop-blur-md border-b border-stone-100 px-4 lg:px-6 flex items-center justify-between sticky top-0 z-30">
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setSidebarOpen(true)} className="md:hidden text-stone-500"><Menu className="w-6 h-6" /></button>
+                <header className="demo-dashboard-header bg-white/90 backdrop-blur-md border-b border-stone-100 px-4 lg:px-6 sticky top-0 z-30">
+                    <div className="demo-dashboard-title flex items-center gap-3">
+                        <button aria-label="Open navigation" onClick={() => setSidebarOpen(true)} className="md:hidden text-stone-500"><Menu className="w-6 h-6" /></button>
                         <h2 className="font-bold text-stone-800">{headerTitle}</h2>
 
                         {isChannelPartnerOffice ? (
@@ -1338,11 +1406,11 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="demo-dashboard-tools">
                         {/* ── Global search (always visible) ── */}
                         <div className="relative" ref={globalSearchRef}>
                             <Search className="absolute left-3 top-2.5 text-stone-400 w-4 h-4" />
-                            <input type="text" readOnly onFocus={(e) => { e.target.removeAttribute('readonly'); if (globalResults.length > 0) setShowGlobalDrop(true); }} name="crm_dash_global_search_unique" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder={isChannelPartnerOffice ? `Search ${partnerName} leads...` : "Search all stages..."} value={globalSearch} onChange={e => setGlobalSearch(e.target.value)}
+                            <input type="text" readOnly onFocus={(e) => { e.target.removeAttribute('readonly'); if (globalResults.length > 0) setShowGlobalDrop(true); }} aria-label="Search all stages" name="crm_dash_global_search_unique" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder={isChannelPartnerOffice ? `Search ${partnerName} leads...` : "Search all stages..."} value={globalSearch} onChange={e => setGlobalSearch(e.target.value)}
                                 className="pl-9 pr-4 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-40 lg:w-60"
                             />
                             {/* Results dropdown */}
@@ -1365,19 +1433,19 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
 
                         {/* Per-stage search (only in stages view) */}
                         {currentView === 'stages' && (
-                            <div className="relative hidden lg:block">
+                            <div className="relative demo-stage-filter">
                                 <Search className="absolute left-3 top-2.5 text-stone-400 w-4 h-4" />
-                                <input type="text" readOnly onFocus={(e) => e.target.removeAttribute('readonly')}  name="crm_dash_stage_search_unique" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder="Filter this stage..." value={stageSearch} onChange={e => setStageSearch(e.target.value)}
+                                <input type="text" readOnly onFocus={(e) => e.target.removeAttribute('readonly')}  aria-label="Filter this stage" name="crm_dash_stage_search_unique" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder="Filter this stage..." value={stageSearch} onChange={e => setStageSearch(e.target.value)}
                                     className="pl-9 pr-4 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-40" />
                             </div>
                         )}
 
                         {/* Channel Partner filter - applies everywhere for Admin/Office */}
                         {!isChannelPartnerOffice && (
-                            <div className="relative hidden lg:flex items-center gap-1.5" ref={channelPartnerFilterRef}>
+                            <div className="relative demo-partner-filter flex items-center gap-1.5" ref={channelPartnerFilterRef}>
                                 <input
                                     type="text"
-                                    placeholder="Channel Partner..."
+                                    aria-label="Filter by channel partner" placeholder="Channel Partner..."
                                     value={channelPartnerFilterInput}
                                     onChange={e => { setChannelPartnerFilterInput(e.target.value); setShowChannelPartnerDrop(true); }}
                                     onFocus={() => setShowChannelPartnerDrop(true)}
@@ -1424,7 +1492,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                                 onChange={event => setDealerFilter(event.target.value)}
                                 aria-label={`Dealer under ${effectivePartnerFilter}`}
                                 title={`Dealer under ${effectivePartnerFilter}`}
-                                className="hidden lg:block px-3 py-2 bg-stone-100 rounded-xl text-sm font-semibold text-stone-700 focus:outline-none focus:ring-2 focus:ring-amber-300 w-36"
+                                className="px-3 py-2 bg-stone-100 rounded-xl text-sm font-semibold text-stone-700 focus:outline-none focus:ring-2 focus:ring-amber-300 w-36"
                             >
                                 <option value="">{isChannelPartnerOffice ? "My office + dealers" : "All dealers"}</option>
                                 {dealerOptions.map(name => <option key={name} value={name}>{name}</option>)}
@@ -1436,14 +1504,14 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                                 onClick={handleFullExport}
                                 disabled={exporting}
                                 className="flex items-center gap-1.5 border border-stone-200 text-stone-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-stone-50 transition-colors disabled:opacity-50 cursor-pointer"
-                                title="Export complete database to CSV"
+                                aria-label="Export complete database to CSV" title="Export complete database to CSV"
                             >
                                 <Download className={`w-4 h-4 ${exporting ? 'animate-bounce text-amber-600' : ''}`} />
                                 <span className="hidden sm:inline text-xs">{exporting ? 'Exporting...' : 'Export'}</span>
                             </button>
                         )}
                         {(user?.userType === 'admin' || user?.userType === 'sales' || user?.userType === 'agent' || isChannelPartnerOffice) && (
-                            <button onClick={() => setShowAddLead(true)}
+                            <button aria-label="Add Lead" onClick={() => setShowAddLead(true)}
                                 className="flex items-center gap-1.5 bg-stone-900 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-stone-800 transition-colors">
                                 <Plus className="w-4 h-4" />
                                 <span className="hidden sm:inline text-xs">Add Lead</span>
@@ -1455,8 +1523,13 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
 
                 {/* View router */}
                 <div className="flex-1 p-4 lg:p-6">
+                    {currentView === 'stages' && STAGE_GUIDANCE[selectedStage] && <section aria-label="Stage guidance" className="mb-4 rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-600 leading-relaxed">
+                        <p>{STAGE_GUIDANCE[selectedStage]}</p>
+                        {selectedStage !== 'LEADS' && <p className="mt-1 text-xs text-stone-500">Open a customer card to see the details for this stage.</p>}
+                    </section>}
                     <Suspense fallback={<ViewLoader />}>
                     {currentView === 'inventory' && ['admin','sales'].includes(user.userType) && <InventoryView currentUser={user} />}
+                    {currentView === 'dashboard' && user.userType === 'admin' && onStartDemoTour && <section className="demo-start-here" aria-labelledby="demo-start-heading"><div><span className="demo-start-eyebrow">START HERE</span><h2 id="demo-start-heading">See how a solar project comes together</h2><p>Explore quotations, a sample customer, materials, installation and subsidy in six short steps.</p></div><div className="demo-start-buttons"><button type="button" onClick={()=>onStartDemoTour('quick')}>Start the 6-step tour</button><button type="button" onClick={()=>onStartDemoTour('quick',2)}>Open a sample customer</button><button type="button" onClick={()=>onStartDemoTour('full')}>Full walkthrough</button></div></section>}
                     {currentView === 'dashboard' && <DashboardView metrics={metrics} loading={loading} scoped={isChannelPartnerOffice} />}
                     {currentView === 'delivery_batches' && canSeeDeliveryBatches && (
                         <DeliveryBatchesView 
@@ -1559,7 +1632,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                             </div>
                         ) : filtered.length > 0 ? (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                                <div className="demo-customer-grid">
                                     {filtered.map(c => (
                                         <CustomerCard key={c.id} customer={c} onSelect={setSelectedCustomer} onMoveStage={handleMoveStage} currentUser={user} />
                                     ))}

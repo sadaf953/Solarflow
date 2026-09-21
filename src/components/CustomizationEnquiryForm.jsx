@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
     Phone, Mail, Building2, User, ExternalLink, CheckCircle2, 
     Sparkles, Layers, FileSpreadsheet, Check, ArrowRight, X, AlertCircle, LoaderCircle
 } from 'lucide-react';
 import { supabase } from '../supabase';
+import { useGlobalPopup } from './GlobalPopup';
+import { enquiryPayload, submitEnquiry } from '../enquiries/submit';
 
 // Configurable link for the basic version (user can supply exact link)
-export const DEFAULT_BASIC_VERSION_URL = 'https://deeprootsystems.in/solarflow-basic';
+export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
 const SOFTWARE_OPTIONS = [
     { id: 'sheets_excel', label: 'Google Sheets / Excel', icon: FileSpreadsheet },
@@ -20,62 +22,57 @@ const SOFTWARE_OPTIONS = [
 export default function CustomizationEnquiryForm({ 
     isModal = false, 
     onClose = null, 
-    basicVersionUrl = DEFAULT_BASIC_VERSION_URL 
+    basicVersionUrl = DEFAULT_BASIC_VERSION_URL,
+    initialStoreFiles = true
 }) {
     const [name, setName] = useState('');
     const [company, setCompany] = useState('');
     const [mobile, setMobile] = useState('');
-    const [modelType, setModelType] = useState('basic'); // 'basic' | 'advance'
-    const [storeFiles, setStoreFiles] = useState('yes'); // 'yes' | 'no'
+    const [modelType, setModelType] = useState('advance'); // 'basic' | 'advance'
+    const [storeFiles, setStoreFiles] = useState(initialStoreFiles ? 'yes' : 'no');
     const [remarks, setRemarks] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState('');
 
+    const { showAlert, showConfirm } = useGlobalPopup();
+    const savingRef = useRef(false);
+    const dirty = !submitted && Boolean(name || company || mobile || remarks);
+    useEffect(() => { setStoreFiles(initialStoreFiles ? 'yes' : 'no'); }, [initialStoreFiles]);
+    useEffect(() => {
+        if (!dirty) return;
+        const warn = event => { event.preventDefault(); event.returnValue = ''; };
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [dirty]);
+    const requestClose = async () => {
+        if (savingRef.current) return;
+        if (dirty && !await showConfirm('Your enquiry has not been saved. Closing will discard the entered details.', {title:'Close without saving?', confirmLabel:'Discard enquiry', cancelLabel:'Keep editing', type:'warning'})) return;
+        onClose?.();
+    };
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (savingRef.current || submitted) return;
         setError('');
-
-        const cleanMobile = mobile.trim().replace(/[^\d+]/g, '');
-        if (!cleanMobile || cleanMobile.length < 10) {
-            setError('Please enter a valid 10-digit mobile number.');
+        let payload;
+        try { payload = enquiryPayload({name, company, mobile, modelType, storeFiles, remarks}); }
+        catch (err) {
+            setError(err.message);
+            showAlert(err.message, {title:'Check your phone number', type:'warning'});
             return;
         }
-
+        savingRef.current = true;
         setSubmitting(true);
-        const submissionPayload = {
-            name: name.trim() || 'Prospective Client',
-            company_name: company.trim() || null,
-            mobile_number: cleanMobile,
-            model_type: modelType,
-            file_storage: storeFiles === 'yes',
-            remarks: remarks.trim() || null,
-            status: 'new',
-            created_at: new Date().toISOString()
-        };
-
         try {
-            const { error: insertErr } = await supabase
-                .from('enquiries')
-                .insert([submissionPayload]);
-
-            if (insertErr) {
-                console.warn('Enquiries table notice, saving locally:', insertErr.message);
-            }
-
-            try {
-                const existing = JSON.parse(localStorage.getItem('solarflow_customer_enquiries') || '[]');
-                existing.unshift({ ...submissionPayload, id: 'local_' + Date.now() });
-                localStorage.setItem('solarflow_customer_enquiries', JSON.stringify(existing));
-            } catch (storageErr) {
-                console.warn('Local storage write warning:', storageErr);
-            }
-
+            await submitEnquiry(supabase, payload);
             setSubmitted(true);
-        } catch (err) {
-            console.warn('Submission fallback triggered:', err);
-            setSubmitted(true);
+            showAlert('Your setup request has been saved successfully.', {title:'Enquiry saved', type:'success'});
+        } catch {
+            const message = 'We could not confirm that your enquiry was saved. Your details are still in this form. Please check your connection and try again.';
+            setError(message);
+            showAlert(message, {title:'Enquiry not confirmed', type:'error'});
         } finally {
+            savingRef.current = false;
             setSubmitting(false);
         }
     };
@@ -96,7 +93,7 @@ export default function CustomizationEnquiryForm({
                 {isModal && onClose && (
                     <button 
                         type="button" 
-                        onClick={onClose}
+                        onClick={requestClose}
                         className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
                         aria-label="Close modal"
                     >
@@ -124,7 +121,7 @@ export default function CustomizationEnquiryForm({
                         </div>
                         <h4 className="text-lg font-bold text-stone-900">Enquiry Received!</h4>
                         <p className="text-xs text-stone-600 mt-1.5 leading-relaxed">
-                            Thank you! We will reach out to <strong>{mobile}</strong> shortly to discuss your setup.
+                            Your setup request has been saved with contact number <strong>{mobile}</strong>.
                         </p>
                         <div className="mt-5 flex justify-center gap-3">
                             <button
@@ -137,7 +134,7 @@ export default function CustomizationEnquiryForm({
                             {isModal && onClose && (
                                 <button
                                     type="button"
-                                    onClick={onClose}
+                                    onClick={requestClose}
                                     className="px-4 py-2 rounded-xl text-xs font-bold bg-stone-900 text-white hover:bg-stone-800 transition cursor-pointer"
                                 >
                                     Close
@@ -147,8 +144,9 @@ export default function CustomizationEnquiryForm({
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <fieldset disabled={submitting} className="space-y-4">
                         {error && (
-                            <div className="p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-2">
+                            <div role="alert" className="p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-2">
                                 <AlertCircle size={15} className="shrink-0 text-rose-600" />
                                 <span>{error}</span>
                             </div>
@@ -312,9 +310,10 @@ export default function CustomizationEnquiryForm({
                                 className="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
                             >
                                 {submitting ? <LoaderCircle size={15} className="animate-spin" /> : <ArrowRight size={15} />}
-                                <span>{submitting ? 'Submitting...' : 'Submit Request'}</span>
+                                <span>{submitting ? 'Saving request...' : error ? 'Retry submission' : 'Submit Request'}</span>
                             </button>
                         </div>
+                        </fieldset>
                     </form>
                 )}
             </div>

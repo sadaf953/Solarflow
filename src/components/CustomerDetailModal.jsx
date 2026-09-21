@@ -1527,7 +1527,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
     };
 
     return (
-        <div className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div data-demo-editor="customer" className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-5xl h-[94vh] overflow-hidden flex flex-col border border-stone-100">
 
                 {/* Realtime Remote Conflict Alert Banner - see SHOW_REMOTE_UPDATE_ALERT */}

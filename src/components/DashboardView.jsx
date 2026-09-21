@@ -54,7 +54,7 @@ export default function DashboardView({ metrics, loading, scoped = false }) {
 
     if (!metrics) return (
         <div className="p-20 text-center text-stone-400 font-medium italic animate-pulse">
-            Calculating solar metrics...
+            Loading project summary…
         </div>
     );
 
@@ -97,15 +97,15 @@ export default function DashboardView({ metrics, loading, scoped = false }) {
 
             {/* Project counts */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                <MetricBox label={scoped ? "My Office & Dealers" : "Total Database"} value={totalProjects}  icon={FolderOpen}   color="blue"    sub={`${liveProjects} active records`} />
-                <MetricBox label="Live Projects"  value={liveProjects}   icon={Activity}     color="amber"   sub="Excluding completed and lost" />
-                <MetricBox label="Completed"      value={completedCount} icon={CheckCircle2} color="emerald" sub="Fully commissioned" />
+                <MetricBox label={scoped ? "My Office & Dealers" : "Total projects"} value={totalProjects}  icon={FolderOpen}   color="blue"    sub={`${liveProjects} projects in progress`} />
+                <MetricBox label="Projects in progress"  value={liveProjects}   icon={Activity}     color="amber"   sub="Excluding completed and lost" />
+                <MetricBox label="Completed"      value={completedCount} icon={CheckCircle2} color="emerald" sub="Installation completed" />
                 <MetricBox label="Lost Projects" value={metrics.lostCount ?? stageCounts['LOST PROJECT'] ?? 0} icon={XCircle} color="rose" sub="Projects marked lost" />
             </div>
 
             {/* Financial Analytics */}
             <div className="bg-white rounded-[32px] p-8 border border-stone-100 shadow-sm">
-                <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-6">Payment Breakdown</h3>
+                <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-6">How customers are paying</h3>
                 <div className="flex justify-between items-end mb-2">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700">
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
@@ -113,7 +113,7 @@ export default function DashboardView({ metrics, loading, scoped = false }) {
                     </div>
                     <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                        <span>Cash ({cashCount})</span>
+                        <span>Self-funded ({cashCount})</span>
                     </div>
                 </div>
                 <div className="h-4 bg-stone-100 rounded-full overflow-hidden flex">
@@ -138,7 +138,7 @@ export default function DashboardView({ metrics, loading, scoped = false }) {
 
             {/* Stage pipeline bar chart */}
             <div className="bg-white rounded-[32px] p-8 border border-stone-100 shadow-sm">
-                <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-8">Operational Density (Stage Breakdown)</h3>
+                <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-8">Projects by stage</h3>
                 <div className="space-y-5">
                     {PRIMARY_STAGES.map(stage => {
                         const count = stageCounts[stage.id] || 0;

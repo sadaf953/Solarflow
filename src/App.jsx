@@ -5,8 +5,8 @@ import { supabase } from './supabase';
 import {ensureThreeDemoVendors,demoVendorTarget} from './demo/vendors';
 import LoginScreen from './components/LoginScreen';
 import DemoHeader from './demo/DemoHeader';
-import PasswordRecoveryModal from './components/PasswordRecoveryModal';
-import TeamChatDrawer from './components/TeamChatDrawer';
+const PasswordRecoveryModal=lazy(()=>import('./components/PasswordRecoveryModal'));
+const TeamChatDrawer=lazy(()=>import('./components/TeamChatDrawer'));
 const Dashboard=lazy(()=>import('./components/Dashboard'));
 const AgentPortal=lazy(()=>import('./components/AgentPortal'));
 const VendorPortal=lazy(()=>import('./components/VendorPortal'));
@@ -83,22 +83,22 @@ export default function App(){
  return (
   <>
    {recoveryMode && (
-    <PasswordRecoveryModal
+    <Suspense fallback={<Loader/>}><PasswordRecoveryModal
      onClose={() => setRecoveryMode(false)}
      onSuccess={() => {
       setRecoveryMode(false);
       window.history.replaceState(null, '', window.location.pathname);
      }}
-    />
+    /></Suspense>
    )}
    {!user ? (
     <LoginScreen initialError={error} onLogin={setUser}/>
    ) : (
     <>
-     <DemoHeader user={user} onTourRoleSwitch={switchTourRole} onSwitchRole={chooseAgain}>
-      {controls=><div className="demo-app"><Suspense fallback={<Loader/>}><Portal key={user.userType} user={user} onLogout={chooseAgain} demoControls={controls}/></Suspense></div>}
+     <DemoHeader user={user} onTourRoleSwitch={switchTourRole}>
+      {(controls,startTour)=><div className="demo-app"><Suspense fallback={<Loader/>}><Portal key={user.userType} user={user} onLogout={chooseAgain} demoControls={controls} onStartDemoTour={startTour}/></Suspense></div>}
      </DemoHeader>
-     <TeamChatDrawer currentUser={user} />
+     <Suspense fallback={null}><TeamChatDrawer currentUser={user} /></Suspense>
     </>
    )}
   </>

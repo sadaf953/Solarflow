@@ -185,7 +185,7 @@ export default function TeamChatDrawer({ currentUser }) {
     return (
         <>
             {/* Floating Chat Trigger Button (Visible on all portals) */}
-            <div className="fixed bottom-20 right-4 sm:bottom-5 sm:right-5 z-40">
+            <div className="team-chat-launcher fixed bottom-20 right-4 sm:bottom-5 sm:right-5 z-40">
                 <button
                     onClick={() => setIsOpen(prev => !prev)}
                     className="flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2.5 bg-stone-900/95 hover:bg-stone-800 text-white rounded-full shadow-2xl border border-stone-700 transition-all transform hover:scale-105 active:scale-95 cursor-pointer backdrop-blur-xs"
