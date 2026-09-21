@@ -1,6 +1,8 @@
 # SolarFlow demo isolation
 
-This copy uses only the new demo Supabase project qduonewmquwayrnwyzvc and the new GitHub remote https://github.com/sadaf953/Solarflow.git. The original backend, repository, deployment workflows and domain are disconnected.
+This copy uses only the new demo Supabase project qduonewmquwayrnwyzvc and the new GitHub remote https://github.com/sadaf953/Solarflow.git. The original backend, repository and deployment workflows are disconnected.
+
+The demo is deliberately published at solarflow.deeprootsystems.in, served by GitHub Pages from the gh-pages branch with Cloudflare in front. This is a decision taken after the original isolation work, and it is the one point at which this copy shares a domain with the original project; the backend, repository and workflows remain severed. public/CNAME carries the hostname so that each `gh-pages -d dist` force-push preserves it — a deploy without that file silently drops the custom domain and the site returns "There isn't a GitHub Pages site here." The isolation guard permits that one hostname and rejects a CNAME naming any other.
 
 ## Current behavior
 
@@ -18,7 +20,7 @@ Use port 5186 for development and 4186 for preview. Other project servers are un
 
 ## Safeguards and limits
 
-Run npm run check:isolation, npm run test:isolation, and npm run build after integration changes. Guards reject other Supabase targets, secret keys, unexpected remotes, deployment workflows and project bindings. These checks protect this working copy, not arbitrary future commands or account-wide login state.
+Run npm run check:isolation, npm run test:isolation, and npm run build after integration changes. Guards reject other Supabase targets, secret keys, unexpected remotes, deployment workflows and project bindings. The one exception is the approved custom domain above: a CNAME containing solarflow.deeprootsystems.in passes, and a CNAME containing anything else fails. These checks protect this working copy, not arbitrary future commands or account-wide login state.
 
 The original Git directory is archived outside this project at /Users/mahvishsadafv2/Desktop/solarflow_demo_git_recovery_20260914/original.git. Credential-bearing local configuration and FETCH_HEAD were removed before archival. Historical secrets/customer data may remain there. Never restore or publish that archive.
 

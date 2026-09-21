@@ -12,6 +12,22 @@ const AgentPortal=lazy(()=>import('./components/AgentPortal'));
 const VendorPortal=lazy(()=>import('./components/VendorPortal'));
 const StampPortal=lazy(()=>import('./components/StampPortal'));
 const Loader=()=> <div className="p-12 text-center text-stone-500" role="status">Opening your workspace…</div>;
+
+// Landing-page gate.
+//
+// The Supabase client persists the anonymous demo session in localStorage
+// (storageKey solarflow-demo-cloud-auth-v1), so a stored session outlives the
+// browser. Restoring straight into a portal on that basis meant any visitor
+// who had ever opened the demo never saw the landing page again.
+//
+// sessionStorage is per-tab and dies with it, so this flag draws the line in
+// the right place: a new tab or a later visit starts at the landing page,
+// while a refresh in the middle of a session still restores the workspace.
+const ENTERED_KEY = 'solarflow_entered_demo';
+function hasEnteredThisTab(){ try{ return !!sessionStorage.getItem(ENTERED_KEY); }catch{ return false; } }
+function markEnteredThisTab(){ try{ sessionStorage.setItem(ENTERED_KEY,'1'); }catch{ /* private mode */ } }
+function clearEnteredThisTab(){ try{ sessionStorage.removeItem(ENTERED_KEY); }catch{ /* ignore */ } }
+
 function scheduleBackgroundDemoCleanup(client) {
  if (typeof window === 'undefined') return;
  const cleanupKey = 'solarflow_demo_cleanup_v2';
@@ -44,6 +60,10 @@ export default function App(){
    try{
     const {data}=await supabase.auth.getSession();
     if(!data?.session)return;
+    // Fresh visit: show the landing page even though a session is stored.
+    // Returning early also skips the profile round-trip, so the landing
+    // page paints sooner.
+    if(!hasEnteredThisTab())return;
     let userId = data.session.user?.id;
     if(!userId){
      const {data:identity,error:authError}=await supabase.auth.getUser();
@@ -61,18 +81,29 @@ export default function App(){
    }catch(e){if(active)setError(e.message);}finally{if(active)setLoading(false);}
   }restore();
   const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{
-   if(event==='SIGNED_OUT' && active)setUser(null);
+   if(event==='SIGNED_OUT' && active){clearEnteredThisTab();setUser(null);}
    if(event==='PASSWORD_RECOVERY' && active)setRecoveryMode(true);
   });
   return()=>{active=false;subscription.unsubscribe();};
  },[]);
- function chooseAgain(){setUser(null);setError('');window.history.replaceState(null,'',window.location.pathname);for(const key of ['solarflow_current_view','solarflow_selected_stage','solarflow_selected_customer_id'])sessionStorage.removeItem(key);}
+ // Entering from the landing page. restore() now returns early on a fresh
+ // visit, so the cleanup it used to schedule for admin/sales is scheduled
+ // here instead - otherwise it would stop running for those visitors.
+ function enterDemo(nextUser){
+  markEnteredThisTab();
+  setUser(nextUser);
+  if(nextUser && ['admin','sales'].includes(nextUser.userType)){
+   scheduleBackgroundDemoCleanup(supabase);
+  }
+ }
+ function chooseAgain(){clearEnteredThisTab();setUser(null);setError('');window.history.replaceState(null,'',window.location.pathname);for(const key of ['solarflow_current_view','solarflow_selected_stage','solarflow_selected_customer_id'])sessionStorage.removeItem(key);}
  async function switchTourRole(role){
   const {data,error}=await supabase.rpc('start_demo_session',{p_role:role});
   if(error)throw error;if(!data?.id)throw new Error('Could not open this demo role.');
   window.history.replaceState(null,'',window.location.pathname);
   for(const key of ['solarflow_current_view','solarflow_selected_stage','solarflow_selected_customer_id'])sessionStorage.removeItem(key);
   if(data.user_type==='vendor')data.name=demoVendorTarget(data.name)||data.name;
+  markEnteredThisTab();
   setUser({...data,userType:data.user_type,isDemo:true});
   if(['admin','sales'].includes(data.user_type)){
    scheduleBackgroundDemoCleanup(supabase);
@@ -92,7 +123,7 @@ export default function App(){
     /></Suspense>
    )}
    {!user ? (
-    <LoginScreen initialError={error} onLogin={setUser}/>
+    <LoginScreen initialError={error} onLogin={enterDemo}/>
    ) : (
     <>
      <DemoHeader user={user} onTourRoleSwitch={switchTourRole}>

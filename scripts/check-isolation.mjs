@@ -7,7 +7,18 @@ for (const name of readdirSync('.').filter(name => /^\.env(?:\.|$)/.test(name)))
   try { validateDemoEnv(parseEnv(readFileSync(name,'utf8'))); }
   catch (error) { failures.push(`${name}: ${error.message}`); }
 }
-for (const path of ['public/CNAME', 'dist/CNAME', '.vercel/project.json', '.netlify/state.json', '.mcp.json']) {
+// The demo is intentionally published at one approved hostname on GitHub
+// Pages. The CNAME file must live in public/ so that each `gh-pages -d dist`
+// force-push carries it into the published branch; without it, every deploy
+// drops the custom domain and the site 404s. A CNAME naming any OTHER host
+// is still an unapproved binding and still fails the check.
+const approvedDomain = 'solarflow.deeprootsystems.in';
+for (const path of ['public/CNAME', 'dist/CNAME']) {
+  if (!existsSync(path)) continue;
+  const host = readFileSync(path, 'utf8').trim();
+  if (host !== approvedDomain) failures.push(`Unapproved custom domain in ${path}: ${host}`);
+}
+for (const path of ['.vercel/project.json', '.netlify/state.json', '.mcp.json']) {
   if (existsSync(path)) failures.push(`Unexpected external project binding: ${path}`);
 }
 const approvedSupabaseRef = 'qduonewmquwayrnwyzvc';
