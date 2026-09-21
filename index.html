@@ -27,6 +27,17 @@
             window.addEventListener('error', function (e) {
                 var el = e && e.target;
                 if (!el || el.tagName !== 'SCRIPT' || !el.src) return;
+
+                // Only OUR OWN bundle failing indicates a stale index.html.
+                // Third-party scripts - the Cloudflare Insights beacon injected
+                // at the edge, ad blockers, browser extensions - fail for
+                // reasons that have nothing to do with staleness, and a reload
+                // will never fix them. Reloading on those costs every visitor a
+                // second full page load on first visit.
+                try {
+                    if (new URL(el.src, location.href).origin !== location.origin) return;
+                } catch (_) { return; }
+
                 try {
                     if (sessionStorage.getItem('ws_stale_reload')) return;
                     sessionStorage.setItem('ws_stale_reload', '1');
