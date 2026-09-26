@@ -10,19 +10,44 @@ import {
     CalendarCheck, IndianRupee, Layers, HelpCircle, PhoneCall, Copy, MessageSquare
 } from 'lucide-react';
 
+const DOCUMENT_MAKERS = [
+    'Quotation',
+    'Bill / Invoice',
+    'Bill of Materials (BOM)',
+    'Delivery Challan / Truck Sheet',
+    'DISCOM Submission',
+    'Feasibility Report',
+];
+
 export default function PricingView({ currentUser }) {
     // Interactive Custom Builder State
     const [clientName, setClientName] = useState(currentUser?.name || '');
     const [companyName, setCompanyName] = useState(currentUser?.channel_partner || '');
     const [phone, setPhone] = useState(currentUser?.phone || '');
-    const [loginsTier, setLoginsTier] = useState('base'); // 'base' (2-3) | 'mid' (5-10) | 'enterprise' (unlimited)
+    const [loginsTier, setLoginsTier] = useState('base'); // 'base' (5-8) | 'mid' (9-20) | 'enterprise' (unlimited)
     const [storageOption, setStorageOption] = useState('checklist'); // 'checklist' | 'gdrive' | 'ultra_premium'
     const [includeFinance, setIncludeFinance] = useState(true);
-    const [includeAttendance, setIncludeAttendance] = useState(true);
-    const [includeMigration, setIncludeMigration] = useState(false);
-    const [includePartners, setIncludePartners] = useState(true);
+    const [includeAttendance, setIncludeAttendance] = useState(false);
+    const [includeInventory, setIncludeInventory] = useState(true);
+    const [includePartners, setIncludePartners] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [copied, setCopied] = useState(false);
+    const selectedModuleCount = [includeFinance, includeAttendance, includeInventory, includePartners].filter(Boolean).length;
+
+    const chooseTier = (tier) => {
+        setLoginsTier(tier);
+        if (tier === 'base' && selectedModuleCount > 2) {
+            setIncludeFinance(true);
+            setIncludeAttendance(false);
+            setIncludeInventory(true);
+            setIncludePartners(false);
+        }
+    };
+
+    const toggleModule = (enabled, setter) => {
+        if (!enabled && loginsTier === 'base' && selectedModuleCount >= 2) return;
+        setter(!enabled);
+    };
 
     const handleCopySpec = () => {
         const specSummary = `
@@ -33,11 +58,14 @@ Company: ${companyName || 'Not specified'}
 Phone: ${phone || 'Not specified'}
 
 Selected Configuration:
-• Logins: ${loginsTier === 'base' ? 'Base Model (2 to 3 Team Logins - Admin/Office)' : loginsTier === 'mid' ? 'Growth Tier (5 to 10 Logins)' : 'Enterprise Tier (Unlimited Team Logins)'}
+• Logins: ${loginsTier === 'base' ? 'Foundation (5 to 8 users - Admin and Office access)' : loginsTier === 'mid' ? 'Growth Tier (9 to 20 users)' : 'Enterprise Tier (Unlimited Team Logins)'}
+• Workflow: Custom stages, client entry and checklist tracking
+• Exports: Daily CSV plus month-wise, year-wise and custom date-range exports
+• Document Maker Options: Quotation, bill, BOM, delivery challan, DISCOM submission and feasibility documents
 • File Storage Architecture: ${storageOption === 'checklist' ? 'Simple Checklist Mode (Zero cloud storage bills)' : storageOption === 'gdrive' ? 'Google Drive / Google One Integration (Pay Google directly ~₹130/mo)' : 'Ultra-Premium Built-in High Speed Cloud Storage'}
 • Financial & Subsidy Tracking: ${includeFinance ? 'YES' : 'NO'}
 • Staff Attendance & Holiday Approval: ${includeAttendance ? 'YES' : 'NO'}
-• Legacy Excel / Data Migration: ${includeMigration ? 'YES' : 'NO'}
+• Inventory & Delivery Operations: ${includeInventory ? 'YES' : 'NO'}
 • Channel Partner & Dealer Portals: ${includePartners ? 'YES' : 'NO'}
 • Deployment Mode: Lifetime All-Time Buy / Perpetual Setup
         `.trim();
@@ -89,14 +117,14 @@ Selected Configuration:
                         </div>
 
                         <div className="p-3 bg-stone-50 rounded-2xl border border-stone-100 space-y-1">
-                            <p className="text-xs font-bold text-stone-800">2 to 3 Team Logins</p>
-                            <p className="text-[11px] text-stone-500">Super Admin &amp; Back-Office / Sales operator.</p>
+                            <p className="text-xs font-bold text-stone-800">5 to 8 Team Users</p>
+                            <p className="text-[11px] text-stone-500">Two access types: Admin and Office / Sales.</p>
                         </div>
 
                         <div className="space-y-2.5 text-xs text-stone-700 pt-2">
                             <div className="flex items-start gap-2">
                                 <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                                <span><strong>All 16 Primary Stages</strong> from Lead to Subsidy &amp; Completed</span>
+                                <span><strong>Custom Workflow:</strong> use the 16-stage solar flow or tailor the stages to the company</span>
                             </div>
                             <div className="flex items-start gap-2">
                                 <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -104,11 +132,23 @@ Selected Configuration:
                             </div>
                             <div className="flex items-start gap-2">
                                 <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                                <span><strong>Solar Toolbox:</strong> Capacity calculator, shadow analysis, string sizing</span>
+                                <span><strong>Client Management:</strong> add clients, update progress and keep every project searchable</span>
                             </div>
                             <div className="flex items-start gap-2">
                                 <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                                <span><strong>Quotation Maker:</strong> Generate instant PDF solar proposals</span>
+                                <span><strong>Flexible Exports:</strong> daily CSV plus month, year and custom date-range downloads</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                <span><strong>Document Maker Options:</strong> add quotation, bill, BOM, delivery challan, DISCOM submission or feasibility makers</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                <span><strong>Google Drive Links:</strong> link each client to their existing Drive folder without duplicating storage</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                <span><strong>Choose 2 Operational Modules:</strong> finance, inventory, partner portals or attendance</span>
                             </div>
                             <div className="flex items-start gap-2">
                                 <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -120,7 +160,7 @@ Selected Configuration:
                     <div className="pt-6 mt-6 border-t border-stone-100">
                         <button
                             type="button"
-                            onClick={() => { setLoginsTier('base'); setStorageOption('checklist'); }}
+                            onClick={() => { chooseTier('base'); setStorageOption('checklist'); }}
                             className="w-full py-2.5 px-4 bg-stone-100 hover:bg-stone-200 text-stone-900 rounded-xl text-xs font-bold transition cursor-pointer"
                         >
                             Select Base Spec
@@ -148,7 +188,7 @@ Selected Configuration:
                         </div>
 
                         <div className="p-3 bg-white/10 rounded-2xl border border-white/10 space-y-1">
-                            <p className="text-xs font-bold text-amber-300">5 to 10 Logins</p>
+                            <p className="text-xs font-bold text-amber-300">9 to 20 Logins</p>
                             <p className="text-[11px] text-stone-300">Admin, Office, Manager, Dealers &amp; Field Agents.</p>
                         </div>
 
@@ -171,7 +211,7 @@ Selected Configuration:
                             </div>
                             <div className="flex items-start gap-2">
                                 <Check className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                                <span><strong>Godown &amp; Inventory Management:</strong> Daily stock logs, BOM, and delivery batches</span>
+                                <span><strong>Inventory &amp; Stock Management:</strong> Daily stock logs, BOM, and delivery batches</span>
                             </div>
                         </div>
                     </div>
@@ -179,7 +219,7 @@ Selected Configuration:
                     <div className="pt-6 mt-6 border-t border-white/10">
                         <button
                             type="button"
-                            onClick={() => { setLoginsTier('mid'); setStorageOption('gdrive'); }}
+                            onClick={() => { chooseTier('mid'); setStorageOption('gdrive'); }}
                             className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-stone-950 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
                         >
                             Select Mid-Tier Spec
@@ -235,7 +275,7 @@ Selected Configuration:
                     <div className="pt-6 mt-6 border-t border-stone-100">
                         <button
                             type="button"
-                            onClick={() => { setLoginsTier('enterprise'); setStorageOption('ultra_premium'); setIncludeMigration(true); }}
+                            onClick={() => { chooseTier('enterprise'); setStorageOption('ultra_premium'); setIncludeInventory(true); }}
                             className="w-full py-2.5 px-4 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer"
                         >
                             Select Enterprise Spec
@@ -245,7 +285,7 @@ Selected Configuration:
             </div>
 
             {/* Storage Architecture Comparison Callout */}
-            <div className="bg-gradient-to-r from-amber-50/80 via-stone-50 to-amber-50/80 rounded-3xl border border-amber-200/70 p-6 md:p-8 space-y-4">
+            <div className="bg-amber-50/60 rounded-3xl border border-amber-200/70 p-6 md:p-8 space-y-4">
                 <div className="flex items-center gap-3">
                     <HardDrive className="w-6 h-6 text-amber-600 shrink-0" />
                     <div>
@@ -342,33 +382,33 @@ Selected Configuration:
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <button
                                 type="button"
-                                onClick={() => setLoginsTier('base')}
+                                onClick={() => chooseTier('base')}
                                 className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
                                     loginsTier === 'base'
                                         ? 'border-amber-500 bg-amber-50/60 ring-1 ring-amber-500 text-stone-900'
                                         : 'border-stone-200 hover:border-stone-300 text-stone-700'
                                 }`}
                             >
-                                <p className="text-xs font-black">Base Model (2-3 Logins)</p>
-                                <p className="text-[11px] text-stone-500 mt-0.5">Admin + Office management</p>
+                                <p className="text-xs font-black">Foundation (5-8 Users)</p>
+                                <p className="text-[11px] text-stone-500 mt-0.5">Admin + Office access types</p>
                             </button>
 
                             <button
                                 type="button"
-                                onClick={() => setLoginsTier('mid')}
+                                onClick={() => chooseTier('mid')}
                                 className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
                                     loginsTier === 'mid'
                                         ? 'border-amber-500 bg-amber-50/60 ring-1 ring-amber-500 text-stone-900'
                                         : 'border-stone-200 hover:border-stone-300 text-stone-700'
                                 }`}
                             >
-                                <p className="text-xs font-black">Growth (5-10 Logins)</p>
+                                <p className="text-xs font-black">Growth (9-20 Users)</p>
                                 <p className="text-[11px] text-stone-500 mt-0.5">Admin, Office, Manager, Dealers</p>
                             </button>
 
                             <button
                                 type="button"
-                                onClick={() => setLoginsTier('enterprise')}
+                                onClick={() => chooseTier('enterprise')}
                                 className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
                                     loginsTier === 'enterprise'
                                         ? 'border-amber-500 bg-amber-50/60 ring-1 ring-amber-500 text-stone-900'
@@ -378,6 +418,22 @@ Selected Configuration:
                                 <p className="text-xs font-black">Enterprise (Unlimited)</p>
                                 <p className="text-[11px] text-stone-500 mt-0.5">All team roles, vendors, agents</p>
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Document generator options */}
+                    <div>
+                        <div className="flex items-center gap-2 mb-2">
+                            <FileSpreadsheet className="w-4 h-4 text-amber-600" />
+                            <label className="text-xs font-bold text-stone-700">Document Maker Options</label>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {DOCUMENT_MAKERS.map(name => (
+                                <div key={name} className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5">
+                                    <FileSpreadsheet className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <span className="text-[11px] font-semibold text-stone-700">{name}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
 
@@ -428,13 +484,16 @@ Selected Configuration:
 
                     {/* Modular Options Checklist */}
                     <div>
-                        <label className="text-xs font-bold text-stone-700 block mb-2">Modular Features (Yes / No)</label>
+                        <div className="flex flex-wrap items-end justify-between gap-2 mb-2">
+                            <label className="text-xs font-bold text-stone-700">Operational Module Basket</label>
+                            <span className="text-[11px] text-stone-500">Foundation includes any 2 modules</span>
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <label className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${includeFinance ? 'bg-amber-50/50 border-amber-300' : 'bg-stone-50 border-stone-200'}`}>
                                 <input
                                     type="checkbox"
                                     checked={includeFinance}
-                                    onChange={e => setIncludeFinance(e.target.checked)}
+                                    onChange={() => toggleModule(includeFinance, setIncludeFinance)}
                                     className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
                                 />
                                 <div>
@@ -447,7 +506,7 @@ Selected Configuration:
                                 <input
                                     type="checkbox"
                                     checked={includeAttendance}
-                                    onChange={e => setIncludeAttendance(e.target.checked)}
+                                    onChange={() => toggleModule(includeAttendance, setIncludeAttendance)}
                                     className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
                                 />
                                 <div>
@@ -456,16 +515,16 @@ Selected Configuration:
                                 </div>
                             </label>
 
-                            <label className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${includeMigration ? 'bg-amber-50/50 border-amber-300' : 'bg-stone-50 border-stone-200'}`}>
+                            <label className={`flex items-center gap-3 p-3.5 rounded-2xl border cursor-pointer transition ${includeInventory ? 'bg-amber-50/50 border-amber-300' : 'bg-stone-50 border-stone-200'}`}>
                                 <input
                                     type="checkbox"
-                                    checked={includeMigration}
-                                    onChange={e => setIncludeMigration(e.target.checked)}
+                                    checked={includeInventory}
+                                    onChange={() => toggleModule(includeInventory, setIncludeInventory)}
                                     className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
                                 />
                                 <div>
-                                    <p className="text-xs font-bold text-stone-900">Historical Excel / CRM Data Migration</p>
-                                    <p className="text-[11px] text-stone-500">Import old customer records, pipeline &amp; quotes</p>
+                                    <p className="text-xs font-bold text-stone-900">Inventory &amp; Delivery Operations</p>
+                                    <p className="text-[11px] text-stone-500">Stock, BOM requirements and delivery batches</p>
                                 </div>
                             </label>
 
@@ -473,7 +532,7 @@ Selected Configuration:
                                 <input
                                     type="checkbox"
                                     checked={includePartners}
-                                    onChange={e => setIncludePartners(e.target.checked)}
+                                    onChange={() => toggleModule(includePartners, setIncludePartners)}
                                     className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
                                 />
                                 <div>

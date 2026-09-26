@@ -11,6 +11,7 @@ const Dashboard=lazy(()=>import('./components/Dashboard'));
 const AgentPortal=lazy(()=>import('./components/AgentPortal'));
 const VendorPortal=lazy(()=>import('./components/VendorPortal'));
 const StampPortal=lazy(()=>import('./components/StampPortal'));
+const PricingView=lazy(()=>import('./components/PricingView'));
 const Loader=()=> <div className="p-12 text-center text-stone-500" role="status">Opening your workspace…</div>;
 
 // Landing-page gate.
@@ -38,7 +39,7 @@ function scheduleBackgroundDemoCleanup(client) {
    ensureThreeDemoDrivers(client),
    ensureGroupedDemoBatches(client)
   ]).then(() => {
-   try { window.sessionStorage.setItem(cleanupKey, '1'); } catch {}
+   try { window.sessionStorage.setItem(cleanupKey, '1'); } catch { /* storage may be unavailable */ }
   }).catch(err => console.warn('Background cleanup notice:', err));
  };
  if (typeof window.requestIdleCallback === 'function') {
@@ -51,6 +52,7 @@ function scheduleBackgroundDemoCleanup(client) {
 export default function App(){
  const [user,setUser]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
  const [recoveryMode, setRecoveryMode]=useState(false);
+ const [publicView,setPublicView]=useState(()=>typeof window!=='undefined'&&window.location.hash==='#/plans'?'plans':null);
  useEffect(()=>{
   let active=true;
   if(typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('type=recovery')){
@@ -91,11 +93,14 @@ export default function App(){
  // here instead - otherwise it would stop running for those visitors.
  function enterDemo(nextUser){
   markEnteredThisTab();
+  setPublicView(null);
   setUser(nextUser);
   if(nextUser && ['admin','sales'].includes(nextUser.userType)){
    scheduleBackgroundDemoCleanup(supabase);
   }
  }
+ function openPlans(){setPublicView('plans');window.history.pushState(null,'','#/plans');}
+ function closePlans(){setPublicView(null);window.history.pushState(null,'',window.location.pathname);}
  function chooseAgain(){clearEnteredThisTab();setUser(null);setError('');window.history.replaceState(null,'',window.location.pathname);for(const key of ['solarflow_current_view','solarflow_selected_stage','solarflow_selected_customer_id'])sessionStorage.removeItem(key);}
  async function switchTourRole(role){
   const {data,error}=await supabase.rpc('start_demo_session',{p_role:role});
@@ -122,8 +127,19 @@ export default function App(){
      }}
     /></Suspense>
    )}
-   {!user ? (
-    <LoginScreen initialError={error} onLogin={enterDemo}/>
+   {!user ? (publicView === 'plans' ? (
+    <div className="min-h-screen bg-stone-50">
+     <div className="sticky top-0 z-20 bg-white/95 border-b border-stone-200 px-4 py-3">
+      <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+       <button type="button" onClick={closePlans} className="text-sm font-bold text-stone-700 hover:text-stone-950">← Back to SolarFlow</button>
+       <button type="button" onClick={closePlans} className="px-4 py-2 rounded-xl bg-stone-900 text-white text-xs font-bold">Open demo</button>
+      </div>
+     </div>
+     <div className="px-4"><Suspense fallback={<Loader/>}><PricingView /></Suspense></div>
+    </div>
+   ) : (
+    <LoginScreen initialError={error} onLogin={enterDemo} onOpenPlans={openPlans}/>
+   )
    ) : (
     <>
      <DemoHeader user={user} onTourRoleSwitch={switchTourRole}>

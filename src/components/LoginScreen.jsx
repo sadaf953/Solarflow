@@ -14,7 +14,7 @@ import BrandMark from './BrandMark';
 import '../demo/demo.css';
 const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handshake,Users,Truck,Stamp];
 const descriptions=['Explore the complete solar business.','Manage leads and daily operations.','Follow your partner’s project pipeline.','Review progress and team activity.','Build quotations and follow up leads.','Track your customers from start to finish.','Manage delivery, installation and photos.','Review documents and completed work.'];
-export default function LoginScreen({onLogin,initialError=''}) {
+export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
  const [busy,setBusy]=useState('');const [error,setError]=useState(initialError);
  const [visitorName, setVisitorName] = useState(() => {
   try { return localStorage.getItem('solarflow_visitor_name') || ''; } catch { return ''; }
@@ -137,7 +137,7 @@ export default function LoginScreen({onLogin,initialError=''}) {
    if(!data?.id)throw new Error('The demo profile could not be created.');
    if(data.user_type==='vendor')data.name=demoVendorTarget(data.name)||data.name;
    if(nameToUse){
-    try { localStorage.setItem('solarflow_visitor_name', nameToUse); } catch {}
+    try { localStorage.setItem('solarflow_visitor_name', nameToUse); } catch { /* storage may be unavailable */ }
    }
    onLogin({...data,userType:data.user_type || data.userType,isDemo:true});
    if(['admin','sales'].includes(data.user_type)){
@@ -580,6 +580,7 @@ export default function LoginScreen({onLogin,initialError=''}) {
 
    <div className="demo-next-links">
     <div><strong>Looking for a simpler CRM?</strong><p>Explore the basic version for leads, quotations and customer tracking.</p><a href={DEFAULT_BASIC_VERSION_URL} target="_blank" rel="noopener noreferrer">Explore Basic Version <ArrowRight size={15}/></a></div>
+    <div><strong>Plans for every team size</strong><p>Compare the Foundation, Growth and Enterprise setup options before entering the demo.</p><button type="button" onClick={onOpenPlans}>View Plans &amp; Pricing <ArrowRight size={15}/></button></div>
     <div><strong>Make it work for your team</strong><p>Tell us about your business when you are ready to discuss setup.</p><button type="button" aria-expanded={showEnquiry} aria-controls="demo-enquiry" onClick={() => setShowEnquiry(!showEnquiry)}>{showEnquiry ? 'Hide setup request' : 'Request a setup'} <ArrowRight size={15}/></button></div>
    </div>
    <div hidden={!showEnquiry} id="demo-enquiry" className="mt-8 max-w-3xl mx-auto w-full"><CustomizationEnquiryForm initialStoreFiles={storeFiles} /></div>

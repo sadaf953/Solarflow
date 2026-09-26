@@ -47,7 +47,7 @@ const getInitialMessages = () => {
         },
         {
             id: 'msg-3',
-            senderName: 'Godown & Logistics',
+            senderName: 'Inventory & Logistics',
             senderRole: 'Admin',
             userType: 'admin',
             text: 'Warehouse stock of bifacial solar modules replenished in godown. Ready for delivery batch allocation.',

@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* SolarFlow visual foundation: warm neutrals with clear solar accents. */
+:root {
+    --sf-canvas: #FAFAF9;
+    --sf-surface: #FFFFFF;
+    --sf-surface-soft: #FFFBEB;
+    --sf-ink: #1C1917;
+    --sf-muted: #78716C;
+    --sf-border: #E7E5E4;
+    --sf-orange: #F97316;
+    --sf-yellow: #FACC15;
+    --sf-green: #16A34A;
+    --sf-green-dark: #15803D;
+    --sf-focus: #FACC15;
+    --sf-radius: 14px;
+}
+
 /* Base Styles */
 * {
     margin: 0;
@@ -11,8 +27,8 @@
 
 body {
     font-family: 'Nunito Sans', system-ui, sans-serif;
-    background-color: #FCFBFA;
-    color: #1C1917;
+    background-color: var(--sf-canvas);
+    color: var(--sf-ink);
     line-height: 1.6;
 }
 
@@ -65,7 +81,7 @@ h6 {
 
 /* Gradient Background for Login */
 .gradient-bg {
-    background: linear-gradient(135deg, #FCFBFA 0%, #FFFBEB 50%, #F5F5F4 100%);
+    background: var(--sf-surface-soft);
 }
 
 /* Stage Button Styles */
@@ -80,8 +96,8 @@ h6 {
 
 .stage-btn.active {
     background-color: #FEF3C7;
-    border-left-color: #D97706;
-    color: #78350F;
+    border-left-color: var(--sf-orange);
+    color: var(--sf-ink);
     font-weight: 700;
 }
 
@@ -90,22 +106,22 @@ input:focus,
 select:focus,
 textarea:focus {
     outline: none;
-    ring: 2px;
-    ring-color: #F59E0B;
-    border-color: #F59E0B;
+    border-color: var(--sf-focus);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, .18);
 }
 
 /* Button Animations */
 .btn-primary {
-    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    border-color: var(--sf-green);
+    background: var(--sf-green);
     color: #FFFFFF;
-    transition: all 0.3s ease;
+    transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, #047857 0%, #064e3b 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+    border-color: var(--sf-green-dark);
+    background: var(--sf-green-dark);
+    box-shadow: 0 3px 10px rgba(21, 128, 61, .18);
 }
 
 /* Follow-up Chat Style */

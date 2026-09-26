@@ -32,7 +32,7 @@ export const ATTENDANCE_STATUSES = {
         bg: 'bg-amber-100 text-amber-800 border-amber-300',
         activeBg: 'bg-amber-500 text-white',
         dot: 'bg-amber-500',
-        color: '#d97706'
+        color: '#f97316'
     },
     leave: {
         id: 'leave',
@@ -59,7 +59,7 @@ export const ATTENDANCE_STATUSES = {
         bg: 'bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-400',
         activeBg: 'bg-amber-500 text-white',
         dot: 'bg-amber-500 animate-pulse',
-        color: '#d97706',
+        color: '#f97316',
         isPending: true
     },
     holiday_request: {
@@ -91,7 +91,7 @@ export const DEFAULT_OFFICE_STAFF = [
     { id: 'staff-ankit', name: 'Ankit Patel', role: 'Discom & Govt Coordinator', department: 'Government Liason', email: 'ankit.p@solarflow.example' },
     { id: 'staff-sneha', name: 'Sneha Joshi', role: 'Customer Relationship Officer', department: 'Customer Support', email: 'sneha.j@solarflow.example' },
     { id: 'staff-pooja', name: 'Pooja Mehta', role: 'Finance & Accounts Officer', department: 'Finance & Accounts', email: 'pooja.m@solarflow.example' },
-    { id: 'staff-vikram', name: 'Vikram Solanki', role: 'Store & Inventory Incharge', department: 'Godown / Logistics', email: 'vikram.s@solarflow.example' },
+    { id: 'staff-vikram', name: 'Vikram Solanki', role: 'Store & Inventory Incharge', department: 'Inventory / Logistics', email: 'vikram.s@solarflow.example' },
     { id: 'staff-hardik', name: 'Hardik Pandya', role: 'Site Survey Engineer', department: 'Engineering', email: 'hardik.p@solarflow.example' },
     { id: 'staff-divya', name: 'Divya Shah', role: 'Quality & Safety Inspector', department: 'QA / Safety', email: 'divya.s@solarflow.example' },
     { id: 'staff-rajesh', name: 'Rajesh Bhavsar', role: 'Solar CAD Designer', department: 'Technical Design', email: 'rajesh.b@solarflow.example' },
@@ -604,4 +604,3 @@ export async function rejectAttendanceRequest(staffName, dateStr, reason = '', a
     );
     return true;
 }
-

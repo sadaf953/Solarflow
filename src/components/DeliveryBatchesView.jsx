@@ -5,13 +5,123 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Truck, Plus, Search, Filter, Calendar, User, Phone, MapPin, 
     Zap, Layers, Printer, Edit3, Trash2, CheckCircle2, AlertCircle, 
-    ChevronDown, ChevronUp, Package, X, Check, ArrowRight, FileText, Clock, ExternalLink
+    ChevronDown, ChevronUp, Package, X, Check, ArrowRight, ArrowUp, ArrowDown, FileText, Clock, ExternalLink
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { PRIMARY_STAGES, DELIVERY_PICKER_COLUMNS } from '../constants';
 import { toIndianCommas, logActivity, formatInputValue, parseIndianNumber, runWrite, getTelephoneHref } from '../utils';
 import { useGlobalPopup } from './GlobalPopup';
 import {filterDeliveryProjects,projectAssignedElsewhere} from '../delivery/projectPicker';
+
+const normalizeMaterial = value => {
+    const normalized = String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (normalized === '16sq mm la cabel') return '16sq mm la cable';
+    if (normalized === 'condute pipe') return 'conduite pipe';
+    return normalized;
+};
+
+const normalizeMaterialUnit = value => {
+    const normalized = String(value || '').trim();
+    return ['no.', 'no', 'nos.', 'nos'].includes(normalized.toLowerCase()) ? 'Nos' : (normalized || 'Nos');
+};
+
+const materialDisplayName = value => {
+    const key = normalizeMaterial(value);
+    if (key === '16sq mm la cable') return '16sq MM LA Cable';
+    if (key === 'conduite pipe') return 'Conduite Pipe';
+    return value;
+};
+
+const readBomItems = (project, relationalItems = {}) => {
+    if (!project?.bom_data) return relationalItems[project?.id] || [];
+    try {
+        const document = typeof project.bom_data === 'string' ? JSON.parse(project.bom_data) : project.bom_data;
+        const items = Array.isArray(document) ? document : document?.items;
+        const inlineItems = Array.isArray(items)
+            ? items.filter(item => String(item?.product_name || '').trim())
+            : [];
+        return inlineItems.length ? inlineItems : (relationalItems[project?.id] || []);
+    } catch {
+        return relationalItems[project?.id] || [];
+    }
+};
+
+const materialQuantity = item => item?.stock_quantity ?? item?.quantity ?? '';
+
+// Saved reference BOMs occasionally contain simple expressions such as 12*4 or 3+1.
+// Evaluate only positive numbers joined by + or *; leave every other value un-totalled.
+const quantityAsNumber = value => {
+    const source = String(value ?? '').replace(/\s+/g, '');
+    if (!/^\d+(?:\.\d+)?(?:[+*]\d+(?:\.\d+)?)*$/.test(source)) return null;
+    const total = source.split('+').reduce((sum, term) => (
+        sum + term.split('*').reduce((product, factor) => product * Number(factor), 1)
+    ), 0);
+    return Number.isFinite(total) ? total : null;
+};
+
+const formatMaterialQuantity = value => {
+    const number = Number(value);
+    return Number.isFinite(number)
+        ? number.toLocaleString('en-IN', { maximumFractionDigits: 3 })
+        : String(value || '–');
+};
+
+const orderedBatchProjects = (batch, customers) => {
+    const byId = new Map(customers.map(project => [project.id, project]));
+    return (batch?.project_ids || []).map(id => byId.get(id)).filter(Boolean);
+};
+
+const batchMaterialManifest = (batch, customers, relationalItems = {}) => {
+    const projects = orderedBatchProjects(batch, customers).map(project => ({
+        project,
+        items: readBomItems(project, relationalItems).map(item => ({
+            ...item,
+            delivery_quantity: materialQuantity(item)
+        })).filter(item => String(item.delivery_quantity ?? '').trim() !== '')
+    }));
+    const totals = new Map();
+    projects.forEach(({items}) => items.forEach(item => {
+        const numeric = quantityAsNumber(item.delivery_quantity);
+        if (numeric === null) return;
+        const uom = normalizeMaterialUnit(item.uom);
+        const key = `${normalizeMaterial(item.product_name)}|${normalizeMaterial(uom)}`;
+        const current = totals.get(key) || { product_name: materialDisplayName(item.product_name), uom, quantity: 0 };
+        current.quantity += numeric;
+        totals.set(key, current);
+    }));
+    return {
+        projects,
+        totals: [...totals.values()].sort((a, b) => a.product_name.localeCompare(b.product_name))
+    };
+};
+
+const batchMaterialMatrix = manifest => {
+    const customerColumns = manifest.projects.map(({ project }) => project);
+    const rows = new Map();
+
+    manifest.projects.forEach(({ items }, customerIndex) => {
+        items.forEach(item => {
+            const quantity = quantityAsNumber(item.delivery_quantity);
+            if (quantity === null) return;
+            const uom = normalizeMaterialUnit(item.uom);
+            const key = `${normalizeMaterial(item.product_name)}|${normalizeMaterial(uom)}`;
+            const row = rows.get(key) || {
+                product_name: materialDisplayName(item.product_name),
+                uom,
+                total: 0,
+                customerQuantities: Array(customerColumns.length).fill(0)
+            };
+            row.total += quantity;
+            row.customerQuantities[customerIndex] += quantity;
+            rows.set(key, row);
+        });
+    });
+
+    return {
+        customers: customerColumns,
+        rows: [...rows.values()].sort((a, b) => a.product_name.localeCompare(b.product_name))
+    };
+};
 
 export default function DeliveryBatchesView({ 
     currentUser, 
@@ -90,6 +200,10 @@ export default function DeliveryBatchesView({
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingBatch, setEditingBatch] = useState(null);
     const [printingBatch, setPrintingBatch] = useState(null);
+    const [materialSheetBatch, setMaterialSheetBatch] = useState(null);
+    const [printBomItems, setPrintBomItems] = useState({});
+    const [printMaterialsLoading, setPrintMaterialsLoading] = useState(false);
+    const [printMaterialsError, setPrintMaterialsError] = useState('');
     const printableRef = useRef(null);
 
     // Form state for Create / Edit Batch
@@ -449,6 +563,155 @@ export default function DeliveryBatchesView({
         }
     };
 
+    const handlePrintMaterialSheet = () => {
+        if (!materialSheetBatch || printMaterialsLoading || printMaterialsError) return;
+        const cleanBatch = String(materialSheetBatch?.batch_no || materialSheetBatch?.id || 'Batch').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const cleanVehicle = String(materialSheetBatch?.vehicle_number || 'Vehicle').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const docTitle = `Material_Summary_${cleanBatch}_${cleanVehicle}`;
+        const source = document.getElementById('printable-material-summary');
+        if (!source) return;
+
+        const frame = document.createElement('iframe');
+        frame.setAttribute('title', 'Material summary print document');
+        frame.style.position = 'fixed';
+        frame.style.right = '0';
+        frame.style.bottom = '0';
+        frame.style.width = '0';
+        frame.style.height = '0';
+        frame.style.border = '0';
+        document.body.appendChild(frame);
+
+        const printDocument = frame.contentDocument;
+        const printWindow = frame.contentWindow;
+        if (!printDocument || !printWindow) {
+            frame.remove();
+            showAlert('The print preview could not be opened.', { type: 'error' });
+            return;
+        }
+
+        const styles = [...document.head.querySelectorAll('style, link[rel="stylesheet"]')]
+            .map(node => node.outerHTML)
+            .join('');
+        printDocument.open();
+        printDocument.write(`<!doctype html><html><head><meta charset="utf-8"><title>${docTitle}</title>${styles}<style>
+            @page { size: A4 landscape; margin: 4mm; }
+            html, body { width: 100%; height: auto; margin: 0; padding: 0; overflow: visible; background: #fff; color: #000; }
+            body *, body * * { visibility: visible !important; }
+            #printable-material-summary { position: static !important; width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
+            .material-summary-page { width: 100% !important; margin: 0 !important; padding: 0 !important; break-inside: auto; page-break-inside: auto; }
+            .material-summary-page:not(:last-child) { break-after: page; page-break-after: always; }
+            .material-summary-table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '7px' : '10px'} !important; color: #000 !important; }
+            .material-summary-table thead { display: table-header-group; }
+            .material-summary-table tr { break-inside: avoid; page-break-inside: avoid; }
+            .material-summary-table th, .material-summary-table td { padding: 1px 3px !important; border: 1px solid #555 !important; color: #000 !important; background: #fff !important; }
+            .material-summary-table th:first-child, .material-summary-table td:first-child { width: 20% !important; }
+            .material-summary-table th:nth-child(2), .material-summary-table td:nth-child(2) { width: 9% !important; }
+            .material-summary-table th:nth-child(3), .material-summary-table td:nth-child(3) { width: 7% !important; }
+            .material-summary-signatures { break-inside: avoid; page-break-inside: avoid; }
+            .no-print { display: none !important; }
+        </style></head><body>${source.outerHTML}</body></html>`);
+        printDocument.close();
+
+        let cleanedUp = false;
+        const cleanup = () => {
+            if (cleanedUp) return;
+            cleanedUp = true;
+            frame.remove();
+        };
+        printWindow.addEventListener('afterprint', cleanup, { once: true });
+        setTimeout(() => {
+            try {
+                printWindow.focus();
+                printWindow.print();
+            } catch (err) {
+                console.error('Print execution error:', err);
+                cleanup();
+                showAlert('The print preview could not be opened.', { type: 'error' });
+            }
+        }, 300);
+        setTimeout(cleanup, 60000);
+    };
+
+    const handleOpenMaterialSheet = async batch => {
+        setPrintingBatch(null);
+        setMaterialSheetBatch(batch);
+        setPrintBomItems({});
+        setPrintMaterialsError('');
+        setPrintMaterialsLoading(true);
+        try {
+            const projects = orderedBatchProjects(batch, customers);
+            const projectIds = projects.map(project => project.id);
+            if (!projectIds.length) return;
+
+            const { data: bomRows, error: bomError } = await supabase
+                .from('bom')
+                .select('*')
+                .in('admin_id', projectIds)
+                .order('created_at', { ascending: false });
+            if (bomError) throw bomError;
+
+            const selectedBomByProject = new Map();
+            projects.forEach(project => {
+                const wantedType = String(project.roof_shed || '').toUpperCase().includes('SHED') ? 'SHED' : 'ROOF';
+                const matching = (bomRows || []).find(row => row.admin_id === project.id && row.bom_type === wantedType)
+                    || (bomRows || []).find(row => row.admin_id === project.id);
+                if (matching) selectedBomByProject.set(project.id, matching);
+            });
+
+            const bomIds = [...selectedBomByProject.values()].map(row => row.id);
+            if (!bomIds.length) return;
+            const { data: bomItems, error: itemError } = await supabase
+                .from('bom_items')
+                .select('*')
+                .in('bom_id', bomIds)
+                .order('sr_no', { ascending: true });
+            if (itemError) throw itemError;
+
+            const itemsByBom = new Map();
+            (bomItems || []).forEach(item => {
+                const list = itemsByBom.get(item.bom_id) || [];
+                list.push(item);
+                itemsByBom.set(item.bom_id, list);
+            });
+            setPrintBomItems(Object.fromEntries(
+                [...selectedBomByProject.entries()].map(([projectId, bom]) => [projectId, itemsByBom.get(bom.id) || []])
+            ));
+        } catch (error) {
+            console.error('Could not load delivery material breakdown:', error);
+            setPrintMaterialsError('Material quantities could not be loaded. Refresh and try again.');
+        } finally {
+            setPrintMaterialsLoading(false);
+        }
+    };
+
+    const handleReorderProject = async (batch, projectId, direction) => {
+        if (saving || batch.status === 'DELIVERED') return;
+        const currentIds = [...(batch.project_ids || [])];
+        const currentIndex = currentIds.indexOf(projectId);
+        const nextIndex = currentIndex + direction;
+        if (currentIndex < 0 || nextIndex < 0 || nextIndex >= currentIds.length) return;
+        [currentIds[currentIndex], currentIds[nextIndex]] = [currentIds[nextIndex], currentIds[currentIndex]];
+
+        const previousBatch = batch;
+        const reorderedBatch = { ...batch, project_ids: currentIds, updated_at: new Date().toISOString() };
+        setSaving(true);
+        setBatches(previous => previous.map(item => item.id === batch.id ? reorderedBatch : item));
+        try {
+            await saveDeliveryBatch(supabase, reorderedBatch, currentIds, []);
+            await logActivity(
+                currentUser?.id || 'admin',
+                'dispatch',
+                `Delivery Batch ${batch.batch_no || batch.id}: Stop order updated`,
+                `${currentIds.length} delivery stops`
+            );
+        } catch (error) {
+            setBatches(previous => previous.map(item => item.id === batch.id ? previousBatch : item));
+            showAlert('Could not update the delivery order: ' + (error.message || 'Unknown error'), { type: 'error' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
             {/* Header & Quick Action */}
@@ -599,7 +862,7 @@ export default function DeliveryBatchesView({
                 <div className="space-y-4">
                     {filteredBatches.map((batch) => {
                         const isExpanded = expandedBatchId === batch.id;
-                        const linkedProjects = customers.filter(c => (batch.project_ids || []).includes(c.id));
+                        const linkedProjects = orderedBatchProjects(batch, customers);
                         const batchKwp = linkedProjects.reduce((sum, p) => sum + (parseFloat(p.system_capacity_kwp) || 0), 0);
                         const totalModules = linkedProjects.reduce((sum, p) => sum + (parseInt(p.no_of_modules) || 0), 0);
                         const isAllDelivered = batch.status === 'DELIVERED' || (linkedProjects.length > 0 && linkedProjects.every(p => (localStatusOverrides[p.id] || p.delivery_status) === 'DELIVERED'));
@@ -730,11 +993,20 @@ export default function DeliveryBatchesView({
                                      <div className="flex items-center gap-2 self-start md:self-auto flex-shrink-0">
                                          <button
                                              type="button"
-                                             onClick={() => setPrintingBatch(batch)}
+                                             onClick={() => { setMaterialSheetBatch(null); setPrintingBatch(batch); }}
                                              className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
                                              title="Print Combined Delivery Challan / Gate Pass"
                                          >
                                              <Printer size={13} /> Print Gate Pass
+                                         </button>
+
+                                         <button
+                                             type="button"
+                                             onClick={() => handleOpenMaterialSheet(batch)}
+                                             className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                             title="Print the material quantity summary for every customer"
+                                         >
+                                             <FileText size={13} /> Material Summary
                                          </button>
 
                                          <button
@@ -833,7 +1105,7 @@ export default function DeliveryBatchesView({
                                                      
                                                      <th className="pb-2">Current Stage</th>
                                                      <th className="pb-2">Location Status</th>
-                                                     <th className="pb-2 text-right">Action</th>
+                                                     <th className="pb-2 text-right">Stop order & action</th>
                                                  </tr>
                                              </thead>
                                              <tbody className="divide-y divide-stone-100 font-medium text-stone-700">
@@ -933,6 +1205,28 @@ export default function DeliveryBatchesView({
                                                             })()}
                                                         </td>
                                                         <td className="py-2.5 text-right">
+                                                            <span className="inline-flex mr-2 rounded-lg border border-stone-200 overflow-hidden align-middle">
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={saving || idx === 0 || batch.status === 'DELIVERED'}
+                                                                    onClick={() => handleReorderProject(batch, proj.id, -1)}
+                                                                    aria-label={`Move ${proj.customer_name} one stop earlier`}
+                                                                    title="Move one stop earlier"
+                                                                    className="p-1.5 text-stone-600 hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                >
+                                                                    <ArrowUp size={12} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={saving || idx === linkedProjects.length - 1 || batch.status === 'DELIVERED'}
+                                                                    onClick={() => handleReorderProject(batch, proj.id, 1)}
+                                                                    aria-label={`Move ${proj.customer_name} one stop later`}
+                                                                    title="Move one stop later"
+                                                                    className="p-1.5 text-stone-600 hover:bg-stone-100 border-l border-stone-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                >
+                                                                    <ArrowDown size={12} />
+                                                                </button>
+                                                            </span>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => onOpenCustomerModal && onOpenCustomerModal(proj)}
@@ -1208,7 +1502,7 @@ export default function DeliveryBatchesView({
             {/* Modal 2: Master Gate Pass & Delivery Challan Printable Sheet */}
             {printingBatch && (
                 <div className="fixed inset-0 z-50 bg-stone-900/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden print-container gate-pass-print">
                         {/* Print Header */}
                         <div className="px-6 py-4 bg-stone-900 text-white flex items-center justify-between no-print">
                             <div className="flex items-center gap-2">
@@ -1346,12 +1640,120 @@ export default function DeliveryBatchesView({
                 </div>
             )}
 
+            {/* Separate landscape material quantity matrix */}
+            {materialSheetBatch && (() => {
+                const manifest = batchMaterialManifest(materialSheetBatch, customers, printBomItems);
+                const matrix = batchMaterialMatrix(manifest);
+                const materialPageSize = Math.ceil(matrix.rows.length / 2);
+                const materialPages = matrix.rows.length
+                    ? [matrix.rows.slice(0, materialPageSize), matrix.rows.slice(materialPageSize)].filter(page => page.length)
+                    : [];
+                return (
+                    <div className="fixed inset-0 z-50 bg-stone-900/70 backdrop-blur-sm flex items-center justify-center p-2 overflow-y-auto material-summary-overlay">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-[96vw] w-full max-h-[92vh] flex flex-col overflow-hidden print-container material-summary-print">
+                            <div className="px-6 py-4 bg-stone-900 text-white flex items-center justify-between no-print">
+                                <div className="flex items-center gap-2">
+                                    <FileText size={18} className="text-amber-400" />
+                                    <h3 className="text-sm font-black uppercase tracking-wider">
+                                        Material Summary Preview - {materialSheetBatch.batch_no}
+                                    </h3>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={handlePrintMaterialSheet}
+                                        disabled={printMaterialsLoading || Boolean(printMaterialsError) || matrix.rows.length === 0}
+                                        className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Printer size={14} /> {printMaterialsLoading ? 'Loading Materials…' : 'Print Summary'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label="Close material summary"
+                                        onClick={() => { setMaterialSheetBatch(null); setPrintBomItems({}); setPrintMaterialsError(''); }}
+                                        className="text-stone-400 hover:text-white p-1 rounded-lg transition"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-auto p-1 bg-stone-100 text-stone-900 print-document" id="printable-material-summary">
+                                {printMaterialsLoading && (
+                                    <p role="status" className="mb-4 border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-900 no-print">
+                                        Loading each customer's saved BOM quantities…
+                                    </p>
+                                )}
+                                {printMaterialsError && (
+                                    <p role="alert" className="mb-4 border border-red-300 bg-red-50 p-3 text-xs font-bold text-red-800 no-print">
+                                        {printMaterialsError}
+                                    </p>
+                                )}
+
+                                {materialPages.length ? materialPages.map((pageRows, pageIndex) => (
+                                    <section key={pageIndex} className={`bg-white p-2 material-summary-page ${pageIndex ? 'mt-1' : ''}`}>
+                                        <div className="border-b-2 border-stone-900 pb-1 mb-1 flex items-end justify-between gap-2">
+                                            <div>
+                                                <h1 className="text-base font-black uppercase tracking-wide text-stone-950">SolarFlow Demo Energy</h1>
+                                                <p className="text-[10px] font-semibold text-stone-600">Batch Material Quantity Summary</p>
+                                            </div>
+                                            <div className="text-right text-[9px] leading-4">
+                                                <div><strong>Batch:</strong> {materialSheetBatch.batch_no} · <strong>Vehicle:</strong> {materialSheetBatch.vehicle_number || '–'}</div>
+                                                <div><strong>Dispatch:</strong> {materialSheetBatch.dispatch_date || '–'} · <strong>Page:</strong> {pageIndex + 1} of {materialPages.length}</div>
+                                            </div>
+                                        </div>
+                                    <table className="w-full border-collapse border border-stone-400 text-[10px] material-summary-table">
+                                        <thead>
+                                            <tr className="bg-stone-900 text-white">
+                                                <th className="border border-stone-500 p-1 text-left min-w-40">Material</th>
+                                                <th className="border border-stone-500 p-1 text-right w-20">Total Quantity</th>
+                                                <th className="border border-stone-500 p-1 text-left w-16">Unit</th>
+                                                {matrix.customers.map((customer, index) => (
+                                                    <th key={customer.id} className="border border-stone-500 p-1 text-center min-w-24">
+                                                        <span className="block">Customer {index + 1}</span>
+                                                        <span className="block normal-case font-semibold text-[9px] text-stone-200">{customer.customer_name || 'Unnamed'}</span>
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {pageRows.map((row, rowIndex) => (
+                                                <tr key={`${row.product_name}-${row.uom}`} className={rowIndex % 2 ? 'bg-stone-50' : 'bg-white'}>
+                                                    <td className="border border-stone-300 px-1 py-0.5 font-semibold">{row.product_name}</td>
+                                                    <td className="border border-stone-300 px-1 py-0.5 text-right font-black">{formatMaterialQuantity(row.total)}</td>
+                                                    <td className="border border-stone-300 px-1 py-0.5">{row.uom}</td>
+                                                    {row.customerQuantities.map((quantity, customerIndex) => (
+                                                        <td key={`${row.product_name}-${customerIndex}`} className="border border-stone-300 px-1 py-0.5 text-center font-bold">
+                                                            {quantity ? formatMaterialQuantity(quantity) : '–'}
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    {pageIndex === materialPages.length - 1 && (
+                                        <div className="mt-3 grid grid-cols-3 gap-6 text-center text-[9px] material-summary-signatures">
+                                            <div><div className="h-5 border-b border-stone-500 mb-0.5"></div><strong>Prepared By</strong></div>
+                                            <div><div className="h-5 border-b border-stone-500 mb-0.5"></div><strong>Warehouse Checked By</strong></div>
+                                            <div><div className="h-5 border-b border-stone-500 mb-0.5"></div><strong>Driver / Transporter</strong></div>
+                                        </div>
+                                    )}
+                                    </section>
+                                )) : !printMaterialsLoading && !printMaterialsError ? (
+                                    <p className="border border-stone-300 p-4 text-sm font-semibold">No saved BOM quantities are available for this batch.</p>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
             {/* Print Specific CSS */}
             <style>{`
                 @media print {
                     @page {
-                        size: A4 portrait;
-                        margin: 10mm;
+                        size: ${materialSheetBatch ? 'A4 landscape' : 'A4 portrait'};
+                        margin: ${materialSheetBatch ? '4mm' : '10mm'};
                     }
                     body * {
                         visibility: hidden !important;
@@ -1371,6 +1773,105 @@ export default function DeliveryBatchesView({
                         z-index: 9999999 !important;
                         overflow: visible !important;
                         max-height: none !important;
+                    }
+                    .print-document, .print-document * {
+                        visibility: visible !important;
+                    }
+                    .print-document {
+                        position: absolute !important;
+                        inset: 0 auto auto 0 !important;
+                        width: 100% !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        padding: 0 !important;
+                    }
+                    .material-summary-overlay {
+                        position: static !important;
+                        inset: auto !important;
+                        display: block !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        min-height: 0 !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        overflow: visible !important;
+                        background: transparent !important;
+                        backdrop-filter: none !important;
+                    }
+                    .material-summary-print.print-container {
+                        position: static !important;
+                        display: block !important;
+                        width: 100% !important;
+                        max-width: none !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        border-radius: 0 !important;
+                        box-shadow: none !important;
+                    }
+                    .material-summary-print .print-document {
+                        position: static !important;
+                        inset: auto !important;
+                        display: block !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        max-height: none !important;
+                        overflow: visible !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        background: #ffffff !important;
+                    }
+                    tr {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
+                    }
+                    thead {
+                        display: table-header-group;
+                    }
+                    .material-summary-table {
+                        width: 100% !important;
+                        table-layout: fixed !important;
+                        font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '7px' : '10px'} !important;
+                        color: #000000 !important;
+                    }
+                    .material-summary-table thead tr,
+                    .material-summary-table thead th,
+                    .material-summary-table thead span {
+                        background: #ffffff !important;
+                        color: #000000 !important;
+                        border-color: #000000 !important;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .material-summary-table td {
+                        border-color: #555555 !important;
+                    }
+                    .material-summary-page {
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        width: 100% !important;
+                        break-inside: auto;
+                        page-break-inside: auto;
+                    }
+                    .material-summary-page:not(:last-child) {
+                        break-after: page;
+                        page-break-after: always;
+                    }
+                    .material-summary-table th:first-child,
+                    .material-summary-table td:first-child {
+                        width: 20% !important;
+                    }
+                    .material-summary-table th:nth-child(2),
+                    .material-summary-table td:nth-child(2) {
+                        width: 9% !important;
+                    }
+                    .material-summary-table th:nth-child(3),
+                    .material-summary-table td:nth-child(3) {
+                        width: 7% !important;
+                    }
+                    .material-summary-signatures {
+                        break-inside: avoid;
+                        page-break-inside: avoid;
                     }
                     .no-print {
                         display: none !important;

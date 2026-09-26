@@ -32,14 +32,88 @@ const DeliveryBatchesView = lazyWithRetry(() => import('./DeliveryBatchesView'))
 const VendorCalendarView = lazyWithRetry(() => import('./VendorCalendarView'));
 const AttendanceView = lazyWithRetry(() => import('./AttendanceView'));
 const ToolboxView = lazyWithRetry(() => import('./ToolboxView'));
-const PricingView = lazyWithRetry(() => import('./PricingView'));
 import { useGlobalPopup } from './GlobalPopup';
 import BrandMark from './BrandMark';
 const QuotationModule = lazyWithRetry(() => import('../quotations/QuotationModule'));
 const openQuotations = () => { window.location.hash = '/quotations'; };
 import { quotationRepository } from '../quotations/client';
+import { summarizeSolarEquipment } from '../dashboard/solarStats';
 
 const ViewLoader = () => <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-stone-900 border-t-transparent rounded-full animate-spin" /></div>;
+
+const SOLAR_EQUIPMENT_COLUMNS = 'id,module_brand,no_of_modules,inverter_make,system_capacity_kwp,stage';
+const SOLAR_EQUIPMENT_PAGE_SIZE = 1000;
+
+async function fetchSolarEquipmentStats(table, channelPartner, dealer) {
+    const rows = [];
+    let from = 0;
+    while (true) {
+        let query = supabase
+            .from(table)
+            .select(SOLAR_EQUIPMENT_COLUMNS)
+            .is('deleted_at', null)
+            .order('id', { ascending: true })
+            .range(from, from + SOLAR_EQUIPMENT_PAGE_SIZE - 1);
+        if (channelPartner) query = query.eq('channel_partner', channelPartner);
+        if (dealer) query = query.eq('sub_channel_partner', dealer);
+        const { data, error } = await query;
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < SOLAR_EQUIPMENT_PAGE_SIZE) break;
+        from += SOLAR_EQUIPMENT_PAGE_SIZE;
+    }
+    return summarizeSolarEquipment(rows);
+}
+
+const indiaDate = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+async function fetchTodaySummary(table, channelPartner, dealer, includeDeliveries) {
+    const today = indiaDate();
+    const scope = query => {
+        if (channelPartner) query = query.eq('channel_partner', channelPartner);
+        if (dealer) query = query.eq('sub_channel_partner', dealer);
+        return query;
+    };
+    const count = async query => {
+        const { count: value, error } = await query;
+        if (error) throw error;
+        return value || 0;
+    };
+
+    const [registeredToday, installedToday, installedLive] = await Promise.all([
+        count(scope(supabase.from(table).select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('registration_date', today))),
+        count(scope(supabase.from(table).select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('installation_date', today).in('installation_status', ['Installed', 'Yes']))),
+        count(scope(supabase.from(table).select('id', { count: 'exact', head: true }).is('deleted_at', null).not('stage', 'in', '("COMPLETED","LOST PROJECT")').in('installation_status', ['Installed', 'Yes']))),
+    ]);
+
+    let deliveriesDueToday = 0;
+    let deliveryProjectsToday = 0;
+    if (includeDeliveries) {
+        const { data: batches, error } = await supabase
+            .from('delivery_batches')
+            .select('id,project_ids')
+            .eq('dispatch_date', today)
+            .neq('status', 'DELIVERED');
+        if (error) throw error;
+        const projectIds = [...new Set((batches || []).flatMap(batch => batch.project_ids || []))];
+        if (channelPartner || dealer) {
+            if (projectIds.length) {
+                const { data: scopedProjects, error: projectsError } = await scope(
+                    supabase.from(table).select('id').is('deleted_at', null).in('id', projectIds)
+                );
+                if (projectsError) throw projectsError;
+                const visibleIds = new Set((scopedProjects || []).map(row => row.id));
+                deliveryProjectsToday = visibleIds.size;
+                deliveriesDueToday = (batches || []).filter(batch => (batch.project_ids || []).some(id => visibleIds.has(id))).length;
+            }
+        } else {
+            deliveriesDueToday = (batches || []).length;
+            deliveryProjectsToday = projectIds.length;
+        }
+    }
+
+    return { date: today, registeredToday, installedToday, installedLive, deliveriesDueToday, deliveryProjectsToday, canViewDeliveries: includeDeliveries };
+}
 
 const MONTH_OPTIONS = [
     ['01', 'January'], ['02', 'February'], ['03', 'March'], ['04', 'April'],
@@ -60,7 +134,7 @@ const getMonthBounds = (monthValue, timestamp = false) => {
 
 import {
     LayoutDashboard, Activity, UserCog, Menu, X, ChevronDown,
-    Search, Plus, Download, LogOut, Trash2, Users, Tag, IndianRupee, Wrench, CreditCard, Terminal, Truck, Calendar, UserCheck, Calculator, Sparkles
+    Search, Plus, Download, LogOut, Trash2, Users, Tag, IndianRupee, Wrench, CreditCard, Terminal, Truck, Calendar, UserCheck, Calculator, Package
 } from 'lucide-react';
 
 // ── NavBtn ────────────────────────────────────────────────────────────────────
@@ -160,7 +234,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         if (typeof window !== 'undefined') {
             if (window.location.hash.startsWith('#/quotations')) return 'quotations';
             const saved = window.sessionStorage.getItem('solarflow_current_view');
-            if (saved && saved !== 'quotations') return saved;
+            if (saved && !['quotations', 'pricing'].includes(saved)) return saved;
         }
         return 'dashboard';
     });
@@ -370,6 +444,23 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
     // the branch filter changes, not on every write anywhere in the system.
     const fetchMetricsAndMeta = async (skipMeta = false) => {
         const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
+        const solarEquipmentPromise = fetchSolarEquipmentStats(
+            isChannelPartnerOffice ? 'cpo_leads' : 'admin',
+            targetPartner,
+            dealerFilter?.trim() || null
+        ).catch(error => {
+            console.warn('Solar equipment summary unavailable:', error.message);
+            return null;
+        });
+        const todaySummaryPromise = fetchTodaySummary(
+            isChannelPartnerOffice ? 'cpo_leads' : 'admin',
+            targetPartner,
+            dealerFilter?.trim() || null,
+            canSeeDeliveryBatches
+        ).catch(error => {
+            console.warn('Today summary unavailable:', error.message);
+            return null;
+        });
         
         if (!skipMeta) {
             supabase.from('metadata').select('category, label').then(metaRes => {
@@ -421,9 +512,12 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         };
 
         if (!metricsRes.error && metricsRes.data) {
+            const [solarEquipment, todaySummary] = await Promise.all([solarEquipmentPromise, todaySummaryPromise]);
             finalMetrics = { 
                 ...finalMetrics,
                 ...metricsRes.data,
+                solarEquipment,
+                todaySummary,
                 loanTagCount: metricsRes.data.loanTagCount ?? metricsRes.data.loanCount ?? 0
             };
             setMetrics(prev => ({
@@ -433,7 +527,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
             try {
                 window.sessionStorage.setItem('solarflow_cached_metrics', JSON.stringify(finalMetrics));
                 window.localStorage.setItem('solarflow_cached_metrics', JSON.stringify(finalMetrics));
-            } catch {}
+            } catch { /* cached metrics are optional */ }
         } else {
             console.error('Metrics fetch error:', metricsRes.error);
         }
@@ -1276,7 +1370,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         'channel_partner_mgmt',
         'vendor_availability',
         'installation_payments',
-        'pricing',
         'activity',
         'users',
         'trash'
@@ -1284,7 +1377,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
 
     const headerTitle =
         currentView === 'toolbox' ? 'Solar Toolbox' :
-        currentView === 'inventory' ? 'Godown / Inventory' :
+        currentView === 'inventory' ? 'Inventory' :
         currentView === 'dashboard' ? 'Business Dashboard'
             : currentView === 'quotations' ? 'Quotation Maker'
             : currentView === 'delivery_batches' ? 'Material Delivery Batches'
@@ -1295,7 +1388,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                 : currentView === 'channel_partner_mgmt' ? 'Operations'
                     : currentView === 'installation_payments' ? 'Installation Payments'
                     : currentView === 'vendor_availability' ? 'Vendor Availability & Schedule'
-                    : currentView === 'pricing' ? 'Modular Plans & Custom Deployment'
                     : currentView === 'activity' ? 'Activity Log'
                         : currentView === 'users' ? 'User Management'
                             : currentView === 'trash' ? 'Trash'
@@ -1338,7 +1430,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                             <NavBtn view="delivery_batches" icon={Truck} label="Delivery Batches" count={deliveryBatchesCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                         )}
                         {['admin', 'sales'].includes(user.userType) && (
-                            <NavBtn view="inventory" icon={Wrench} label="Godown / Inventory" currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                            <NavBtn view="inventory" icon={Package} label="Inventory" currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                         )}
                         <NavBtn view="subsidy" icon={Tag} label="Subsidy tracking" count={subsidyTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                         <NavBtn view="loan_tags" icon={IndianRupee} label="Loan tracking" count={loanTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
@@ -1363,7 +1455,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                                 <NavBtn view="vendor_availability" icon={Calendar} label="Vendor Availability" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                                 <NavBtn view="installation_payments" icon={CreditCard} label="Installation Payments" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             </SidebarGroup>
-                            <NavBtn view="pricing" icon={Sparkles} label="Plans & Deployment" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="activity" icon={Activity} label="Activity Log" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="users" icon={UserCog} label="User Management" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="trash" icon={Trash2} label="Trash" count={trashCount} redBadge currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
@@ -1618,7 +1709,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     )}
 
                     {currentView === 'attendance' && <AttendanceView currentUser={user} />}
-                    {currentView === 'pricing' && <PricingView currentUser={user} />}
                     {currentView === 'channel_partner_mgmt' && user.userType === 'admin' && <ChannelPartnerManagementView currentUser={user} />}
                     {currentView === 'vendor_availability' && user.userType === 'admin' && <VendorCalendarView isAdmin={true} currentUser={user} />}
                     {currentView === 'installation_payments' && user.userType === 'admin' && <InstallationPaymentsView onSelectCustomer={setSelectedCustomer} currentUser={user} />}

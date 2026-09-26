@@ -2,7 +2,7 @@
 
 This copy uses only the new demo Supabase project qduonewmquwayrnwyzvc and the new GitHub remote https://github.com/sadaf953/Solarflow.git. The original backend, repository and deployment workflows are disconnected.
 
-The demo is deliberately published at solarflow.deeprootsystems.in, served by GitHub Pages from the gh-pages branch with Cloudflare in front. This is a decision taken after the original isolation work, and it is the one point at which this copy shares a domain with the original project; the backend, repository and workflows remain severed. public/CNAME carries the hostname so that each `gh-pages -d dist` force-push preserves it — a deploy without that file silently drops the custom domain and the site returns "There isn't a GitHub Pages site here." The isolation guard permits that one hostname and rejects a CNAME naming any other.
+The demo is deliberately published at solarflow.deeprootsystems.in, served by GitHub Pages from the gh-pages branch with Cloudflare in front. This is a decision taken after the original isolation work, and it is the one point at which this copy shares a domain with the original project; the backend, repository and workflows remain severed. public/CNAME carries the hostname so that each `gh-pages -d dist` force-push preserves it a deploy without that file silently drops the custom domain and the site returns "There isn't a GitHub Pages site here." The isolation guard permits that one hostname and rejects a CNAME naming any other.
 
 ## Current behavior
 
