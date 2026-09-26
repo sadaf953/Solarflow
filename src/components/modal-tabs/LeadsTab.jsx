@@ -143,10 +143,6 @@ export default function LeadsTab({
                     <h3 className="text-[10px] font-bold text-stone-700 uppercase tracking-widest flex items-center gap-2">
                         <ClipboardList size={13} className="text-amber-500" /> Document Checklist
                     </h3>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">Mode:</span>
-                        <ChecklistModeToggle />
-                    </div>
                 </div>
                 <div className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm space-y-4">
                     {/* Payment Type Selection at the top */}

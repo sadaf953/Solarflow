@@ -16,6 +16,21 @@ import { supabase } from '../supabase';
 import { Activity, RefreshCw } from 'lucide-react';
 import { ACTION_COLORS } from '../constants';
 
+const ACTION_FILTER_OPTIONS = [
+    { value: 'all', label: 'All activities' },
+    { value: 'attendance', label: 'Staff Attendance' },
+    { value: 'operations', label: 'Operations & Directory' },
+    { value: 'vendor', label: 'Vendor Availability' },
+    { value: 'payment', label: 'Installation Payments' },
+    { value: 'dispatch', label: 'Delivery & Dispatch' },
+    { value: 'stage_change', label: 'Stage Transitions' },
+    { value: 'create', label: 'Creations' },
+    { value: 'update', label: 'Updates & Edits' },
+    { value: 'delete', label: 'Deletions' },
+    { value: 'email', label: 'Emails' },
+    { value: 'error_occurred', label: 'Errors' }
+];
+
 export default function ActivityLogView() {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -32,8 +47,23 @@ export default function ActivityLogView() {
     // latest 200, which is what "filter by user" has to mean.
     const [userFilter, setUserFilter] = useState('all');   // 'all' | 'unattributed' | <profile id>
     const [actionFilter, setActionFilter] = useState('all');
-    const [actors, setActors] = useState([]);              // [{ id, name }]
-    const actorNames = useMemo(() => new Map(actors.map(actor => [actor.id, actor.name])), [actors]);
+    const [allProfiles, setAllProfiles] = useState([]);              // [{ id, name }]
+    const actorNames = useMemo(() => new Map(allProfiles.map(p => [p.id, p.name])), [allProfiles]);
+
+    // Group unique names so each person appears only once in the dropdown
+    const uniqueActors = useMemo(() => {
+        const map = new Map();
+        for (const p of allProfiles) {
+            const name = (p.name || '').trim();
+            if (!name) continue;
+            if (!map.has(name)) {
+                map.set(name, { name, ids: [p.id] });
+            } else {
+                map.get(name).ids.push(p.id);
+            }
+        }
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }, [allProfiles]);
 
     // Paging. PAGE_SIZE at a time; `hasMore` is true while the last page came
     // back full, which is the only reliable signal without a count query.
@@ -59,8 +89,16 @@ export default function ActivityLogView() {
                 .order('created_at', { ascending: false })
                 .range(from, from + PAGE_SIZE - 1);
 
-            if (userFilter === 'unattributed') query = query.is('user_id', null);
-            else if (userFilter !== 'all') query = query.eq('user_id', userFilter);
+            if (userFilter === 'unattributed') {
+                query = query.is('user_id', null);
+            } else if (userFilter !== 'all') {
+                const matched = uniqueActors.find(a => a.name === userFilter);
+                if (matched?.ids?.length === 1) {
+                    query = query.eq('user_id', matched.ids[0]);
+                } else if (matched?.ids?.length > 1) {
+                    query = query.in('user_id', matched.ids);
+                }
+            }
 
             if (actionFilter !== 'all') query = query.eq('action', actionFilter);
 
@@ -85,19 +123,17 @@ export default function ActivityLogView() {
             setRefreshing(false);
             setLoading(false);
         }
-    }, [userFilter, actionFilter]);
+    }, [userFilter, actionFilter, uniqueActors]);
 
     useEffect(() => { logsRef.current = logs; }, [logs]);
 
     useEffect(() => { fetchLogs({ silent: true }); }, [fetchLogs]);
 
-    // The people who appear in the log. Built from profiles so a name shows even
-    // for someone with no entries yet - "this person has done nothing" is itself
-    // worth being able to see.
+    // Load profiles to resolve names and populate actor list
     useEffect(() => {
         let cancelled = false;
         supabase.from('profiles').select('id, name').order('name').then(({ data, error }) => {
-            if (!cancelled && !error) setActors(data || []);
+            if (!cancelled && !error) setAllProfiles(data || []);
         });
         return () => { cancelled = true; };
     }, []);
@@ -126,15 +162,16 @@ export default function ActivityLogView() {
                     .single();
                 if (!data) return;
                 // Do not let a live insert bypass the active filter.
+                const matched = uniqueActors.find(a => a.name === userFilter);
                 const matchesUser = userFilter === 'all'
-                    || (userFilter === 'unattributed' ? data.user_id === null : data.user_id === userFilter);
+                    || (userFilter === 'unattributed' ? data.user_id === null : matched?.ids?.includes(data.user_id));
                 const matchesAction = actionFilter === 'all' || data.action === actionFilter;
                 if (!matchesUser || !matchesAction) return;
                 setLogs(prev => [data, ...prev.filter(l => l.id !== data.id)]);
             })
             .subscribe();
         return () => supabase.removeChannel(channel);
-    }, [userFilter, actionFilter]);
+    }, [userFilter, actionFilter, uniqueActors]);
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
@@ -151,7 +188,7 @@ export default function ActivityLogView() {
                     className="bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-[11px] font-bold text-stone-700 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer shadow-xs max-w-[190px]"
                 >
                     <option value="all">Everyone</option>
-                    {actors.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {uniqueActors.map(a => <option key={a.name} value={a.name}>{a.name}</option>)}
                     <option value="unattributed">System / unattributed</option>
                 </select>
 
@@ -160,9 +197,8 @@ export default function ActivityLogView() {
                     onChange={e => setActionFilter(e.target.value)}
                     className="bg-white border border-stone-200 rounded-xl px-3 py-1.5 text-[11px] font-bold text-stone-700 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer shadow-xs"
                 >
-                    <option value="all">All actions</option>
-                    {['create', 'update', 'stage_change', 'delete', 'email', 'error_occurred'].map(a => (
-                        <option key={a} value={a}>{a.replace('_', ' ')}</option>
+                    {ACTION_FILTER_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                 </select>
 
@@ -202,7 +238,7 @@ export default function ActivityLogView() {
                     {(userFilter !== 'all' || actionFilter !== 'all') && (
                         <p className="text-[11px] mt-1">
                             {userFilter !== 'all'
-                                ? `${actors.find(a => a.id === userFilter)?.name || 'This user'} has no matching entries.`
+                                ? `${userFilter} has no matching entries.`
                                 : 'Try a different action type.'}
                         </p>
                     )}
@@ -211,9 +247,10 @@ export default function ActivityLogView() {
                 <div key={log.id} className="bg-white rounded-xl p-4 border border-stone-100 shadow-sm flex items-start gap-3">
                     {(() => {
                         const c = ACTION_COLORS[log.action] || { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200' };
+                        const label = ACTION_COLORS[log.action]?.label || log.action?.replace('_', ' ');
                         return (
-                            <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase flex-shrink-0 border ${c.bg} ${c.text} ${c.border || ''}`}>
-                                {log.action}
+                            <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider flex-shrink-0 border ${c.bg} ${c.text} ${c.border || ''}`}>
+                                {label}
                             </span>
                         );
                     })()}

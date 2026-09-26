@@ -278,7 +278,7 @@ export const AgreementPreview = ({ data, onChange, onClose, onAddToDocuments, ex
             )}
             <button
               onClick={handlePrint}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-blue-600/20 transition text-xs cursor-pointer"
+              className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-amber-500/20 transition text-xs cursor-pointer"
             >
               <Printer className="w-4 h-4" />
               <span>Print / Save PDF</span>

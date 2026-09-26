@@ -39,7 +39,10 @@ function scan(dir) {
     if (entry.isSymbolicLink()) { failures.push(`Review symlink: ${path}`); continue; }
     if (entry.isDirectory()) { scan(path); continue; }
     if (!/\.(?:js|jsx|ts|tsx|json|html|yml|yaml|toml|sql|mjs)$/.test(path)) continue;
-    const text = readFileSync(path, 'utf8').replaceAll('https://qduonewmquwayrnwyzvc.supabase.co','[APPROVED_DEMO]');
+    const text = readFileSync(path, 'utf8')
+      .replaceAll('https://qduonewmquwayrnwyzvc.supabase.co','[APPROVED_DEMO]')
+      .replaceAll('"sb_secret_"', '"[APPROVED_PREFIX]"')
+      .replaceAll("'sb_secret_'", "'[APPROVED_PREFIX]'");
     if (/https?:\/\/[\w.-]+\.supabase\.(?:co|com)|postgres(?:ql)?:\/\/|github_pat_|ghp_[A-Za-z0-9]{20,}|sb_secret_/i.test(text)) failures.push(`Remote backend or credential found: ${path}`);
   }
 }

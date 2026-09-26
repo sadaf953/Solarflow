@@ -420,10 +420,6 @@ export default function LoanTab({
                             <h4 className="text-[10px] font-bold text-stone-700 uppercase tracking-widest flex items-center gap-1.5">
                                 <Paperclip size={12} className="text-amber-500" /> Loan Documents
                             </h4>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">Mode:</span>
-                                <ChecklistModeToggle />
-                            </div>
                         </div>
 
                         <div className="flex flex-col gap-2">

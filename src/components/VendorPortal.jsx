@@ -1109,7 +1109,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
 
                     {/* Customers List, Calendar, or Payouts Ledger */}
                     {activeTab === 'AVAILABILITY' ? (
-                        <VendorCalendarView vendorName={user.name} />
+                        <VendorCalendarView vendorName={user.name} currentUser={user} />
                     ) : activeTab === 'PAYOUTS' ? (
                         <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm space-y-4">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
@@ -1658,7 +1658,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                                             }}
                                             disabled={saving || vendorIsPastTab}
                                             title={geoTagStatus !== 'Proceed' || geoDocs.length === 0 ? 'Set status to Proceed and upload a geo-tag photo first.' : undefined}
-                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-blue-600/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] cursor-pointer"
+                                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-3.5 rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/10 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-[0.98] cursor-pointer"
                                         >
                                             {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving & Moving...</> : <><CheckCircle2 size={14} /> Save & Move to Discom Submission</>}
                                         </button>

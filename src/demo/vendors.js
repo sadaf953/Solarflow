@@ -14,7 +14,7 @@ export async function ensureThreeDemoVendors(client){
  const checked=async query=>{const result=await query;if(result.error)throw result.error;return result.data;};
  for(let n=1;n<=3;n++){
   const name=`Vendor ${n}`;
-  await checked(client.from('vendors').upsert({name,email:n===1?'vendor1@solarflow.example':`vendor.${n}@solarflow.example`,phone:`000000000${n}`},{onConflict:'demo_session_id,name',ignoreDuplicates:true}));
+  await checked(client.from('vendors').upsert({name,email:n===1?'vendor1@solarflow.example':`vendor.${n}@solarflow.example`,phone:`000000000${n}`},{onConflict:'name',ignoreDuplicates:true}));
   const names=obsolete.filter(v=>demoVendorTarget(v.name)===name).map(v=>v.name);if(!names.length)continue;
   await checked(client.from('admin').update({vendor:name}).in('vendor',names).select('id'));
   await checked(client.from('delivery_batches').update({vendor:name}).in('vendor',names).select('id'));

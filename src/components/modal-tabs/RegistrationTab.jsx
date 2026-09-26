@@ -129,9 +129,8 @@ export default function RegistrationTab({
                             </span>
                         </div>
 
-                        {/* Front Storage Mode Option */}
+                        {/* Demo document helper */}
                         <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">Mode:</span>
                             <ChecklistModeToggle
                                 onFillAllDemoDocs={isEditable && onFileUpload ? handleFillAllDemoDocs : null}
                                 isFilling={fillingDemoDocs}

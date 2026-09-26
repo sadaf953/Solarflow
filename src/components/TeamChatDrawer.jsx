@@ -1,103 +1,111 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     MessageSquare, Send, X, Users, AlertCircle, Sparkles, 
-    Tag, Bell, Check, Shield, Flame, CheckCircle2, ChevronDown, Minimize2
+    Tag, Bell, Check, Shield, Flame, CheckCircle2, ChevronDown, Minimize2, RotateCcw, Trash2
 } from 'lucide-react';
+import { supabase } from '../supabase';
 
 const STORAGE_KEY = 'solarflow_team_chat_messages';
 
-// Realistic starter messages spread across recent weeks and months
-const INITIAL_MESSAGES = [
-    {
-        id: 'msg-1',
-        senderName: 'Ravi (Admin)',
-        senderRole: 'Admin',
-        userType: 'admin',
-        text: 'Welcome everyone to the SolarFlow Operations channel. All dispatches, site updates, and discom submissions can be announced here for full team visibility.',
-        tag: 'General',
-        timestamp: '2026-08-20T09:30:00Z',
-        timeFormatted: '20 Aug, 09:30 AM'
-    },
-    {
-        id: 'msg-2',
-        senderName: 'Surya Shakti Solar',
-        senderRole: 'Channel Partner Office',
-        userType: 'channel_partner_office',
-        text: 'Submitted 12 new residential proposals for Ahmedabad East cluster. 8 have opted for loan financing via Jansamarth.',
-        tag: 'General',
-        timestamp: '2026-08-28T14:15:00Z',
-        timeFormatted: '28 Aug, 02:15 PM'
-    },
-    {
-        id: 'msg-3',
-        senderName: 'Nikhil (Operations)',
-        senderRole: 'Admin',
-        userType: 'admin',
-        text: 'Warehouse stock of 580W Adani bifacial modules replenished in godown. Ready for delivery batching.',
-        tag: 'Dispatch',
-        timestamp: '2026-09-04T11:00:00Z',
-        timeFormatted: '04 Sep, 11:00 AM'
-    },
-    {
-        id: 'msg-4',
-        senderName: 'Vendor 1',
-        senderRole: 'Vendor',
-        userType: 'vendor',
-        text: 'Completed rooftop mounting structure and inverter wiring for consumer Ramesh Patel (Ahmedabad Plot 14). Geo-tag photos submitted.',
-        tag: 'Installation',
-        timestamp: '2026-09-11T16:45:00Z',
-        timeFormatted: '11 Sep, 04:45 PM'
-    },
-    {
-        id: 'msg-5',
-        senderName: 'Stamp Guy',
-        senderRole: 'Stamp Maker',
-        userType: 'stamp',
-        text: 'Executed and uploaded stamped discom agreements for batch 22. All returned to admin queue.',
-        tag: 'Discom',
-        timestamp: '2026-09-15T10:20:00Z',
-        timeFormatted: '15 Sep, 10:20 AM'
-    },
-    {
-        id: 'msg-6',
-        senderName: 'Driver 1',
-        senderRole: 'Staff',
-        userType: 'admin',
-        text: 'Truck VEHICLE-001 has departed godown for Surat deliveries. Estimated arrival 02:00 PM.',
-        tag: 'Dispatch',
-        timestamp: '2026-09-17T08:30:00Z',
-        timeFormatted: 'Today, 08:30 AM'
+const formatTime = (d) => {
+    try {
+        const date = d instanceof Date ? d : new Date(d);
+        return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } catch {
+        return '';
     }
-];
+};
+
+// Dynamic starter updates relative to current time
+const getInitialMessages = () => {
+    const now = new Date();
+    const fmt = (d, timeStr) => `${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}, ${timeStr}`;
+    const d0 = new Date(now);
+    const d1 = new Date(now); d1.setDate(d1.getDate() - 1);
+    const d2 = new Date(now); d2.setDate(d2.getDate() - 3);
+
+    return [
+        {
+            id: 'msg-1',
+            senderName: 'Operations Admin',
+            senderRole: 'Admin',
+            userType: 'admin',
+            text: 'Welcome to the SolarFlow Operations channel. All dispatches, site installation updates, and DISCOM submissions can be announced here for full team visibility.',
+            tag: 'General',
+            timestamp: d2.toISOString(),
+            timeFormatted: fmt(d2, '09:30 AM')
+        },
+        {
+            id: 'msg-2',
+            senderName: 'Channel Partner Office',
+            senderRole: 'CPO',
+            userType: 'channel_partner_office',
+            text: 'Submitted 12 new residential proposals for East cluster. 8 have opted for Jan Samarth bank loan financing.',
+            tag: 'General',
+            timestamp: d1.toISOString(),
+            timeFormatted: fmt(d1, '02:15 PM')
+        },
+        {
+            id: 'msg-3',
+            senderName: 'Godown & Logistics',
+            senderRole: 'Admin',
+            userType: 'admin',
+            text: 'Warehouse stock of bifacial solar modules replenished in godown. Ready for delivery batch allocation.',
+            tag: 'Dispatch',
+            timestamp: d0.toISOString(),
+            timeFormatted: fmt(d0, '10:00 AM')
+        },
+        {
+            id: 'msg-4',
+            senderName: 'Site Installation Lead',
+            senderRole: 'Vendor',
+            userType: 'vendor',
+            text: 'Completed rooftop mounting structure and inverter wiring for consumer Ramesh Patel. Geo-tag photos submitted.',
+            tag: 'Installation',
+            timestamp: d0.toISOString(),
+            timeFormatted: fmt(d0, '11:45 AM')
+        },
+        {
+            id: 'msg-5',
+            senderName: 'Document & Stamp Executive',
+            senderRole: 'Stamp Maker',
+            userType: 'stamp',
+            text: 'Executed and uploaded stamped DISCOM agreements for batch 22. All returned to admin queue for final review.',
+            tag: 'Discom',
+            timestamp: d0.toISOString(),
+            timeFormatted: fmt(d0, '01:20 PM')
+        }
+    ];
+};
 
 const TAG_OPTIONS = [
     { label: 'General', color: 'bg-stone-100 text-stone-700 border-stone-200' },
-    { label: 'Dispatch', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-    { label: 'Installation', color: 'bg-amber-50 text-amber-800 border-amber-200' },
-    { label: 'Discom', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+    { label: 'Dispatch', color: 'bg-orange-50 text-orange-700 border-orange-200' },
+    { label: 'Installation', color: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+    { label: 'Discom', color: 'bg-amber-50 text-amber-800 border-amber-200' },
     { label: 'Urgent', color: 'bg-rose-50 text-rose-700 border-rose-200' },
 ];
 
 const ROLE_BADGES = {
-    admin: { label: 'Admin', color: 'bg-purple-100 text-purple-800 border-purple-200' },
-    channel_partner_office: { label: 'CPO', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-    office2: { label: 'CPO', color: 'bg-blue-100 text-blue-800 border-blue-200' },
-    agent: { label: 'Dealer', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-    agent2: { label: 'Dealer', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-    vendor: { label: 'Vendor', color: 'bg-amber-100 text-amber-800 border-amber-200' },
-    stamp: { label: 'Stamp Maker', color: 'bg-rose-100 text-rose-800 border-rose-200' },
+    admin: { label: 'Admin', color: 'bg-stone-900 text-amber-400 border-stone-800' },
+    channel_partner_office: { label: 'CPO', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+    office2: { label: 'CPO Manager', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
+    agent: { label: 'Dealer', color: 'bg-amber-100 text-amber-900 border-amber-300' },
+    agent2: { label: 'Dealer', color: 'bg-amber-100 text-amber-900 border-amber-300' },
+    vendor: { label: 'Vendor', color: 'bg-orange-100 text-orange-900 border-orange-300' },
+    stamp: { label: 'Stamp Maker', color: 'bg-yellow-100 text-yellow-900 border-yellow-300' },
     sales: { label: 'Staff', color: 'bg-stone-100 text-stone-800 border-stone-200' }
 };
 
 export default function TeamChatDrawer({ currentUser }) {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState(() => {
-        if (typeof window === 'undefined') return INITIAL_MESSAGES;
+        if (typeof window === 'undefined') return getInitialMessages();
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
-            return stored ? JSON.parse(stored) : INITIAL_MESSAGES;
+            return stored ? JSON.parse(stored) : getInitialMessages();
         } catch {
-            return INITIAL_MESSAGES;
+            return getInitialMessages();
         }
     });
 
@@ -112,6 +120,8 @@ export default function TeamChatDrawer({ currentUser }) {
     const broadcastChannelRef = useRef(null);
 
     useEffect(() => {
+        let isMounted = true;
+
         if (typeof window !== 'undefined' && window.BroadcastChannel) {
             broadcastChannelRef.current = new BroadcastChannel('solarflow_team_chat');
             broadcastChannelRef.current.onmessage = (event) => {
@@ -123,16 +133,137 @@ export default function TeamChatDrawer({ currentUser }) {
                     if (!isOpen) {
                         setUnreadCount(c => c + 1);
                     }
+                } else if (event.data?.type === 'RESET_MESSAGES') {
+                    setMessages(event.data.messages || []);
                 }
             };
         }
 
+        // Fetch messages from Supabase
+        async function loadSupabaseChat() {
+            try {
+                const { data, error } = await supabase
+                    .from('team_chat_messages')
+                    .select('*')
+                    .order('created_at', { ascending: true })
+                    .limit(200);
+
+                if (!error && data && data.length > 0 && isMounted) {
+                    const mapped = data.map(r => ({
+                        id: r.id,
+                        senderName: r.sender_name,
+                        senderRole: r.sender_role,
+                        userType: r.user_type,
+                        text: r.text,
+                        tag: r.tag || 'General',
+                        timestamp: r.created_at,
+                        timeFormatted: formatTime(r.created_at)
+                    }));
+                    setMessages(mapped);
+                    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped)); } catch {}
+                } else if (!error && data && data.length === 0 && isMounted) {
+                    // Seed initial announcements
+                    const starters = getInitialMessages();
+                    setMessages(starters);
+                    const rows = starters.map(m => ({
+                        sender_name: m.senderName,
+                        sender_role: m.senderRole,
+                        user_type: m.userType,
+                        text: m.text,
+                        tag: m.tag,
+                        created_at: m.timestamp
+                    }));
+                    supabase.from('team_chat_messages').insert(rows).catch(() => {});
+                }
+            } catch (err) {
+                console.warn('Notice loading Supabase team chat:', err);
+            }
+        }
+
+        loadSupabaseChat();
+
+        // Subscribe to Supabase Realtime for live cross-device messaging
+        const realtimeChannel = supabase.channel('realtime:team_chat_messages')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'team_chat_messages' },
+                (payload) => {
+                    const row = payload.new;
+                    if (!row?.id) return;
+                    const newMsg = {
+                        id: row.id,
+                        senderName: row.sender_name,
+                        senderRole: row.sender_role,
+                        userType: row.user_type,
+                        text: row.text,
+                        tag: row.tag || 'General',
+                        timestamp: row.created_at,
+                        timeFormatted: formatTime(row.created_at)
+                    };
+                    setMessages(prev => {
+                        if (prev.some(m => m.id === newMsg.id || (m.timestamp === newMsg.timestamp && m.text === newMsg.text && m.senderName === newMsg.senderName))) {
+                            return prev.map(m => (m.text === newMsg.text && m.senderName === newMsg.senderName ? newMsg : m));
+                        }
+                        return [...prev, newMsg];
+                    });
+                    if (!isOpen) {
+                        setUnreadCount(c => c + 1);
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'team_chat_messages' },
+                (payload) => {
+                    if (payload.old?.id) {
+                        setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+                    } else {
+                        setMessages([]);
+                    }
+                }
+            )
+            .subscribe();
+
         return () => {
+            isMounted = false;
+            supabase.removeChannel(realtimeChannel);
             if (broadcastChannelRef.current) {
                 broadcastChannelRef.current.close();
             }
         };
     }, [isOpen]);
+
+    const handleClearChat = async () => {
+        setMessages([]);
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+            if (broadcastChannelRef.current) {
+                broadcastChannelRef.current.postMessage({ type: 'RESET_MESSAGES', messages: [] });
+            }
+            await supabase.from('team_chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        } catch { /* ignore */ }
+    };
+
+    const handleResetChat = async () => {
+        const fresh = getInitialMessages();
+        setMessages(fresh);
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+            if (broadcastChannelRef.current) {
+                broadcastChannelRef.current.postMessage({ type: 'RESET_MESSAGES', messages: fresh });
+            }
+            await supabase.from('team_chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            const rows = fresh.map(m => ({
+                sender_name: m.senderName,
+                sender_role: m.senderRole,
+                user_type: m.userType,
+                text: m.text,
+                tag: m.tag,
+                created_at: m.timestamp
+            }));
+            await supabase.from('team_chat_messages').insert(rows);
+        } catch { /* ignore */ }
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -141,7 +272,7 @@ export default function TeamChatDrawer({ currentUser }) {
         }
     }, [isOpen, messages]);
 
-    const handleSendMessage = (e) => {
+    const handleSendMessage = async (e) => {
         e?.preventDefault();
         const text = inputMessage.trim();
         if (!text) return;
@@ -150,10 +281,11 @@ export default function TeamChatDrawer({ currentUser }) {
         const roleConfig = ROLE_BADGES[roleKey] || { label: 'Team Member', color: 'bg-stone-100 text-stone-800' };
 
         const now = new Date();
-        const timeFormatted = `${now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}, ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        const timeFormatted = formatTime(now);
+        const tempId = `temp-${Date.now()}`;
 
         const newMsg = {
-            id: `msg-${Date.now()}`,
+            id: tempId,
             senderName: currentUser?.name || 'Staff Member',
             senderRole: roleConfig.label,
             userType: roleKey,
@@ -173,7 +305,25 @@ export default function TeamChatDrawer({ currentUser }) {
                 broadcastChannelRef.current.postMessage({ type: 'NEW_MESSAGE', message: newMsg });
             }
         } catch (err) {
-            console.error('Failed to store team chat message:', err);
+            console.error('Failed to store team chat message locally:', err);
+        }
+
+        try {
+            const { data, error } = await supabase.from('team_chat_messages').insert({
+                sender_id: currentUser?.id || null,
+                sender_name: newMsg.senderName,
+                sender_role: newMsg.senderRole,
+                user_type: newMsg.userType,
+                text: newMsg.text,
+                tag: newMsg.tag,
+                created_at: newMsg.timestamp
+            }).select().maybeSingle();
+
+            if (!error && data?.id) {
+                setMessages(prev => prev.map(m => m.id === tempId ? { ...m, id: data.id } : m));
+            }
+        } catch (err) {
+            console.warn('Notice saving message to Supabase backend:', err);
         }
     };
 
@@ -227,10 +377,24 @@ export default function TeamChatDrawer({ currentUser }) {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={handleResetChat}
+                                className="p-1.5 text-stone-400 hover:text-amber-400 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+                                title="Reset to Sample Updates"
+                            >
+                                <RotateCcw className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={handleClearChat}
+                                className="p-1.5 text-stone-400 hover:text-rose-400 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+                                title="Clear All Messages"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="p-1.5 text-stone-400 hover:text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
+                                className="p-1.5 text-stone-400 hover:text-white rounded-lg hover:bg-stone-800 transition-colors cursor-pointer ml-1"
                                 title="Close Chat"
                             >
                                 <X className="w-5 h-5" />

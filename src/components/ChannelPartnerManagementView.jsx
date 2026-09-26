@@ -217,7 +217,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
             setNewDriverName('');
             setNewDriverPhone('');
             setNewDriverVehicle('');
-            await logActivity(currentUser.id, 'create', `Added new Driver: "${name}" (${phone}, ${vehicle})`);
+            await logActivity(currentUser?.id, 'operations', `Added new Driver: "${name}" (${phone}, ${vehicle})`, `Phone: ${phone} | Vehicle: ${vehicle}`);
         } catch (e) {
             console.error('Error adding driver:', e);
             showAlert('Failed to add driver: ' + e.message, { type: 'error' });
@@ -249,7 +249,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
 
             setDrivers(prev => prev.map(d => d.id === id ? { ...d, name, phone, vehicle_number: vehicle } : d));
             setEditingId(null);
-            await logActivity(currentUser.id, 'update', `Updated Driver: "${name}" (${phone}, ${vehicle})`);
+            await logActivity(currentUser?.id, 'operations', `Updated Driver: "${name}" (${phone}, ${vehicle})`, `Phone: ${phone} | Vehicle: ${vehicle}`);
         } catch (e) {
             console.error('Error updating driver:', e);
             showAlert('Failed to update driver: ' + e.message, { type: 'error' });
@@ -265,7 +265,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
             );
             if (!res.ok) throw res.error;
             setDrivers(prev => prev.filter(d => d.id !== id));
-            await logActivity(currentUser.id, 'delete', `Deleted Driver: "${name}"`);
+            await logActivity(currentUser?.id, 'operations', `Deleted Driver: "${name}"`);
         } catch (e) {
             console.error('Error deleting driver:', e);
             showAlert('Failed to delete driver: ' + e.message, { type: 'error' });
@@ -337,7 +337,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
 
             setPartners(prev => [...prev, ...data]);
             setNewPartner('');
-            await logActivity(currentUser.id, 'create', `Added new Channel Partner: "${val}"`);
+            await logActivity(currentUser?.id, 'operations', `Added new Channel Partner: "${val}"`);
         } catch (e) {
             console.error('Error adding partner:', e);
             showAlert('Error adding partner: ' + e.message, { type: 'error' });
@@ -365,7 +365,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
 
             setBrands(prev => [...prev, ...data]);
             setNewBrand('');
-            await logActivity(currentUser.id, 'create', `Added new Module Brand: "${val}"`);
+            await logActivity(currentUser?.id, 'operations', `Added new Module Brand: "${val}"`);
         } catch (e) {
             console.error('Error adding brand:', e);
             showAlert('Error adding brand: ' + e.message, { type: 'error' });
@@ -393,7 +393,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
 
             setRegistrations(prev => [...prev, ...data]);
             setNewRegistration('');
-            await logActivity(currentUser.id, 'create', `Added new Registration Staff: "${val}"`);
+            await logActivity(currentUser?.id, 'operations', `Added new Registration Staff: "${val}"`);
         } catch (e) {
             console.error('Error adding registration staff:', e);
             showAlert('Error adding registration staff: ' + e.message, { type: 'error' });
@@ -421,7 +421,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
 
             setIntegrations(prev => [...prev, ...data]);
             setNewIntegration('');
-            await logActivity(currentUser.id, 'create', `Added new Integration Staff: "${val}"`);
+            await logActivity(currentUser?.id, 'operations', `Added new Integration Staff: "${val}"`);
         } catch (e) {
             console.error('Error adding integration staff:', e);
             showAlert('Error adding integration staff: ' + e.message, { type: 'error' });
@@ -449,7 +449,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
 
             setInverters(prev => [...prev, ...data]);
             setNewInverter('');
-            await logActivity(currentUser.id, 'create', `Added new Inverter Make: "${val}"`);
+            await logActivity(currentUser?.id, 'operations', `Added new Inverter Make: "${val}"`);
         } catch (e) {
             console.error('Error adding inverter make:', e);
             showAlert('Error adding inverter make: ' + e.message, { type: 'error' });
@@ -518,7 +518,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
             ));
             setEditingId(null);
             if (loginNote) showAlert('Vendor updated.' + loginNote, { type: 'success' });
-            await logActivity(currentUser.id, 'update', `Updated Vendor: "${oldName}" → "${name}" (${email})`);
+            await logActivity(currentUser?.id, 'operations', `Updated Vendor: "${oldName}" → "${name}" (${email})`);
         } catch (e) {
             console.error('Error updating vendor:', e);
             showAlert('Error updating vendor: ' + e.message, { type: 'error' });
@@ -537,7 +537,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
             if (!res.ok) throw res.error;
 
             setVendors(prev => prev.filter(v => v.id !== id));
-            await logActivity(currentUser.id, 'delete', `Deleted Vendor: "${name}"`);
+            await logActivity(currentUser?.id, 'operations', `Deleted Vendor: "${name}"`);
         } catch (e) {
             console.error('Error deleting vendor:', e);
             showAlert('Error deleting vendor: ' + e.message, { type: 'error' });
@@ -665,7 +665,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
                 setInverters(prev => prev.map(x => x.id === id ? { ...x, label: trimmed } : x));
             }
 
-            await logActivity(currentUser.id, 'update', `Renamed ${category} from "${oldLabel}" to "${trimmed}"`);
+            await logActivity(currentUser?.id, 'operations', `Renamed ${category} from "${oldLabel}" to "${trimmed}"`);
         } catch (e) {
             console.error('Error renaming metadata:', e);
             showAlert('Error renaming metadata: ' + e.message, { type: 'error' });
@@ -726,7 +726,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
             else if (category === 'integration_by')  setIntegrations(prev => prev.filter(i => i.id !== id));
             else if (category === 'inverter_make')   setInverters(prev => prev.filter(i => i.id !== id));
 
-            await logActivity(currentUser.id, 'delete',
+            await logActivity(currentUser?.id, 'operations',
                 `Removed ${category} option: "${label}"${inUse > 0 ? ` (${inUse} ${TARGET.noun} keep the value)` : ''}`);
         } catch (e) {
             console.error('Error deleting metadata:', e);

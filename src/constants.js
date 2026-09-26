@@ -86,7 +86,7 @@ export const APP_ROLES = [
     { id: 'agent2', label: 'Dealer', user_type: 'agent2', role: 'Channel Partner' },
     { id: 'channel_partner', label: 'Channel Partners', user_type: 'agent', role: 'Channel Partners' },
     { id: 'vendor', label: 'Vendors', user_type: 'vendor', role: 'Vendors' },
-    { id: 'stamp', label: 'Stamp Guy', user_type: 'stamp', role: 'Stamp' },
+    { id: 'stamp', label: 'Stamp Maker', user_type: 'stamp', role: 'Stamp' },
 ];
 
 
@@ -334,13 +334,19 @@ export const DOC_TYPE_FLAG_COLUMN = {
 // ACTIVITY LOG & ACTION COLORS
 // ════════════════════════════════════════════════════════════
 export const ACTION_COLORS = {
-    create:   { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500', label: 'Created' },
-    update:   { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',    dot: 'bg-blue-500',    label: 'Updated' },
-    delete:   { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200',    dot: 'bg-rose-500',    label: 'Deleted' },
-    recall:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   dot: 'bg-amber-500',   label: 'Recalled' },
-    upload:   { bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200',  dot: 'bg-purple-500',  label: 'Uploaded' },
-    download: { bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200',  dot: 'bg-indigo-500',  label: 'Downloaded' },
-    login:    { bg: 'bg-stone-50',   text: 'text-stone-700',   border: 'border-stone-200',   dot: 'bg-stone-500',   label: 'Logged In' },
+    create:       { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500', label: 'Created' },
+    update:       { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-200',    dot: 'bg-blue-500',    label: 'Updated' },
+    delete:       { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200',    dot: 'bg-rose-500',    label: 'Deleted' },
+    recall:       { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   dot: 'bg-amber-500',   label: 'Recalled' },
+    upload:       { bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200',  dot: 'bg-purple-500',  label: 'Uploaded' },
+    download:     { bg: 'bg-indigo-50',  text: 'text-indigo-700',  border: 'border-indigo-200',  dot: 'bg-indigo-500',  label: 'Downloaded' },
+    login:        { bg: 'bg-stone-50',   text: 'text-stone-700',   border: 'border-stone-200',   dot: 'bg-stone-500',   label: 'Logged In' },
+    attendance:   { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200',    dot: 'bg-teal-500',    label: 'Attendance' },
+    operations:   { bg: 'bg-cyan-50',    text: 'text-cyan-700',    border: 'border-cyan-200',    dot: 'bg-cyan-500',    label: 'Operations' },
+    vendor:       { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200',  dot: 'bg-orange-500',  label: 'Vendor' },
+    payment:      { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-300', dot: 'bg-emerald-600', label: 'Payment' },
+    dispatch:     { bg: 'bg-amber-50',   text: 'text-amber-800',   border: 'border-amber-300',   dot: 'bg-amber-600',   label: 'Dispatch' },
+    stage_change: { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200',  dot: 'bg-violet-500',  label: 'Stage' },
 };
 
 // ════════════════════════════════════════════════════════════

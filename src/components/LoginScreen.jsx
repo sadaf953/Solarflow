@@ -3,7 +3,7 @@ import {ensureThreeDemoDrivers} from '../demo/drivers';
 import { useState } from 'react';
 import { 
     ArrowRight, ShieldCheck, BriefcaseBusiness, Building2, ChartNoAxesCombined, 
-    Handshake, Users, Truck, Stamp, LoaderCircle, Mail, Lock, KeyRound, Send, AlertTriangle, Check 
+    Handshake, Users, Truck, Stamp, LoaderCircle, Mail, Lock, KeyRound, Send, AlertTriangle, Check, User 
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { APP_ROLES } from '../constants';
@@ -16,6 +16,9 @@ const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handsha
 const descriptions=['Explore the complete solar business.','Manage leads and daily operations.','Follow your partner’s project pipeline.','Review progress and team activity.','Build quotations and follow up leads.','Track your customers from start to finish.','Manage delivery, installation and photos.','Review documents and completed work.'];
 export default function LoginScreen({onLogin,initialError=''}) {
  const [busy,setBusy]=useState('');const [error,setError]=useState(initialError);
+ const [visitorName, setVisitorName] = useState(() => {
+  try { return localStorage.getItem('solarflow_visitor_name') || ''; } catch { return ''; }
+ });
  const [hasBranches, setHasBranches] = useState(false);
  const [hasVendors, setHasVendors] = useState(false);
  const [hasStamp, setHasStamp] = useState(false);
@@ -120,15 +123,22 @@ export default function LoginScreen({onLogin,initialError=''}) {
   }
  }
 
- async function choose(role){
+ async function choose(role, customName){
   setBusy(role.user_type);setError('');
   try {
    const {data:session,error:sessionError}=await supabase.auth.getSession();if(sessionError)throw sessionError;
    if(!session.session){const result=await supabase.auth.signInAnonymously();if(result.error)throw result.error;}
-   const {data,error:roleError}=await supabase.rpc('start_demo_session',{p_role:role.user_type});
+   const nameToUse = (customName !== undefined ? customName : visitorName || '').trim();
+   const {data,error:roleError}=await supabase.rpc('start_demo_session',{
+     p_role: role.user_type,
+     p_name: nameToUse || null
+   });
    if(roleError)throw roleError;
    if(!data?.id)throw new Error('The demo profile could not be created.');
    if(data.user_type==='vendor')data.name=demoVendorTarget(data.name)||data.name;
+   if(nameToUse){
+    try { localStorage.setItem('solarflow_visitor_name', nameToUse); } catch {}
+   }
    onLogin({...data,userType:data.user_type || data.userType,isDemo:true});
    if(['admin','sales'].includes(data.user_type)){
     Promise.allSettled([
@@ -333,27 +343,46 @@ export default function LoginScreen({onLogin,initialError=''}) {
      </div>
     ) : (
      <>
-     {/* Prominent Admin Hero Card */}
-    <button 
-     type="button"
-     onClick={() => choose(adminRole)} 
-     disabled={!!busy} 
-     className="demo-login-hero-card"
-     aria-label="Try the Advanced Demo"
-    >
-     <div className="demo-login-hero-content">
-      <div className="demo-login-hero-badge">
-       <ShieldCheck size={14} />
-       <span>NO SIGNUP · SAMPLE DATA INCLUDED</span>
+     {/* Prominent Name Entry & Hero Card */}
+     <form 
+      onSubmit={(e) => {
+       e.preventDefault();
+       choose(adminRole);
+      }}
+      className="demo-login-hero-card"
+      aria-label="Enter SolarFlow"
+     >
+      <div className="demo-login-hero-content">
+       <div className="demo-login-hero-badge">
+        <ShieldCheck size={14} />
+        <span>NO SIGNUP NEEDED · COLLABORATIVE LIVE WORKSPACE</span>
+       </div>
+       <h2>Enter your name to start</h2>
+       <p>Join the team workspace. Any changes, quotation drafts, or project updates you make will be recorded under your name in the live Activity Log.</p>
+       
+       <div className="demo-name-entry-row">
+        <div className="demo-name-input-wrap">
+         <User className="demo-name-input-icon" size={18}/>
+         <input
+          type="text"
+          value={visitorName}
+          onChange={(e) => setVisitorName(e.target.value)}
+          placeholder="Enter your name (e.g. Rahul, Priya)..."
+          className="demo-name-input"
+          autoFocus
+         />
+        </div>
+        <button 
+         type="submit" 
+         disabled={!!busy} 
+         className="demo-login-hero-btn"
+        >
+         {busy === adminRole.user_type ? <LoaderCircle className="animate-spin" size={19}/> : <ArrowRight size={19}/>}
+         <span>{busy === adminRole.user_type ? 'Entering SolarFlow...' : 'Enter SolarFlow'}</span>
+        </button>
+       </div>
       </div>
-      <h2>Explore your solar business</h2>
-      <p>Start in the business overview, open a sample project, or create your first quotation. Other team views are available whenever you need them.</p>
-     </div>
-     <div className="demo-login-hero-btn">
-      {busy === adminRole.user_type ? <LoaderCircle className="animate-spin" size={19}/> : <ArrowRight size={19}/>}
-      <span>{busy === adminRole.user_type ? 'Opening your demo...' : 'Try the Advanced Demo'}</span>
-     </div>
-    </button>
+     </form>
 
     <div className="demo-start-options">
      <button type="button" aria-expanded={showSetup} aria-controls="demo-company-setup" onClick={() => setShowSetup(!showSetup)}>{showSetup ? 'Hide demo options' : 'Customize demo or explore team roles'} <ArrowRight size={16}/></button>

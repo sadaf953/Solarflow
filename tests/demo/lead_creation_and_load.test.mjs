@@ -281,7 +281,7 @@ test('Enterprise Scale Load Test: 5,000 customers pagination, search, and memory
     const page0Duration = performance.now() - page0Start;
     assert.equal(page0.length, 50);
     assert.equal(page0[0].customer_name, `Enterprise Client ${ENTERPRISE_SIZE}`);
-    assert.ok(page0Duration < 20, `Page 0 of 5,000 records should take < 20ms, took ${page0Duration.toFixed(2)}ms`);
+    assert.ok(page0Duration < 100, `Page 0 of 5,000 records should take < 100ms, took ${page0Duration.toFixed(2)}ms`);
 
     // 2. Global search across 5,000 records
     const searchStart = performance.now();

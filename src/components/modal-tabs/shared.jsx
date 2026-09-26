@@ -589,38 +589,9 @@ export function ChecklistModeToggle({ className = '', onFillAllDemoDocs = null, 
         setMode(newMode);
     };
 
-    return (
-        <div className={`inline-flex items-center gap-2 ${className}`}>
-            <div className="inline-flex items-center rounded-lg bg-stone-100 p-0.5 border border-stone-200">
-                <button
-                    type="button"
-                    onClick={() => handleSwitch('checklist')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                        mode === 'checklist'
-                            ? 'bg-amber-500 text-white shadow-xs'
-                            : 'text-stone-500 hover:text-stone-800'
-                    }`}
-                    title="Simple Checklist: 1-click verify items directly without needing file attachments"
-                >
-                    <CheckSquare size={11} />
-                    <span>Simple Checklist</span>
-                </button>
-                <button
-                    type="button"
-                    onClick={() => handleSwitch('files')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                        mode === 'files'
-                            ? 'bg-amber-500 text-white shadow-xs'
-                            : 'text-stone-500 hover:text-stone-800'
-                    }`}
-                    title="File Storage: Upload client documents, photos, and demo attachments"
-                >
-                    <FolderOpen size={11} />
-                    <span>File Storage</span>
-                </button>
-            </div>
-
-            {mode === 'files' && onFillAllDemoDocs && (
+    if (mode === 'files' && onFillAllDemoDocs) {
+        return (
+            <div className={`inline-flex items-center ${className}`}>
                 <button
                     type="button"
                     onClick={onFillAllDemoDocs}
@@ -631,9 +602,11 @@ export function ChecklistModeToggle({ className = '', onFillAllDemoDocs = null, 
                     <Sparkles size={11} className="text-amber-500" />
                     <span>{isFilling ? 'Attaching...' : '✨ Fill Demo Docs'}</span>
                 </button>
-            )}
-        </div>
-    );
+            </div>
+        );
+    }
+
+    return null;
 }
 
 export function CheckboxRemarkItem({ label, field, value, onChange, onAutoSave, isEditing, documents = [], onUpload, onDelete, onPreview, onDownload, onUpdateRemark, note, canDelete = false, canReplace = canDelete, allowReturnedReplace = !canDelete }) {

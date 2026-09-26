@@ -16,14 +16,15 @@ const fmtLakh = formatINRCompact;
 
 const MetricBox = ({ label, value, sub, icon: Icon, color }) => {
     const colorMap = {
+        neutral: 'bg-stone-100 text-stone-600',
         amber:   'bg-amber-50 text-amber-600',
         emerald: 'bg-emerald-50 text-emerald-600',
-        blue:    'bg-blue-50 text-blue-600',
-        rose: 'bg-rose-50 text-rose-600',
+        blue:    'bg-sky-50 text-sky-600',
+        rose:    'bg-rose-50 text-rose-600',
     };
     return (
         <div className="bg-white p-6 rounded-[28px] border border-stone-100 shadow-sm">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${colorMap[color]}`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${colorMap[color] || colorMap.neutral}`}>
                 <Icon size={16} />
             </div>
             <p className="text-2xl font-bold text-stone-800 tracking-tight">{value}</p>
@@ -97,7 +98,7 @@ export default function DashboardView({ metrics, loading, scoped = false }) {
 
             {/* Project counts */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                <MetricBox label={scoped ? "My Office & Dealers" : "Total projects"} value={totalProjects}  icon={FolderOpen}   color="blue"    sub={`${liveProjects} projects in progress`} />
+                <MetricBox label={scoped ? "My Office & Dealers" : "Total projects"} value={totalProjects}  icon={FolderOpen}   color="neutral"    sub={`${liveProjects} projects in progress`} />
                 <MetricBox label="Projects in progress"  value={liveProjects}   icon={Activity}     color="amber"   sub="Excluding completed and lost" />
                 <MetricBox label="Completed"      value={completedCount} icon={CheckCircle2} color="emerald" sub="Installation completed" />
                 <MetricBox label="Lost Projects" value={metrics.lostCount ?? stageCounts['LOST PROJECT'] ?? 0} icon={XCircle} color="rose" sub="Projects marked lost" />
@@ -113,7 +114,7 @@ export default function DashboardView({ metrics, loading, scoped = false }) {
                     </div>
                     <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                        <span>Self-funded ({cashCount})</span>
+                        <span>Cash ({cashCount})</span>
                     </div>
                 </div>
                 <div className="h-4 bg-stone-100 rounded-full overflow-hidden flex">

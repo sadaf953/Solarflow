@@ -253,10 +253,6 @@ export default function DiscomSubmissionTab({
                     <h4 className="text-xs font-bold text-stone-700 uppercase tracking-widest flex items-center gap-2">
                         <ClipboardList className="w-4 h-4 text-amber-500" /> Utility File Checklist
                     </h4>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-bold text-stone-400 uppercase tracking-wider">Mode:</span>
-                        <ChecklistModeToggle />
-                    </div>
                 </div>
                 <div className="flex flex-col gap-2">
                     <CheckboxRemarkItem label="DCR Certificate" field="dcr_certificate" value={editData.dcr_certificate} onChange={handleChange} isEditing={isEditable} documents={documents} onUpload={onFileUpload} onDelete={onFileDelete} onPreview={onFilePreview} onUpdateRemark={onUpdateRemark} canDelete={canDeleteDocs} />
@@ -689,7 +685,7 @@ export default function DiscomSubmissionTab({
                                     </select>
                                     {stampMakers.length === 0 && (
                                         <p className="text-[9px] text-amber-700 font-semibold mt-1">
-                                            No Stamp Guy accounts found - create one in User Management.
+                                            No Stamp Maker accounts found - create one in User Management.
                                         </p>
                                     )}
                                 </div>
@@ -927,7 +923,7 @@ export default function DiscomSubmissionTab({
                         <button
                             type="button"
                             onClick={onGenerateAgreement}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/10 flex items-center gap-1.5 cursor-pointer"
+                            className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all shadow-md shadow-amber-500/10 flex items-center gap-1.5 cursor-pointer"
                         >
                             <Printer className="w-4 h-4" /> Pop Open & Print Agreement
                         </button>

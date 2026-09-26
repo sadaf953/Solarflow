@@ -1197,7 +1197,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                         onClick={() => { setActiveWorkdeskTab(stage.id); setIsSidebarOpen(false); }}
                                         className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all cursor-pointer ${
                                             isActive 
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' 
+                                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20' 
                                             : 'hover:bg-slate-800 text-slate-300 hover:text-white'
                                         }`}
                                     >
@@ -1339,7 +1339,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                                         <Phone size={14} />
                                                     </a>
                                                 )}
-                                                <button type="button" aria-label={`Open ${cust.customer_name}`} className="shrink-0 w-7 h-7 bg-stone-50 group-hover:bg-blue-600 group-hover:text-white text-stone-400 rounded-lg transition-all flex items-center justify-center shadow-2xs border border-stone-100 group-hover:border-blue-600">
+                                                <button type="button" aria-label={`Open ${cust.customer_name}`} className="shrink-0 w-7 h-7 bg-stone-50 group-hover:bg-emerald-600 group-hover:text-white text-stone-400 rounded-lg transition-all flex items-center justify-center shadow-2xs border border-stone-100 group-hover:border-emerald-600">
                                                     <ChevronRight size={14} />
                                                 </button>
                                             </div>
@@ -1393,7 +1393,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                 {/* MOBILE FLOATING ACTION BUTTON */}
                 <button
                     onClick={() => setShowAddLead(true)}
-                    className="sm:hidden fixed bottom-6 right-4 z-40 bg-blue-600 text-white w-12 h-12 rounded-full shadow-lg shadow-blue-500/40 flex items-center justify-center active:scale-95 transition-transform"
+                    className="sm:hidden fixed bottom-6 right-4 z-40 bg-emerald-600 text-white w-12 h-12 rounded-full shadow-lg shadow-emerald-500/40 flex items-center justify-center active:scale-95 transition-transform"
                 >
                     <Plus size={22} />
                 </button>
@@ -1581,7 +1581,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                     <button
                                         type="button"
                                         onClick={handleGenerateAgreementPreview}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                                        className="w-full bg-amber-500 hover:bg-amber-600 text-white py-2.5 px-4 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
                                     >
                                         <FileText size={14} /> Preview PM Surya Ghar Agreement
                                     </button>
@@ -2507,7 +2507,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                             <button
                                                 onClick={() => handleSaveMeterInstallation(true)}
                                                 disabled={saving}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-3 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-3 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
                                                 <CheckCircle2 size={14} /> {saving ? 'Saving...' : 'Save & Move'}
                                             </button>

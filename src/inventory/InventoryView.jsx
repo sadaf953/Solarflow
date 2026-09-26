@@ -1,6 +1,6 @@
 import {useDemoTourNavigation} from '../demo/tour';
 import {useEffect,useRef,useState} from 'react';
-import {Package,ArrowDownToLine,History,CalendarDays,RefreshCw} from 'lucide-react';
+import {Package,ArrowDownToLine,History,CalendarDays,RefreshCw,Download} from 'lucide-react';
 import {supabase} from '../supabase';
 import {dailyStock,stockDay} from './model';
 import './inventory.css';
@@ -12,8 +12,65 @@ export default function InventoryView({currentUser}){
  const [tab,setTab]=useState('stock'),[page,setPage]=useState(0),[loadFailed,setLoadFailed]=useState(false);
  useDemoTourNavigation(entry=>{if(entry.view==='inventory' && tabs.some(([id])=>id===entry.tab)){setTab(entry.tab);setPage(0);setSearch('');}});
  const [reportDay,setReportDay]=useState(()=>stockDay(Date.now()));const request=useRef(null);
+
+ function downloadDailyReport() {
+  const filtered = items.filter(i => `${i.sku} ${i.product_name} ${i.uom}`.toLowerCase().includes(search.toLowerCase()));
+  const reportData = dailyStock(filtered, history, reportDay);
+  const escapeCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const headers = ['Material', 'SKU', 'Unit', 'Opening Stock', 'Incoming (+)', 'Outgoing (-)', 'Closing Stock', 'Report Date'];
+  const lines = [
+   headers.map(escapeCsv).join(','),
+   ...reportData.map(r => [
+    escapeCsv(r.product_name),
+    escapeCsv(r.sku || ''),
+    escapeCsv(r.uom),
+    escapeCsv(r.opening),
+    escapeCsv(r.incoming),
+    escapeCsv(r.outgoing),
+    escapeCsv(r.closing),
+    escapeCsv(reportDay)
+   ].join(','))
+  ];
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `SolarFlow_Daily_Inventory_${reportDay}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+ }
+
+ function downloadCurrentStock() {
+  const escapeCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const headers = ['Material', 'SKU', 'Unit', 'Available Stock', 'Reorder Level', 'Status'];
+  const lines = [
+   headers.map(escapeCsv).join(','),
+   ...shown.map(r => [
+    escapeCsv(r.product_name),
+    escapeCsv(r.sku || ''),
+    escapeCsv(r.uom),
+    escapeCsv(r.stock_on_hand),
+    escapeCsv(r.reorder_level),
+    escapeCsv(Number(r.stock_on_hand) <= Number(r.reorder_level) ? 'Low Stock' : 'In Stock')
+   ].join(','))
+  ];
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `SolarFlow_Stock_${stockDay(Date.now())}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+ }
  async function refresh(){setLoading(true);setLoadFailed(false);setError('');try{
-  const synced=await supabase.rpc('sync_inventory_catalog');if(synced.error)throw synced.error;
+  try {
+   const synced = await supabase.rpc('sync_inventory_catalog');
+   if (synced?.error) console.warn('Inventory sync notice:', synced.error.message);
+  } catch (e) { console.warn('Inventory sync skipped:', e?.message); }
   const readAll=async(table,order)=>{const rows=[];for(let offset=0;;offset+=1000){const p=await supabase.from(table).select('*').order(order).range(offset,offset+999);if(p.error)throw p.error;rows.push(...p.data);if(p.data.length<1000)return rows;}};
   const [stock,moves]=await Promise.all([readAll('inventory_items','sku'),readAll('inventory_movements','id')]);
   setItems(stock);setHistory(moves.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)));
@@ -75,13 +132,41 @@ export default function InventoryView({currentUser}){
  }
 
  return <section className="inventory">
- <div className="inventory-heading inventory-hero"><div><span className="inventory-eyebrow">MATERIALS & STOCK</span><h2>Godown / Inventory</h2><p>Receive stock, record movements and track warehouse balances.</p></div><button onClick={refresh} disabled={loading||saving}><RefreshCw size={14}/> Refresh</button></div>
+ <div className="inventory-heading inventory-hero">
+   <div>
+     <span className="inventory-eyebrow">MATERIALS & STOCK</span>
+     <h2>Godown / Inventory</h2>
+     <p>Receive stock, record movements and track warehouse balances.</p>
+   </div>
+   <div className="inventory-hero-actions">
+     <button type="button" className="inventory-hero-download" onClick={downloadDailyReport} disabled={loading||loadFailed} title="Download daily inventory report as CSV">
+       <Download size={14}/> Download Daily Report
+     </button>
+     <button onClick={refresh} disabled={loading||saving}>
+       <RefreshCw size={14}/> Refresh
+     </button>
+   </div>
+ </div>
  <div className="inventory-summary"><div><Package size={18}/><strong>{loading || loadFailed ? '—' : items.length}</strong><span>Materials in godown</span></div><div><ArrowDownToLine size={18}/><strong>{loading || loadFailed ? '—' : items.filter(i=>Number(i.stock_on_hand)<=Number(i.reorder_level)).length}</strong><span>Low-stock materials</span></div><div><History size={18}/><strong>{loading || loadFailed ? '—' : history.length}</strong><span>Stock movements</span></div></div>
  <div className="inventory-tabs" role="tablist" aria-label="Inventory sections">{tabs.map(([id,label,Icon])=><button key={id} id={`inv-tab-${id}`} role="tab" aria-selected={tab===id} aria-controls={`inv-panel-${id}`} onClick={()=>setTab(id)}><Icon size={16}/>{label}</button>)}</div>
  {error&&<p className="inventory-error" role="alert">{error}</p>}
  <section role="tabpanel" id={`inv-panel-${tab}`} aria-labelledby={`inv-tab-${tab}`} className="inventory-panel">
- <div className="inventory-filters"><label>Search<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Material, SKU or reference"/></label>
- {tab==='daily'&&<label>Report date (India time)<input type="date" value={reportDay} max={stockDay(Date.now())} onChange={e=>{if(e.target.value)setReportDay(e.target.value);}}/></label>}</div>
+ <div className="inventory-filters">
+   <label>Search<input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Material, SKU or reference"/></label>
+   {tab==='daily'&&(
+     <>
+       <label>Report date (India time)<input type="date" value={reportDay} max={stockDay(Date.now())} onChange={e=>{if(e.target.value)setReportDay(e.target.value);}}/></label>
+       <button type="button" className="inventory-download-btn" onClick={downloadDailyReport} disabled={loading||loadFailed} title="Download daily inventory report as CSV">
+         <Download size={14}/> Download Daily Report (CSV)
+       </button>
+     </>
+   )}
+   {tab==='stock'&&(
+     <button type="button" className="inventory-download-btn" onClick={downloadCurrentStock} disabled={loading||loadFailed} title="Export current stock inventory as CSV">
+       <Download size={14}/> Export Stock (CSV)
+     </button>
+   )}
+ </div>
  <p className="inventory-help">{tab==='stock'?'Opening balances are sample stock. Add quantity when material arrives. Delivered batches deduct stock automatically.':tab==='daily'?'Opening + incoming − outgoing = closing. Opening entries belong to the opening balance on their recorded day.':'Receipts and deliveries share this stock ledger. Changing a delivered status back does not return materials; record an actual return as a receipt.'}</p>
  {loading?<p role="status">Loading inventory…</p>:loadFailed?<div className="inventory-empty"><h3>Inventory couldn’t be loaded</h3><p>Your stock records have not been changed. Choose Refresh to try again.</p></div>:<div className="inventory-table"><table><thead><tr>{(tab==='stock'?['Material','Unit','Available quantity','Reorder level','Action']:tab==='daily'?['Material','Unit','Opening','Incoming','Outgoing','Closing']:['Material','Movement','Quantity','Reference','By','Recorded']).map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>
  {visible.map((row,index)=>tab==='stock'?<tr key={row.id}><td><strong>{row.product_name}</strong><small>{row.sku}</small></td><td>{row.uom}</td><td><span className={`inventory-badge ${Number(row.stock_on_hand)<=Number(row.reorder_level)?'low':'good'}`}>{fmt(row.stock_on_hand)}</span></td><td>{fmt(row.reorder_level)}</td><td><button className="inventory-primary" onClick={()=>openStock(row)}>+ Add quantity</button> <button onClick={()=>openStock(row,'issue')}>Issue</button></td></tr>:tab==='daily'?<tr key={row.id}><td>{row.product_name}</td><td>{row.uom}</td><td>{fmt(row.opening)}</td><td className="inventory-in">+{fmt(row.incoming)}</td><td className="inventory-out">−{fmt(row.outgoing)}</td><td><strong>{fmt(row.closing)}</strong></td></tr>:(()=>{const parsed=formatMovementRow(row);return <tr key={row.id||index}><td>{itemMap.get(row.item_id)?.product_name||'Material'}</td><td><span className={`inventory-badge ${row.kind==='issue'?'low':'good'}`}>{row.kind}</span></td><td>{row.kind==='issue'?'−':'+'}{fmt(row.quantity)} {itemMap.get(row.item_id)?.uom}</td><td>{parsed.displayNote}</td><td><span className="inventory-badge" style={{background:'#edf5f2',color:'#1e5849',fontWeight:700}}>{parsed.author}</span></td><td>{new Date(row.created_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}</td></tr>;})())}

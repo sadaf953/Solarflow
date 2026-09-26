@@ -186,7 +186,7 @@ export default function CustomizationEnquiryForm({
                                     }`}
                                 >
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xs font-bold">Advance Model</span>
+                                        <span className="text-xs font-bold">Advanced Edition</span>
                                         {modelType === 'advance' && <Check size={14} className="text-emerald-600" />}
                                     </div>
                                     <p className="text-[11px] font-normal text-stone-500 mt-0.5">

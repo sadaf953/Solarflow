@@ -235,10 +235,10 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                 }));
 
                 await logActivity(
-                    currentUser.id,
-                    'update',
+                    currentUser?.id,
+                    'payment',
                     `${customerRecord.customer_name}: Vendor payment status set to ${nextStatus}${isPaid ? ` (Paid on: ${paidDate})` : ' (Cleared)'}`,
-                    '',
+                    `Vendor: ${customerRecord.installation_vendor || 'Assigned Vendor'} | Amount: ₹${toIndianCommas(customerRecord.vendor_payable_amount || 0)}`,
                     customerRecord.id
                 );
             } else {
@@ -322,10 +322,10 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                 }));
 
                 await logActivity(
-                    currentUser.id,
-                    'update',
+                    currentUser?.id,
+                    'payment',
                     `Paid all ${unpaidRecords.length} client installations for vendor ${selectedVendor} (Total: ₹${toIndianCommas(pendingAmount)})`,
-                    '',
+                    `Vendor: ${selectedVendor} | Settled Projects: ${unpaidRecords.length} | Amount: ₹${toIndianCommas(pendingAmount)}`,
                     unpaidIds[0]
                 );
             } else {

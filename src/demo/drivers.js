@@ -10,7 +10,7 @@ export async function ensureThreeDemoDrivers(client){
  if(!obsolete.length&&drivers.length===3&&drivers.every(d=>demoDriverTarget(d.name)===d.name))return;
  for(let n=1;n<=3;n++){
   const name=`Driver ${n}`,phone=`000000000${n}`;
-  await checked(client.from('drivers').upsert({name,phone,vehicle_number:`VEHICLE-00${n}`},{onConflict:'demo_session_id,name',ignoreDuplicates:true}));
+  await checked(client.from('drivers').upsert({name,phone,vehicle_number:`VEHICLE-00${n}`},{onConflict:'name',ignoreDuplicates:true}));
   // Retain an existing canonical driver's contact details, including user edits.
   const contact=drivers.find(d=>d.name===name)?.phone||phone;
   const names=obsolete.filter(d=>demoDriverTarget(d.name)===name).map(d=>d.name);if(!names.length)continue;

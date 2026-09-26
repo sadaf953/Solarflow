@@ -376,7 +376,7 @@ export default function InstallationStatusTab({
                                             className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer ${
                                                 sendingInfo
                                                     ? 'bg-stone-200 text-stone-400 cursor-wait'
-                                                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/10'
+                                                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10'
                                             }`}
                                         >
                                             <Mail className="w-3.5 h-3.5" />
@@ -512,7 +512,7 @@ export default function InstallationStatusTab({
                                         fetchLogs();
                                     }
                                 }}
-                                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer"
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5 cursor-pointer"
                             >
                                 <Mail size={14} />
                                 Confirm & Send Email

@@ -32,6 +32,7 @@ const DeliveryBatchesView = lazyWithRetry(() => import('./DeliveryBatchesView'))
 const VendorCalendarView = lazyWithRetry(() => import('./VendorCalendarView'));
 const AttendanceView = lazyWithRetry(() => import('./AttendanceView'));
 const ToolboxView = lazyWithRetry(() => import('./ToolboxView'));
+const PricingView = lazyWithRetry(() => import('./PricingView'));
 import { useGlobalPopup } from './GlobalPopup';
 import BrandMark from './BrandMark';
 const QuotationModule = lazyWithRetry(() => import('../quotations/QuotationModule'));
@@ -59,7 +60,7 @@ const getMonthBounds = (monthValue, timestamp = false) => {
 
 import {
     LayoutDashboard, Activity, UserCog, Menu, X, ChevronDown,
-    Search, Plus, Download, LogOut, Trash2, Users, Tag, IndianRupee, Wrench, CreditCard, Terminal, Truck, Calendar, UserCheck, Calculator
+    Search, Plus, Download, LogOut, Trash2, Users, Tag, IndianRupee, Wrench, CreditCard, Terminal, Truck, Calendar, UserCheck, Calculator, Sparkles
 } from 'lucide-react';
 
 // ── NavBtn ────────────────────────────────────────────────────────────────────
@@ -120,8 +121,8 @@ function SidebarGroup({ label, activeKey, defaultOpen = false, children }) {
     const id = `nav-${label.toLowerCase().replace(/[^a-z]+/g, '-')}`;
     return <div className="pt-2">
         <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}
-            className={`w-full flex items-center justify-between gap-2 px-3 py-3 rounded-lg text-xs font-semibold text-left hover:bg-stone-100 ${activeKey ? 'text-emerald-800' : 'text-stone-600'}`}>
-            <span>{label}{!open && activeKey && <span className="ml-2 text-emerald-700">•</span>}</span>
+            className={`w-full flex items-center justify-between gap-2 px-3 py-3 rounded-lg text-xs font-semibold text-left hover:bg-stone-100 ${activeKey ? 'text-amber-800' : 'text-stone-600'}`}>
+            <span>{label}{!open && activeKey && <span className="ml-2 text-amber-600">•</span>}</span>
             <ChevronDown aria-hidden="true" className={`w-4 h-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
         <div id={id} hidden={!open} className="ml-2 pl-1 border-l border-stone-200">{children}</div>
@@ -1270,7 +1271,16 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
 
     // ── Nav button helper ─────────────────────────────────────────────────────
     
-    // ── Role-based routing (agent only - sales/operations now share this shell) ─
+    const isSystemView = [
+        'attendance',
+        'channel_partner_mgmt',
+        'vendor_availability',
+        'installation_payments',
+        'pricing',
+        'activity',
+        'users',
+        'trash'
+    ].includes(currentView);
 
     const headerTitle =
         currentView === 'toolbox' ? 'Solar Toolbox' :
@@ -1281,10 +1291,11 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
             : currentView === 'subsidy' ? 'Subsidy tracking'
                 : currentView === 'loan_tags' ? 'Loan tracking'
                 : currentView === 'installation_tags' ? 'Installation tracking'
-                : currentView === 'attendance' ? 'Staff Attendance'
+                : currentView === 'attendance' ? 'Staff Attendance & Leave'
                 : currentView === 'channel_partner_mgmt' ? 'Operations'
                     : currentView === 'installation_payments' ? 'Installation Payments'
                     : currentView === 'vendor_availability' ? 'Vendor Availability & Schedule'
+                    : currentView === 'pricing' ? 'Modular Plans & Custom Deployment'
                     : currentView === 'activity' ? 'Activity Log'
                         : currentView === 'users' ? 'User Management'
                             : currentView === 'trash' ? 'Trash'
@@ -1307,7 +1318,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     style={{ minHeight: 0, maxHeight: 'calc(100vh - 150px)', WebkitOverflowScrolling: 'touch' }}
                 >
                     <NavBtn view="dashboard" icon={LayoutDashboard} label="Dashboard" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    {['admin', 'sales'].includes(user.userType) && <button onClick={() => { openQuotations(); setCurrentView('quotations'); setSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold ${currentView === 'quotations' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-4 h-4" /> Quotation Maker</button>}
+                    {['admin', 'sales'].includes(user.userType) && <button onClick={() => { openQuotations(); setCurrentView('quotations'); setSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold mb-0.5 transition-colors cursor-pointer ${currentView === 'quotations' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-4 h-4 flex-shrink-0" /> Quotation Maker</button>}
                     <button
                         onClick={() => { setCurrentView('toolbox'); setSidebarOpen(false); }}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold mb-1 transition-all cursor-pointer ${
@@ -1321,6 +1332,19 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                         <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded-md font-bold">8 Tools</span>
                     </button>
 
+                    {/* Tracking & logistics directly after Quotation Maker & Toolbox */}
+                    <SidebarGroup label="Tracking & logistics" defaultOpen={true} activeKey={['delivery_batches', 'inventory', 'subsidy', 'loan_tags', 'installation_tags'].includes(currentView) ? currentView : null}>
+                        {canSeeDeliveryBatches && (
+                            <NavBtn view="delivery_batches" icon={Truck} label="Delivery Batches" count={deliveryBatchesCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                        )}
+                        {['admin', 'sales'].includes(user.userType) && (
+                            <NavBtn view="inventory" icon={Wrench} label="Godown / Inventory" currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                        )}
+                        <NavBtn view="subsidy" icon={Tag} label="Subsidy tracking" count={subsidyTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                        <NavBtn view="loan_tags" icon={IndianRupee} label="Loan tracking" count={loanTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                        <NavBtn view="installation_tags" icon={Wrench} label="Installation tracking" count={installationTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                    </SidebarGroup>
+
                     <p className="px-3 pt-4 pb-1 text-[10px] uppercase font-bold text-stone-500 tracking-widest">Project workflow</p>
                     {STAGE_GROUPS.map((group, index) => <SidebarGroup key={group.label} label={group.label} defaultOpen={index === 0}
                         activeKey={currentView === 'stages' && group.stages.includes(selectedStage) ? selectedStage : null}>
@@ -1328,28 +1352,30 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                             <NavBtn key={s.id} view="stages" stage={s.id} icon={s.icon} label={s.label} count={stageCounts[s.id] || 0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                         ))}
                     </SidebarGroup>)}
-                    <SidebarGroup label="Tracking & logistics" activeKey={['delivery_batches', 'subsidy', 'loan_tags', 'installation_tags', ...(user.userType === 'sales' ? ['inventory'] : [])].includes(currentView) ? currentView : null}>
-                    {canSeeDeliveryBatches && (
-                        <NavBtn view="delivery_batches" icon={Truck} label="Delivery Batches" count={deliveryBatchesCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    )}
-                    <NavBtn view="subsidy" icon={Tag} label="Subsidy tracking" count={subsidyTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    {['sales'].includes(user.userType) && <NavBtn view="inventory" icon={Wrench} label="Godown / Inventory" currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />}
-                    <NavBtn view="loan_tags" icon={IndianRupee} label="Loan tracking" count={loanTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    <NavBtn view="installation_tags" icon={Wrench} label="Installation tracking" count={installationTagCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                    </SidebarGroup>
 
-                    {/* System - admin only */}
+                    {/* Systems - sensitive & only visible to admin */}
                     {user.userType === 'admin' && (
-                        <SidebarGroup label="Team & administration" activeKey={['attendance', 'channel_partner_mgmt', 'vendor_availability', 'installation_payments', 'activity', 'inventory', 'users', 'trash'].includes(currentView) ? currentView : null}>
-                            <NavBtn view="attendance" icon={UserCheck} label="Staff Attendance" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                            <NavBtn view="channel_partner_mgmt" icon={Users} label="Operations" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                            <NavBtn view="vendor_availability" icon={Calendar} label="Vendor Availability" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                            <NavBtn view="installation_payments" icon={CreditCard} label="Installation Payments" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                        <div className="pt-2">
+                            <p className="px-3 pt-3 pb-1 text-[10px] uppercase font-bold text-stone-500 tracking-widest">Systems</p>
+                            <SidebarGroup label="Team & administration" defaultOpen={false} activeKey={['attendance', 'channel_partner_mgmt', 'vendor_availability', 'installation_payments'].includes(currentView) ? currentView : null}>
+                                <NavBtn view="attendance" icon={UserCheck} label="Staff Attendance & Leave" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                                <NavBtn view="channel_partner_mgmt" icon={Users} label="Operations" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                                <NavBtn view="vendor_availability" icon={Calendar} label="Vendor Availability" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                                <NavBtn view="installation_payments" icon={CreditCard} label="Installation Payments" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                            </SidebarGroup>
+                            <NavBtn view="pricing" icon={Sparkles} label="Plans & Deployment" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="activity" icon={Activity} label="Activity Log" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                            <NavBtn view="inventory" icon={Wrench} label="Godown / Inventory" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="users" icon={UserCog} label="User Management" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="trash" icon={Trash2} label="Trash" count={trashCount} redBadge currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                        </SidebarGroup>
+                        </div>
+                    )}
+
+                    {/* Non-admin staff self-service */}
+                    {user.userType !== 'admin' && (
+                        <div className="pt-2">
+                            <p className="px-3 pt-3 pb-1 text-[10px] uppercase font-bold text-stone-500 tracking-widest">Self Service</p>
+                            <NavBtn view="attendance" icon={UserCheck} label="Attendance & Leave" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                        </div>
                     )}
 
                     {/* Partner Office - main CPO account only */}
@@ -1406,118 +1432,155 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                         )}
                     </div>
 
-                    <div className="demo-dashboard-tools">
-                        {/* ── Global search (always visible) ── */}
-                        <div className="relative" ref={globalSearchRef}>
-                            <Search className="absolute left-3 top-2.5 text-stone-400 w-4 h-4" />
-                            <input type="text" readOnly onFocus={(e) => { e.target.removeAttribute('readonly'); if (globalResults.length > 0) setShowGlobalDrop(true); }} aria-label="Search all stages" name="crm_dash_global_search_unique" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder={isChannelPartnerOffice ? `Search ${partnerName} leads...` : "Search all stages..."} value={globalSearch} onChange={e => setGlobalSearch(e.target.value)}
-                                className="pl-9 pr-4 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-40 lg:w-60"
-                            />
-                            {/* Results dropdown */}
-                            {showGlobalDrop && (
-                                <div className="absolute top-full mt-1 left-0 right-0 bg-white rounded-2xl shadow-xl border border-stone-100 py-1 z-50 overflow-hidden">
-                                    {globalResults.map(c => (
-                                        <button key={c.id} onClick={() => handleGlobalSelect(c)}
-                                             className="w-full px-4 py-2.5 text-left hover:bg-amber-50 transition-colors group">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-sm font-semibold text-stone-800 group-hover:text-amber-700">{c.customer_name || 'Unnamed'}</p>
-                                            </div>
-                                            <p className="text-[10px] text-stone-400 mt-0.5">
-                                                {PRIMARY_STAGES.find(s => s.id === c.stage)?.label || c.stage} · {c.phone_number || 'No phone'}
-                                            </p>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Per-stage search (only in stages view) */}
-                        {currentView === 'stages' && (
-                            <div className="relative demo-stage-filter">
+                    {!isSystemView && (
+                        <div className="demo-dashboard-tools">
+                            {/* ── Global search (always visible) ── */}
+                            <div className="relative" ref={globalSearchRef}>
                                 <Search className="absolute left-3 top-2.5 text-stone-400 w-4 h-4" />
-                                <input type="text" readOnly onFocus={(e) => e.target.removeAttribute('readonly')}  aria-label="Filter this stage" name="crm_dash_stage_search_unique" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder="Filter this stage..." value={stageSearch} onChange={e => setStageSearch(e.target.value)}
-                                    className="pl-9 pr-4 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-40" />
-                            </div>
-                        )}
-
-                        {/* Channel Partner filter - applies everywhere for Admin/Office */}
-                        {!isChannelPartnerOffice && (
-                            <div className="relative demo-partner-filter flex items-center gap-1.5" ref={channelPartnerFilterRef}>
-                                <input
-                                    type="text"
-                                    aria-label="Filter by channel partner" placeholder="Channel Partner..."
-                                    value={channelPartnerFilterInput}
-                                    onChange={e => { setChannelPartnerFilterInput(e.target.value); setShowChannelPartnerDrop(true); }}
-                                    onFocus={() => setShowChannelPartnerDrop(true)}
-                                    onKeyDown={e => e.key === 'Enter' && (setChannelPartnerFilter(channelPartnerFilterInput.trim()), setShowChannelPartnerDrop(false))}
-                                    className="px-3 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-32"
+                                <input type="text" readOnly onFocus={(e) => { e.target.removeAttribute('readonly'); if (globalResults.length > 0) setShowGlobalDrop(true); }} aria-label="Search all stages" name="crm_dash_global_search_unique" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder={isChannelPartnerOffice ? `Search ${partnerName} leads...` : "Search all stages..."} value={globalSearch} onChange={e => setGlobalSearch(e.target.value)}
+                                    className="pl-9 pr-4 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-40 lg:w-60"
                                 />
-                                <button
-                                    onClick={() => {
-                                        setChannelPartnerFilter(channelPartnerFilterInput.trim());
-                                        setShowChannelPartnerDrop(false);
-                                    }}
-                                    className="px-3 py-2 rounded-xl text-xs font-medium bg-stone-900 text-white hover:bg-stone-800 transition-colors">
-                                    Apply
-                                </button>
-                                {(channelPartnerFilter || channelPartnerFilterInput) && (
-                                    <button
-                                        onClick={() => {
-                                            setChannelPartnerFilter('');
-                                            setChannelPartnerFilterInput('');
-                                            setShowChannelPartnerDrop(false);
-                                        }}
-                                        className="px-3 py-2 rounded-xl text-xs font-medium bg-stone-200 text-stone-700 hover:bg-stone-300 transition-colors">
-                                        Clear
-                                    </button>
-                                )}
-                                {showChannelPartnerDrop && channelPartnerSuggestions.length > 0 && (
-                                    <div className="absolute top-full mt-1 left-0 w-48 bg-white rounded-xl shadow-xl border border-stone-100 py-1 z-50 max-h-48 overflow-y-auto">
-                                        {channelPartnerSuggestions.map(name => (
-                                            <button key={name}
-                                                onClick={() => { setChannelPartnerFilterInput(name); setShowChannelPartnerDrop(false); }}
-                                                className="w-full px-3 py-2 text-left text-xs hover:bg-stone-50 text-stone-700 transition-colors">
-                                                {name}
+                                {/* Results dropdown */}
+                                {showGlobalDrop && (
+                                    <div className="absolute top-full mt-1 left-0 right-0 bg-white rounded-2xl shadow-xl border border-stone-100 py-1 z-50 overflow-hidden">
+                                        {globalResults.map(c => (
+                                            <button key={c.id} onClick={() => handleGlobalSelect(c)}
+                                                 className="w-full px-4 py-2.5 text-left hover:bg-amber-50 transition-colors group">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-sm font-semibold text-stone-800 group-hover:text-amber-700">{c.customer_name || 'Unnamed'}</p>
+                                                </div>
+                                                <p className="text-[10px] text-stone-400 mt-0.5">
+                                                    {PRIMARY_STAGES.find(s => s.id === c.stage)?.label || c.stage} · {c.phone_number || 'No phone'}
+                                                </p>
                                             </button>
                                         ))}
                                     </div>
                                 )}
                             </div>
-                        )}
 
-                        {/* Dealer is a global child-scope filter, just like Channel Partner. */}
-                        {effectivePartnerFilter && (
-                            <select
-                                value={dealerFilter}
-                                onChange={event => setDealerFilter(event.target.value)}
-                                aria-label={`Dealer under ${effectivePartnerFilter}`}
-                                title={`Dealer under ${effectivePartnerFilter}`}
-                                className="px-3 py-2 bg-stone-100 rounded-xl text-sm font-semibold text-stone-700 focus:outline-none focus:ring-2 focus:ring-amber-300 w-36"
-                            >
-                                <option value="">{isChannelPartnerOffice ? "My office + dealers" : "All dealers"}</option>
-                                {dealerOptions.map(name => <option key={name} value={name}>{name}</option>)}
-                            </select>
-                        )}
+                            {/* Per-stage search (only in stages view) */}
+                            {currentView === 'stages' && (
+                                <div className="relative demo-stage-filter">
+                                    <Search className="absolute left-3 top-2.5 text-stone-400 w-4 h-4" />
+                                    <input type="text" readOnly onFocus={(e) => e.target.removeAttribute('readonly')}  aria-label="Filter this stage" name="crm_dash_stage_search_unique" autoComplete="off" autoCorrect="off" spellCheck="false" placeholder="Filter this stage..." value={stageSearch} onChange={e => setStageSearch(e.target.value)}
+                                        className="pl-9 pr-4 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-40" />
+                                </div>
+                            )}
 
-                        {user?.userType === 'admin' && (
-                            <button 
-                                onClick={handleFullExport}
-                                disabled={exporting}
-                                className="flex items-center gap-1.5 border border-stone-200 text-stone-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-stone-50 transition-colors disabled:opacity-50 cursor-pointer"
-                                aria-label="Export complete database to CSV" title="Export complete database to CSV"
-                            >
-                                <Download className={`w-4 h-4 ${exporting ? 'animate-bounce text-amber-600' : ''}`} />
-                                <span className="hidden sm:inline text-xs">{exporting ? 'Exporting...' : 'Export'}</span>
-                            </button>
-                        )}
-                        {(user?.userType === 'admin' || user?.userType === 'sales' || user?.userType === 'agent' || isChannelPartnerOffice) && (
-                            <button aria-label="Add Lead" onClick={() => setShowAddLead(true)}
-                                className="flex items-center gap-1.5 bg-stone-900 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-stone-800 transition-colors">
-                                <Plus className="w-4 h-4" />
-                                <span className="hidden sm:inline text-xs">Add Lead</span>
-                            </button>
-                        )}
-                    </div>
+                            {/* Year Dropdown */}
+                            {currentView === 'stages' && (
+                                <select
+                                    value={yearFilter}
+                                    onChange={e => { setYearFilter(e.target.value); setPage(0); }}
+                                    aria-label="Filter by year"
+                                    className="px-3 py-2 bg-stone-100 rounded-xl text-sm font-semibold text-stone-700 focus:outline-none focus:ring-2 focus:ring-amber-300 cursor-pointer"
+                                >
+                                    <option value="all">All Years</option>
+                                    <option value="2026">This Year (2026)</option>
+                                    <option value="2025">Last Year (2025)</option>
+                                </select>
+                            )}
+
+                            {/* Month Filter Dropdown (Leads / Registration) */}
+                            {currentView === 'stages' && (selectedStage === STAGE_IDS.LEADS || selectedStage === STAGE_IDS.REGISTRATION) && (
+                                <select
+                                    value={selectedStage === STAGE_IDS.LEADS ? leadMonthFilter : registrationMonthFilter}
+                                    onChange={event => {
+                                        if (selectedStage === STAGE_IDS.LEADS) setLeadMonthFilter(event.target.value);
+                                        else setRegistrationMonthFilter(event.target.value);
+                                        setPage(0);
+                                    }}
+                                    aria-label={selectedStage === STAGE_IDS.LEADS ? 'Filter leads by month' : 'Filter registrations by month'}
+                                    className="px-3 py-2 bg-stone-100 rounded-xl text-sm font-semibold text-stone-700 focus:outline-none focus:ring-2 focus:ring-amber-300 cursor-pointer"
+                                >
+                                    <option value="">All Months</option>
+                                    <option value="this-month">This month</option>
+                                    <option value="last-month">Last month</option>
+                                    {MONTH_OPTIONS.map(([value, label]) => (
+                                        <option key={value} value={value}>{label}</option>
+                                    ))}
+                                </select>
+                            )}
+
+                            {/* Channel Partner filter - applies everywhere for Admin/Office */}
+                            {!isChannelPartnerOffice && (
+                                <div className="relative demo-partner-filter flex items-center gap-1.5" ref={channelPartnerFilterRef}>
+                                    <input
+                                        type="text"
+                                        aria-label="Filter by channel partner" placeholder="Channel Partner..."
+                                        value={channelPartnerFilterInput}
+                                        onChange={e => { setChannelPartnerFilterInput(e.target.value); setShowChannelPartnerDrop(true); }}
+                                        onFocus={() => setShowChannelPartnerDrop(true)}
+                                        onKeyDown={e => e.key === 'Enter' && (setChannelPartnerFilter(channelPartnerFilterInput.trim()), setShowChannelPartnerDrop(false))}
+                                        className="px-3 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-32"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            setChannelPartnerFilter(channelPartnerFilterInput.trim());
+                                            setShowChannelPartnerDrop(false);
+                                        }}
+                                        className="px-3 py-2 rounded-xl text-xs font-medium bg-stone-900 text-white hover:bg-stone-800 transition-colors">
+                                        Apply
+                                    </button>
+                                    {(channelPartnerFilter || channelPartnerFilterInput) && (
+                                        <button
+                                            onClick={() => {
+                                                setChannelPartnerFilter('');
+                                                setChannelPartnerFilterInput('');
+                                                setShowChannelPartnerDrop(false);
+                                            }}
+                                            className="px-3 py-2 rounded-xl text-xs font-medium bg-stone-200 text-stone-700 hover:bg-stone-300 transition-colors">
+                                            Clear
+                                        </button>
+                                    )}
+                                    {showChannelPartnerDrop && channelPartnerSuggestions.length > 0 && (
+                                        <div className="absolute top-full mt-1 left-0 w-48 bg-white rounded-xl shadow-xl border border-stone-100 py-1 z-50 max-h-48 overflow-y-auto">
+                                            {channelPartnerSuggestions.map(name => (
+                                                <button key={name}
+                                                    onClick={() => { setChannelPartnerFilterInput(name); setShowChannelPartnerDrop(false); }}
+                                                    className="w-full px-3 py-2 text-left text-xs hover:bg-stone-50 text-stone-700 transition-colors">
+                                                    {name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Dealer is a global child-scope filter, just like Channel Partner. */}
+                            {effectivePartnerFilter && (
+                                <select
+                                    value={dealerFilter}
+                                    onChange={event => setDealerFilter(event.target.value)}
+                                    aria-label={`Dealer under ${effectivePartnerFilter}`}
+                                    title={`Dealer under ${effectivePartnerFilter}`}
+                                    className="px-3 py-2 bg-stone-100 rounded-xl text-sm font-semibold text-stone-700 focus:outline-none focus:ring-2 focus:ring-amber-300 w-36"
+                                >
+                                    <option value="">{isChannelPartnerOffice ? "My office + dealers" : "All dealers"}</option>
+                                    {dealerOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                                </select>
+                            )}
+
+                            {user?.userType === 'admin' && (
+                                <button 
+                                    onClick={handleFullExport}
+                                    disabled={exporting}
+                                    className="flex items-center gap-1.5 border border-stone-200 text-stone-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-stone-50 transition-colors disabled:opacity-50 cursor-pointer"
+                                    aria-label="Export complete database to CSV" title="Export complete database to CSV"
+                                >
+                                    <Download className={`w-4 h-4 ${exporting ? 'animate-bounce text-amber-600' : ''}`} />
+                                    <span className="hidden sm:inline text-xs">{exporting ? 'Exporting...' : 'Export'}</span>
+                                </button>
+                            )}
+                            {(user?.userType === 'admin' || user?.userType === 'sales' || user?.userType === 'agent' || isChannelPartnerOffice) && (
+                                <button aria-label="Add Lead" onClick={() => setShowAddLead(true)}
+                                    className="flex items-center gap-1.5 bg-stone-900 text-white px-3 py-2 rounded-xl text-sm font-medium hover:bg-stone-800 transition-colors">
+                                    <Plus className="w-4 h-4" />
+                                    <span className="hidden sm:inline text-xs">Add Lead</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
                 <div className="demo-portal-controls">{demoControls}</div>
             </header>
 
@@ -1533,7 +1596,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     {currentView === 'dashboard' && <DashboardView metrics={metrics} loading={loading} scoped={isChannelPartnerOffice} />}
                     {currentView === 'delivery_batches' && canSeeDeliveryBatches && (
                         <DeliveryBatchesView 
-                            currentUser={user} 
+                             currentUser={user} 
                             onRefreshCustomers={fetchMetricsAndMeta} 
                             onOpenCustomerModal={setSelectedCustomer} 
                         />
@@ -1554,9 +1617,10 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                         </Suspense>
                     )}
 
-                    {currentView === 'attendance' && user.userType === 'admin' && <AttendanceView currentUser={user} />}
+                    {currentView === 'attendance' && <AttendanceView currentUser={user} />}
+                    {currentView === 'pricing' && <PricingView currentUser={user} />}
                     {currentView === 'channel_partner_mgmt' && user.userType === 'admin' && <ChannelPartnerManagementView currentUser={user} />}
-                    {currentView === 'vendor_availability' && user.userType === 'admin' && <VendorCalendarView isAdmin={true} />}
+                    {currentView === 'vendor_availability' && user.userType === 'admin' && <VendorCalendarView isAdmin={true} currentUser={user} />}
                     {currentView === 'installation_payments' && user.userType === 'admin' && <InstallationPaymentsView onSelectCustomer={setSelectedCustomer} currentUser={user} />}
                     {currentView === 'activity' && user.userType === 'admin' && <ActivityLogView />}
                     {currentView === 'users' && (user.userType === 'admin' || user.userType === 'channel_partner_office') && (
@@ -1573,56 +1637,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                         />
                     )}
 
-                    {currentView === 'stages' && (
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 sm:p-3 rounded-2xl border border-stone-100 shadow-xs">
-                            {/* Year Filtering Tabs: All, This Year (2026), Last Year (2025) */}
-                            <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl">
-                                <button
-                                    type="button"
-                                    onClick={() => { setYearFilter('all'); setPage(0); }}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${yearFilter === 'all' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'}`}
-                                >
-                                    All Years
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setYearFilter('2026'); setPage(0); }}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${yearFilter === '2026' ? 'bg-white text-amber-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'}`}
-                                >
-                                    This Year (2026)
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setYearFilter('2025'); setPage(0); }}
-                                    className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${yearFilter === '2025' ? 'bg-white text-amber-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'}`}
-                                >
-                                    Last Year (2025)
-                                </button>
-                            </div>
-
-                            {(selectedStage === STAGE_IDS.LEADS || selectedStage === STAGE_IDS.REGISTRATION) && (
-                                <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-stone-400">Month:</span>
-                                    <select
-                                        value={selectedStage === STAGE_IDS.LEADS ? leadMonthFilter : registrationMonthFilter}
-                                        onChange={event => {
-                                            if (selectedStage === STAGE_IDS.LEADS) setLeadMonthFilter(event.target.value);
-                                            else setRegistrationMonthFilter(event.target.value);
-                                            setPage(0);
-                                        }}
-                                        aria-label={selectedStage === STAGE_IDS.LEADS ? 'Filter leads by month' : 'Filter registrations by month'}
-                                        className="w-36 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-300"
-                                    >
-                                        <option value="">All Months</option>
-                                        <option value="this-month">This month</option>
-                                        {MONTH_OPTIONS.map(([value, label]) => (
-                                            <option key={value} value={value}>{label}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-                        </div>
-                    )}
 
                     {/* Stage grid - identical for every role */}
                     {currentView === 'stages' && (

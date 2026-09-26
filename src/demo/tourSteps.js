@@ -29,7 +29,7 @@ export const workflowTour = [
  admin('24. Vendor work and installation payment','A vendor assignment links the job; an installed status makes it eligible here. Review capacity, rate and amount, then record the vendor’s payment details and mark payment status only after the payment is actually recorded. This demo does not transfer money.','installation_payments'),
  admin('25. First loan payment','Return to Loan Tags → 1st Payment. Open the customer, record the bank’s first release and save the tag/history. These records remain available even though the installation stage has moved forward.','loan_tags',{tag:'1st Payment'}),
  customer('26. Discom sends work to Stamp Maker','In Discom Submission, enter Submitted By and Date, choose the linked Stamp Maker, stamp value and description, then use the send action. The assignment routes this customer’s document work to that maker’s queue. Optional photos do not block stage progression.','DISCOM SUBMISSION'),
- customer('27. Stamp Maker uploads and returns the file','The assigned Stamp Maker receives this customer card in their Stamp Guy portal, uploads the completed stamp agreement, and marks it Complete. The completed file is instantly attached back to this customer.','DISCOM SUBMISSION'),
+ customer('27. Stamp Maker uploads and returns the file','The assigned Stamp Maker receives this customer card in their Stamp Maker portal, uploads the completed stamp agreement, and marks it Complete. The completed file is instantly attached back to this customer.','DISCOM SUBMISSION'),
  customer('28. Stamp Maker completed record','Completed stamp agreements appear in the Stamp Maker’s Record ledger with dates and monthly totals, providing full reconciliation between Admin and document makers.','DISCOM SUBMISSION'),
  customer('29. Returned stamp file in Discom','Back in Admin → Discom Submission, open the customer that was sent to the maker. The returned stamp file and status appear in the same customer record. Review or download the file; use Send Back with a remark if it needs correction.','DISCOM SUBMISSION'),
  customer('30. Meter installation','Set Meter Installation to Yes and enter Installation Date. Meter photos and other attachments are optional. Save & Move continues to Discom Inspection.','METER INSTALLATION'),
@@ -88,7 +88,7 @@ export function tourSteps(role){
  ];
 
  if(role === 'stamp') return [
-  step('Stamp Maker Portal','Welcome to the Stamp Guy portal. Review agreement requests dispatched directly from DISCOM Submission.',role,'queue'),
+  step('Stamp Maker Portal','Welcome to the Stamp Maker portal. Review agreement requests dispatched directly from DISCOM Submission.',role,'queue'),
   step('1. Document queue','Review customer details, stamp duty amounts, and agreement parties requiring preparation.',role,'queue'),
   step('2. Upload executed stamp agreement','Upload the notarized/executed stamp file and mark the card Complete to route it back to the Admin Discom team.',role,'queue'),
   step('3. Completed records ledger','Track completed agreements, monthly volumes, and billing reconciliation records.',role,'record')

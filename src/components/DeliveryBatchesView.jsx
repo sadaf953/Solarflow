@@ -602,7 +602,7 @@ export default function DeliveryBatchesView({
                         const linkedProjects = customers.filter(c => (batch.project_ids || []).includes(c.id));
                         const batchKwp = linkedProjects.reduce((sum, p) => sum + (parseFloat(p.system_capacity_kwp) || 0), 0);
                         const totalModules = linkedProjects.reduce((sum, p) => sum + (parseInt(p.no_of_modules) || 0), 0);
-                        const isAllDelivered = linkedProjects.length > 0 && linkedProjects.every(p => (localStatusOverrides[p.id] || p.delivery_status) === 'DELIVERED');
+                        const isAllDelivered = batch.status === 'DELIVERED' || (linkedProjects.length > 0 && linkedProjects.every(p => (localStatusOverrides[p.id] || p.delivery_status) === 'DELIVERED'));
 
                         return (
                             <div 
@@ -631,7 +631,7 @@ export default function DeliveryBatchesView({
                                                         const projectIds = linkedProjects.map(p => p.id);
                                                         await updateDeliveryStatus(supabase, batch.id, newStatus, projectIds);
 
-                                                        await logActivity(currentUser?.id || "admin", "update", `Changed delivery batch ${batch.batch_no || batch.id} status to ${newStatus}`, "");
+                                                        await logActivity(currentUser?.id || "admin", "dispatch", `Delivery Batch ${batch.batch_no || batch.id}: Status changed to ${newStatus}`, `Driver: ${batch.driver_name || 'N/A'} | Vehicle: ${batch.vehicle_no || 'N/A'}`);
                                                         await handleRefresh();
                                                     } catch (err) {
                                                         setBatches(prev => prev.map(b => b.id === batch.id ? previousBatch : b));
@@ -794,7 +794,7 @@ export default function DeliveryBatchesView({
                                                      const projectIds = linkedProjects.map(p => p.id);
                                                      await updateDeliveryStatus(supabase, batch.id, 'DELIVERED', projectIds);
 
-                                                     await logActivity(currentUser?.id || "admin", "update", `Marked delivery batch ${batch.batch_no || batch.id} as DELIVERED (${projectIds.length} projects)`, "");
+                                                     await logActivity(currentUser?.id || "admin", "dispatch", `Delivery Batch ${batch.batch_no || batch.id}: Marked as DELIVERED (${projectIds.length} projects)`, `Projects: ${projectIds.length} items`);
                                                      await handleRefresh();
                                                  } catch (err) {
                                                      setBatches(prev => prev.map(b => b.id === batch.id ? previousBatch : b));
@@ -867,47 +867,70 @@ export default function DeliveryBatchesView({
                                                              </span>
                                                          </td>
                                                          <td className="py-2.5">
-                                                             <select
-                                                                 disabled={saving} aria-label={`Delivery status for ${proj.customer_name}`} value={(localStatusOverrides[proj.id] || proj.delivery_status || 'PENDING')}
-                                                                 onChange={async (e) => {
-                                                                     if (saving) return;
-                                                                     const newStat = e.target.value;
-                                                                     if (newStat === 'PENDING' && batch.project_ids.length === 1 && !await showConfirm('This is the last project. Return it to Pending and disband the empty batch?', {title: 'Remove last project?', confirmLabel: 'Remove and disband', cancelLabel: 'Keep batch'})) return;
-                                                                     setSaving(true);
-                                                                     const previousStat = localStatusOverrides[proj.id] || proj.delivery_status || 'PENDING';
-                                                                     setLocalStatusOverrides(prev => ({ ...prev, [proj.id]: newStat }));
-                                                                     try {
-                                                                         if (newStat === 'PENDING') {
-                                                                             await removeDeliveryProject(supabase, batch, proj.id);
-                                                                         } else {
-                                                                             // One database statement: the stock trigger succeeds or
-                                                                             // rolls back together with this project's status.
-                                                                             const todayStr = new Date().toISOString().split('T')[0];
-                                                                             const statusRes = await runWrite(
-                                                                                 supabase.from('admin').update({
-                                                                                     delivery_status: newStat,
-                                                                                     material_delivery_date: proj.material_delivery_date || batch.dispatch_date || todayStr,
-                                                                                 }).eq('id', proj.id).eq('delivery_batch_id', batch.batch_no).select('id'),
-                                                                                 { action: 'delivery status change' }
-                                                                             );
-                                                                             if (!statusRes.ok) throw statusRes.error;
-                                                                         }
-                                                                         await handleRefresh();
-                                                                     } catch (err) {
-                                                                         setLocalStatusOverrides(prev => ({ ...prev, [proj.id]: previousStat }));
-                                                                         showAlert("Failed to update delivery status: " + (err.message || "Unknown error"), { type: 'error' });
-                                                                     } finally { setSaving(false); }
-                                                                 }}
-                                                                 className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md outline-none cursor-pointer ${
-                                                                     (localStatusOverrides[proj.id] || proj.delivery_status || 'PENDING') === 'DELIVERED' 
-                                                                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
-                                                                         : 'bg-stone-100 text-stone-600 border border-stone-300'
-                                                                 }`}
-                                                             >
-                                                                <option value="PENDING">Pending</option>
-                                                                <option value="IN_TRANSIT">In Transit</option>
-                                                                <option value="DELIVERED">Delivered</option>
-                                                            </select>
+                                                            {(() => {
+                                                                const currentProjStatus = localStatusOverrides[proj.id] || (
+                                                                    proj.delivery_status === "DELIVERED" || batch.status === "DELIVERED"
+                                                                        ? "DELIVERED"
+                                                                        : "IN_TRANSIT"
+                                                                );
+                                                                return (
+                                                                    <select
+                                                                        disabled={saving}
+                                                                        aria-label={`Delivery status for ${proj.customer_name}`}
+                                                                        value={currentProjStatus}
+                                                                        onChange={async (e) => {
+                                                                            if (saving) return;
+                                                                            const newStat = e.target.value;
+                                                                            if (newStat === currentProjStatus) return;
+                                                                            if (newStat === "PENDING") {
+                                                                                const isLast = (batch.project_ids || []).length === 1;
+                                                                                const confirmMsg = isLast
+                                                                                    ? "This is the last project in this batch. Returning it to Pending will disband the empty batch. Continue?"
+                                                                                    : `Remove ${proj.customer_name || "this project"} from this batch and return to Pending?`;
+                                                                                const ok = await showConfirm(confirmMsg, {
+                                                                                    title: isLast ? "Disband empty batch?" : "Remove from batch?",
+                                                                                    confirmLabel: isLast ? "Remove and disband" : "Remove to Pending",
+                                                                                    cancelLabel: "Keep batch",
+                                                                                    type: "warning"
+                                                                                });
+                                                                                if (!ok) return;
+                                                                            }
+                                                                            setSaving(true);
+                                                                            setLocalStatusOverrides(prev => ({ ...prev, [proj.id]: newStat }));
+                                                                            try {
+                                                                                if (newStat === "PENDING") {
+                                                                                    await removeDeliveryProject(supabase, batch, proj.id);
+                                                                                } else {
+                                                                                    const todayStr = new Date().toISOString().split("T")[0];
+                                                                                    const statusRes = await runWrite(
+                                                                                        supabase.from("admin").update({
+                                                                                            delivery_status: newStat,
+                                                                                            material_delivery_date: proj.material_delivery_date || batch.dispatch_date || todayStr,
+                                                                                        }).eq("id", proj.id).eq("delivery_batch_id", batch.batch_no).select("id"),
+                                                                                        { action: "delivery status change" }
+                                                                                    );
+                                                                                    if (!statusRes.ok) throw statusRes.error;
+                                                                                }
+                                                                                await handleRefresh();
+                                                                            } catch (err) {
+                                                                                setLocalStatusOverrides(prev => ({ ...prev, [proj.id]: currentProjStatus }));
+                                                                                showAlert("Failed to update delivery status: " + (err.message || "Unknown error"), { type: "error" });
+                                                                            } finally { setSaving(false); }
+                                                                        }}
+                                                                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md outline-none cursor-pointer ${
+                                                                            currentProjStatus === "DELIVERED"
+                                                                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                                                                : currentProjStatus === "IN_TRANSIT"
+                                                                                    ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                                                                    : "bg-stone-100 text-stone-600 border border-stone-300"
+                                                                        }`}
+                                                                    >
+                                                                        <option value="IN_TRANSIT">In Transit</option>
+                                                                        <option value="DELIVERED">Delivered</option>
+                                                                        <option value="PENDING">Pending (Remove)</option>
+                                                                    </select>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="py-2.5 text-right">
                                                             <button

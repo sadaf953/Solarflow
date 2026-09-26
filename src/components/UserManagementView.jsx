@@ -7,13 +7,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { logActivity, runWrite } from '../utils';
 import { APP_ROLES } from '../constants';
-import DemoPeople from '../demo/DemoPeople';
-import BrevoModal from './BrevoModal';
 import { 
     ShieldCheck, Plus, RefreshCw, AlertTriangle, Eye, EyeOff, 
-    UserCog, X, KeyRound, Ban, Search, Edit2, Check, Loader2, Building2, Send, Lock, Mail, Calendar 
+    UserCog, X, KeyRound, Ban, Search, Edit2, Check, Loader2, Building2, Send, Lock, Mail, Calendar, Copy 
 } from 'lucide-react';
-import VendorCalendarView from './VendorCalendarView';
 
 // ─── ResetPasswordModal ───────────────────────────────────────────────────────
 function ResetPasswordModal({ user, onClose, onSuccess, currentUser }) {
@@ -752,6 +749,130 @@ function CreateUserModal({ onClose, onCreated, currentUser, branchOptions = [] }
     );
 }
 
+// ─── Default System & Demo Credentials ─────────────────────────────────────────
+export const DEFAULT_SYSTEM_USERS = [
+    {
+        id: 'system-user-admin',
+        name: 'Demo Admin',
+        email: 'admin@solarflow.demo',
+        password: 'SolarFlow@2026',
+        user_type: 'admin',
+        role: 'Admin',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    },
+    {
+        id: 'system-user-office-priya',
+        name: 'Priya Sharma (Office)',
+        email: 'office@solarflow.demo',
+        password: 'SolarFlow@2026',
+        user_type: 'sales',
+        role: 'Office',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    },
+    {
+        id: 'system-user-cpo',
+        name: 'Demo Aurora Solar (CPO)',
+        email: 'cpo@solarflow.demo',
+        password: 'SolarFlow@2026',
+        user_type: 'channel_partner_office',
+        role: 'Channel Partner Office',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    },
+    {
+        id: 'system-user-manager',
+        name: 'Demo Manager',
+        email: 'manager@solarflow.demo',
+        password: 'SolarFlow@2026',
+        user_type: 'office2',
+        role: 'Channel Partner Manager',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    },
+    {
+        id: 'system-user-dealer',
+        name: 'Demo Dealer',
+        email: 'dealer@solarflow.demo',
+        password: 'SolarFlow@2026',
+        user_type: 'agent2',
+        role: 'Channel Partner',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    },
+    {
+        id: 'system-user-partner',
+        name: 'Demo Partner (Agent)',
+        email: 'partner@solarflow.demo',
+        password: 'SolarFlow@2026',
+        user_type: 'agent',
+        role: 'Channel Partners',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    },
+    {
+        id: 'system-user-vendor',
+        name: 'Vendor 1',
+        email: 'vendor@solarflow.demo',
+        password: 'SolarFlow@2026',
+        user_type: 'vendor',
+        role: 'Vendors',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    },
+    {
+        id: 'system-user-stamp',
+        name: 'Demo Stamp Maker',
+        email: 'stamp@solarflow.demo',
+        password: 'SolarFlow@2026',
+        user_type: 'stamp',
+        role: 'Stamp',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    },
+    {
+        id: 'system-user-rahul',
+        name: 'Rahul Verma',
+        email: 'rahul.v@solarflow.example',
+        password: 'SolarFlow@2026',
+        user_type: 'sales',
+        role: 'Office',
+        channel_partner: 'Surat Solar Hub',
+        status: 'active'
+    },
+    {
+        id: 'system-user-amit',
+        name: 'Amit Trivedi',
+        email: 'amit.t@solarflow.example',
+        password: 'SolarFlow@2026',
+        user_type: 'sales',
+        role: 'Office',
+        channel_partner: 'Baroda Green Energy',
+        status: 'active'
+    },
+    {
+        id: 'system-user-ankit',
+        name: 'Ankit Patel',
+        email: 'ankit.p@solarflow.example',
+        password: 'SolarFlow@2026',
+        user_type: 'office2',
+        role: 'Channel Partner Manager',
+        channel_partner: 'Gujarat Suntech',
+        status: 'active'
+    },
+    {
+        id: 'system-user-sneha',
+        name: 'Sneha Joshi',
+        email: 'sneha.j@solarflow.example',
+        password: 'SolarFlow@2026',
+        user_type: 'sales',
+        role: 'Office',
+        channel_partner: 'Demo Aurora Solar',
+        status: 'active'
+    }
+];
+
 // ─── UserManagementView ───────────────────────────────────────────────────────
 export default function UserManagementView({ currentUser, initialShowCreate = false }) {
     return <AccountManagementView currentUser={currentUser} initialShowCreate={initialShowCreate} />;
@@ -776,13 +897,10 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
     }, [profiles]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(Boolean(initialShowCreate));
-    const [showBrevoModal, setShowBrevoModal] = useState(false);
-    const [showVendorCalendarModal, setShowVendorCalendarModal] = useState(false);
 
     useEffect(() => {
         if (initialShowCreate) {
             setShowCreateModal(true);
-            setSubTab('users');
         }
     }, [initialShowCreate]);
     const [actionLoading, setActionLoading] = useState(null);
@@ -793,21 +911,10 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
     const [tempEmail, setTempEmail] = useState('');
     const [editingNameId, setEditingNameId] = useState(null);
     const [tempName, setTempName] = useState('');
-    // DISABLED for the launch (2026-08-30).
-    // profiles.name is what RLS matches on (admin.sub_channel_partner for
-    // agent/agent2, admin.vendor for vendors), so a rename has to rewrite the
-    // name across every linked customer record. The cascade below is written
-    // and error-checked, but it is a large multi-row write on live data and a
-    // half-applied rename would silently hide records from that user.
-    //
-    // Proper fix is the UUID migration - see MIGRATION_PLAN_uuid_identity.md.
-    // After that, renaming is a single profiles.name update and this can be
-    // switched on permanently.
     const ALLOW_NAME_EDIT = false;
     const [editingPartnerId, setEditingPartnerId] = useState(null);
     const [tempPartner, setTempPartner] = useState('');
     const [isCustomPartner, setIsCustomPartner] = useState(false);
-    const [subTab, setSubTab] = useState('users'); // 'users' | 'demo_roles'
     const [pwdResetUser, setPwdResetUser] = useState(null);
 
     const showToast = (type, message) => {
@@ -820,51 +927,67 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
     const isAdmin = currentUserType === 'admin';
     const partnerName = (currentUser?.channel_partner || currentUser?.name || '').trim();
 
-    // ─── Robust Fetch Profiles ──────────────────────────────────────────────────
+    // ─── Robust Fetch Profiles & System Users ──────────────────────────────────
     const fetchProfiles = async () => {
         setLoading(true);
         try {
-            let query = supabase.from(targetTable).select('*').order('created_at', { ascending: false });
-            
-            if (isCP) {
-                if (isDemo) {
-                    if (partnerName) {
-                        query = query.ilike('channel_partner', partnerName);
-                    }
-                } else {
-                    if (currentUser?.id && partnerName) {
-                        query = query.or(`created_by.eq.${currentUser.id},channel_partner.ilike.${partnerName}`);
-                    } else if (currentUser?.id) {
-                        query = query.eq('created_by', currentUser.id);
-                    } else if (partnerName) {
-                        query = query.ilike('channel_partner', partnerName);
-                    }
-                }
+            const [pRes, dpRes] = await Promise.allSettled([
+                supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+                supabase.from('demo_profiles').select('*').order('created_at', { ascending: false })
+            ]);
+
+            let dbProfiles = [];
+            if (pRes.status === 'fulfilled' && pRes.value.data) {
+                dbProfiles = [...dbProfiles, ...pRes.value.data];
+            }
+            if (dpRes.status === 'fulfilled' && dpRes.value.data) {
+                dbProfiles = [...dbProfiles, ...dpRes.value.data];
             }
 
-            const { data, error } = await query;
-            if (!error && data && data.length > 0) {
-                if (isCP) {
-                    const cpoFiltered = data.filter(p => 
-                        p.id !== currentUser?.id &&
-                        p.user_type !== 'admin' &&
-                        p.role !== 'Admin' &&
-                        p.user_type !== 'channel_partner_office' &&
-                        p.role !== 'Channel Partner Office' &&
-                        (
-                            (!isDemo && p.created_by && p.created_by === currentUser?.id) ||
-                            (partnerName && p.channel_partner && p.channel_partner.trim().toLowerCase() === partnerName.toLowerCase())
-                        )
-                    );
-                    setProfiles(cpoFiltered);
-                } else {
-                    setProfiles(data);
+            const SCRIPT_NAMES = new Set(['deduplicator', 'inspector', 'admin 1', 'admin 2', 'cleaner script', 'cleaner admin', 'database trimmer', 'seeder']);
+            dbProfiles = dbProfiles.filter(p => !SCRIPT_NAMES.has(String(p.name || '').trim().toLowerCase()));
+
+            const mergedMap = new Map();
+            DEFAULT_SYSTEM_USERS.forEach(su => {
+                mergedMap.set(su.email.toLowerCase(), { ...su });
+            });
+
+            dbProfiles.forEach(p => {
+                const emailKey = p.email ? p.email.toLowerCase() : null;
+                if (emailKey && mergedMap.has(emailKey)) {
+                    mergedMap.set(emailKey, {
+                        ...mergedMap.get(emailKey),
+                        ...p,
+                        password: mergedMap.get(emailKey).password || 'SolarFlow@2026'
+                    });
+                } else if (p.id) {
+                    mergedMap.set(p.id, {
+                        ...p,
+                        password: 'SolarFlow@2026'
+                    });
                 }
-            } else {
-                setProfiles([]);
+            });
+
+            let allUsers = Array.from(mergedMap.values());
+
+            if (isCP) {
+                allUsers = allUsers.filter(p => 
+                    p.id !== currentUser?.id &&
+                    p.user_type !== 'admin' &&
+                    p.role !== 'Admin' &&
+                    p.user_type !== 'channel_partner_office' &&
+                    p.role !== 'Channel Partner Office' &&
+                    (
+                        (!isDemo && p.created_by && p.created_by === currentUser?.id) ||
+                        (partnerName && p.channel_partner && p.channel_partner.trim().toLowerCase() === partnerName.toLowerCase())
+                    )
+                );
             }
+
+            setProfiles(allUsers);
         } catch (err) {
             console.error('Error fetching user profiles:', err);
+            setProfiles(DEFAULT_SYSTEM_USERS);
         } finally {
             setLoading(false);
         }
@@ -1269,75 +1392,40 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
                     <div>
                         <h2 className="text-base font-bold text-stone-900">User Management</h2>
                         <p className="text-xs text-stone-500 font-medium">
-                            {subTab === 'users' ? `${filteredProfiles.length} of ${profiles.length} users active` : 'Persistent role profiles & integration staff'}
+                            {filteredProfiles.length} of {profiles.length} system users &amp; credentials active
                         </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    {/* View Switcher: Live System Users vs Demo Roles Directory */}
-                    <div className="flex bg-stone-100 p-1 rounded-xl border border-stone-200 text-xs font-bold">
-                        <button
-                            type="button"
-                            onClick={() => setSubTab('users')}
-                            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                                subTab === 'users' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
-                            }`}
-                        >
-                            <UserCog size={13} />
-                            <span>System Users</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setSubTab('demo_roles')}
-                            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                                subTab === 'demo_roles' ? 'bg-white text-stone-900 shadow-xs' : 'text-stone-500 hover:text-stone-800'
-                            }`}
-                        >
-                            <Building2 size={13} />
-                            <span>Demo Roles &amp; Staff</span>
-                        </button>
-                    </div>
-
-                    {subTab === 'users' && (
-                        <>
-                            <button 
-                                onClick={fetchProfiles} 
-                                className="p-2 border border-stone-200 hover:border-stone-300 bg-white rounded-xl text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer shadow-xs"
-                                title="Refresh User List"
-                            >
-                                <RefreshCw className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setShowBrevoModal(true)}
-                                className="flex items-center gap-2 bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-                                title="Brevo Email & Messaging Integration"
-                            >
-                                <Mail className="w-4 h-4 text-amber-700" /> Brevo Messaging
-                            </button>
-                            <button
-                                onClick={() => setShowVendorCalendarModal(true)}
-                                className="flex items-center gap-2 bg-white text-stone-700 border border-stone-200 hover:bg-stone-50 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs"
-                                title="Inspect vendor unavailabilities and schedule"
-                            >
-                                <Calendar className="w-4 h-4 text-amber-600" /> Vendor Calendar
-                            </button>
-                            <button 
-                                onClick={() => setShowCreateModal(true)}
-                                className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800 transition-all cursor-pointer shadow-sm"
-                            >
-                                <Plus className="w-4 h-4" /> Create User
-                            </button>
-                        </>
-                    )}
+                    <button 
+                        onClick={fetchProfiles} 
+                        className="p-2 border border-stone-200 hover:border-stone-300 bg-white rounded-xl text-stone-600 hover:bg-stone-50 transition-colors cursor-pointer shadow-xs"
+                        title="Refresh User List"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                    </button>
+                    <button 
+                        onClick={() => setShowCreateModal(true)}
+                        className="flex items-center gap-2 bg-stone-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-stone-800 transition-all cursor-pointer shadow-sm"
+                    >
+                        <Plus className="w-4 h-4" /> Create User
+                    </button>
                 </div>
             </div>
 
-            {subTab === 'demo_roles' ? (
-                <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
-                    <DemoPeople />
+            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+                {/* Credentials Banner */}
+                <div className="p-3.5 bg-amber-50/80 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-950">
+                    <div className="flex items-center gap-2">
+                        <KeyRound className="w-4 h-4 text-amber-600 shrink-0" />
+                        <div>
+                            <span className="font-bold">System Demo Logins: </span>
+                            <span>All accounts use default demo password </span>
+                            <code className="bg-amber-200/80 text-amber-950 px-1.5 py-0.5 rounded font-mono font-bold">SolarFlow@2026</code>
+                        </div>
+                    </div>
+                    <span className="text-[11px] text-amber-800 font-semibold">1-Click copy email / password available on each row</span>
                 </div>
-            ) : (
-                <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
                     {/* Search */}
                     <div className="border-b border-stone-100 p-4 bg-stone-50/50 flex flex-col sm:flex-row gap-2">
                         <div className="relative flex-1">
@@ -1391,6 +1479,7 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
                             <thead>
                                 <tr className="border-b border-stone-100 bg-stone-50/80">
                                     <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">User Details</th>
+                                    <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Login Credentials</th>
                                     <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Assigned Role</th>
                                     <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Branch / Partner</th>
                                     <th className="px-4 py-3 text-[10px] font-black text-stone-400 uppercase tracking-wider">Status</th>
@@ -1510,6 +1599,43 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
                                                             )}
                                                         </div>
                                                     )}
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        {/* Login Credentials */}
+                                        <td className="px-4 py-3">
+                                            <div className="flex flex-col gap-1 min-w-[190px]">
+                                                <div className="flex items-center gap-1.5 text-xs text-stone-800 font-mono">
+                                                    <span className="font-semibold text-stone-900 truncate max-w-[170px]" title={profile.email || ''}>{profile.email || '–'}</span>
+                                                    {profile.email && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(profile.email);
+                                                                showToast('success', `Copied ${profile.email}`);
+                                                            }}
+                                                            className="p-1 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded transition cursor-pointer"
+                                                            title="Copy login email"
+                                                        >
+                                                            <Copy className="w-3 h-3" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                                                    <KeyRound className="w-3 h-3 text-amber-500 shrink-0" />
+                                                    <span className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-700 font-semibold">{profile.password || 'SolarFlow@2026'}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(profile.password || 'SolarFlow@2026');
+                                                            showToast('success', 'Copied demo password (SolarFlow@2026)');
+                                                        }}
+                                                        className="p-1 text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded transition cursor-pointer"
+                                                        title="Copy demo password"
+                                                    >
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
                                                 </div>
                                             </div>
                                         </td>
@@ -1732,7 +1858,6 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
                         </table>
                     </div>
                 </div>
-            )}
 
             {showCreateModal && (
                 <CreateUserModal
@@ -1754,53 +1879,6 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
                     onSuccess={(msg) => { showToast('success', msg); }}
                     currentUser={currentUser}
                 />
-            )}
-
-            <BrevoModal
-                isOpen={showBrevoModal}
-                onClose={() => setShowBrevoModal(false)}
-            />
-
-            {/* Vendor Availability Calendar Modal for Admin */}
-            {showVendorCalendarModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-stone-200 p-6 relative">
-                        <div className="flex items-center justify-between pb-4 mb-4 border-b border-stone-100">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
-                                    <Calendar className="w-4 h-4" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-stone-900">Vendor Availability Schedule</h3>
-                                    <p className="text-[11px] text-stone-500">Inspect vendor availability before assigning delivery or installation batches</p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowVendorCalendarModal(false)}
-                                className="p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-stone-700 transition cursor-pointer"
-                                title="Close calendar"
-                            >
-                                <X size={18} />
-                            </button>
-                        </div>
-
-                        <VendorCalendarView 
-                            vendorName="Vendor 1" 
-                            isAdmin={true} 
-                        />
-
-                        <div className="mt-6 pt-4 border-t border-stone-100 flex justify-end">
-                            <button
-                                type="button"
-                                onClick={() => setShowVendorCalendarModal(false)}
-                                className="px-5 py-2 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl transition cursor-pointer"
-                            >
-                                Close Schedule
-                            </button>
-                        </div>
-                    </div>
-                </div>
             )}
         </div>
     );

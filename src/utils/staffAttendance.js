@@ -51,6 +51,35 @@ export const ATTENDANCE_STATUSES = {
         activeBg: 'bg-purple-600 text-white',
         dot: 'bg-purple-500',
         color: '#9333ea'
+    },
+    pending_present: {
+        id: 'pending_present',
+        label: 'Self-Marked (Pending)',
+        short: 'SMP',
+        bg: 'bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-400',
+        activeBg: 'bg-amber-500 text-white',
+        dot: 'bg-amber-500 animate-pulse',
+        color: '#d97706',
+        isPending: true
+    },
+    holiday_request: {
+        id: 'holiday_request',
+        label: 'Holiday Request',
+        short: 'HR',
+        bg: 'bg-indigo-100 text-indigo-900 border-indigo-300 ring-1 ring-indigo-400',
+        activeBg: 'bg-indigo-600 text-white',
+        dot: 'bg-indigo-500 animate-pulse',
+        color: '#4f46e5',
+        isPending: true
+    },
+    holiday: {
+        id: 'holiday',
+        label: 'Holiday / Approved Leave',
+        short: 'H',
+        bg: 'bg-teal-100 text-teal-800 border-teal-300',
+        activeBg: 'bg-teal-600 text-white',
+        dot: 'bg-teal-500',
+        color: '#0d9488'
     }
 };
 
@@ -299,16 +328,35 @@ export async function setStaffAttendance(staffName, dateStr, status, notes = '',
     // Persist to Supabase if table exists
     try {
         if (status) {
-            await supabase
+            const { data: existing } = await supabase
                 .from('staff_attendance')
-                .upsert({
-                    staff_name: staffName,
-                    date: dateStr,
-                    status: status,
-                    notes: notes || '',
-                    marked_by: markedBy,
-                    updated_at: nowIso
-                }, { onConflict: 'staff_name,date' });
+                .select('id')
+                .eq('staff_name', staffName)
+                .eq('date', dateStr)
+                .maybeSingle();
+
+            if (existing?.id) {
+                await supabase
+                    .from('staff_attendance')
+                    .update({
+                        status: status,
+                        notes: notes || '',
+                        marked_by: markedBy,
+                        updated_at: nowIso
+                    })
+                    .eq('id', existing.id);
+            } else {
+                await supabase
+                    .from('staff_attendance')
+                    .insert({
+                        staff_name: staffName,
+                        date: dateStr,
+                        status: status,
+                        notes: notes || '',
+                        marked_by: markedBy,
+                        updated_at: nowIso
+                    });
+            }
         } else {
             await supabase
                 .from('staff_attendance')
@@ -355,7 +403,12 @@ export async function markAllStaffPresent(staffList, dateStr, markedBy = 'Admin'
     try {
         await supabase
             .from('staff_attendance')
-            .upsert(upsertRows, { onConflict: 'staff_name,date' });
+            .delete()
+            .eq('date', dateStr);
+
+        await supabase
+            .from('staff_attendance')
+            .insert(upsertRows);
     } catch (err) {
         console.warn('Backend batch attendance sync skipped:', err);
     }
@@ -478,5 +531,77 @@ export function exportAttendanceToCSV({ staffList, columns, records, viewMode, t
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+}
+
+/**
+ * Submit a holiday / leave request spanning from startDateStr to endDateStr
+ */
+export async function submitHolidayRequest(staffName, startDateStr, endDateStr, reason = '', requestedBy = 'Staff') {
+    if (!staffName || !startDateStr) return false;
+
+    const start = new Date(startDateStr);
+    const end = endDateStr ? new Date(endDateStr) : new Date(startDateStr);
+    
+    // Safety check: max 31 days per request
+    const daysDiff = Math.round((end - start) / (1000 * 60 * 60 * 24));
+    if (daysDiff < 0 || daysDiff > 31) return false;
+
+    const current = new Date(start);
+    while (current <= end) {
+        const y = current.getFullYear();
+        const m = String(current.getMonth() + 1).padStart(2, '0');
+        const d = String(current.getDate()).padStart(2, '0');
+        const dateKey = `${y}-${m}-${d}`;
+
+        await setStaffAttendance(
+            staffName,
+            dateKey,
+            'holiday_request',
+            `Holiday Request: ${reason || 'Leave requested'}`,
+            requestedBy
+        );
+
+        current.setDate(current.getDate() + 1);
+    }
+    return true;
+}
+
+/**
+ * Staff self-marks themselves present for today (pending admin approval)
+ */
+export async function submitSelfAttendance(staffName, dateStr, notes = '', markedBy = 'Staff') {
+    if (!staffName || !dateStr) return false;
+    await setStaffAttendance(
+        staffName,
+        dateStr,
+        'pending_present',
+        `Self-marked present: ${notes || 'Submitted by staff'}`,
+        markedBy
+    );
+    return true;
+}
+
+/**
+ * Admin approves a pending request
+ */
+export async function approveAttendanceRequest(staffName, dateStr, currentStatus, adminName = 'Admin') {
+    const targetStatus = currentStatus === 'holiday_request' ? 'holiday' : 'present';
+    const noteText = currentStatus === 'holiday_request' ? 'Approved holiday / leave by Admin' : 'Approved attendance by Admin';
+    await setStaffAttendance(staffName, dateStr, targetStatus, noteText, adminName);
+    return true;
+}
+
+/**
+ * Admin rejects a pending request
+ */
+export async function rejectAttendanceRequest(staffName, dateStr, reason = '', adminName = 'Admin') {
+    await setStaffAttendance(
+        staffName,
+        dateStr,
+        'absent',
+        `Rejected by ${adminName}: ${reason || 'Leave not granted'}`,
+        adminName
+    );
+    return true;
 }
 

@@ -21,7 +21,7 @@ export async function ensureGroupedDemoBatches(client){
   const assigned=eligible.filter(p=>1+(Number(p.demo_seed_key.split('-').at(-1))-1)%3===n);
   if(!assigned.length)continue;
   const payload={batch_no:batchNo,dispatch_date:new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'}),driver_name:`Demo Driver ${n}`,driver_phone:`000000000${n}`,vehicle_number:`DEMO-VEHICLE-00${n}`,rent_amount:'1500',status:'PENDING',notes:truckNote,project_ids:[]};
-  if(!existing)await checked(client.from('delivery_batches').upsert(payload,{onConflict:'demo_session_id,batch_no',ignoreDuplicates:true}));
+  if(!existing)await checked(client.from('delivery_batches').upsert(payload,{onConflict:'batch_no',ignoreDuplicates:true}));
   const current=await checked(client.from('delivery_batches').select('*').eq('batch_no',batchNo));
   if(current.length!==1)throw new Error('Could not load the sample truck batch. Refresh to retry.');
   const ids=Array.from(new Set([...(current[0].project_ids||[]),...assigned.map(p=>p.id)]));

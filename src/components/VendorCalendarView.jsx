@@ -10,6 +10,7 @@ import {
     getAllVendorUnavailabilities,
     getUnavailableVendorsForDate
 } from '../utils/vendorAvailability';
+import { logActivity } from '../utils';
 
 const MONTH_NAMES = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -40,7 +41,7 @@ function formatTimestamp(isoString) {
     }
 }
 
-export default function VendorCalendarView({ vendorName = 'Vendor 1', isAdmin = false }) {
+export default function VendorCalendarView({ vendorName = 'Vendor 1', isAdmin = false, currentUser }) {
     // In Admin mode, allow selecting 'All Vendors' or individual vendors
     const [selectedVendorFilter, setSelectedVendorFilter] = useState('All Vendors');
     const effectiveVendor = isAdmin ? selectedVendorFilter : (vendorName || 'Vendor 1');
@@ -116,6 +117,12 @@ export default function VendorCalendarView({ vendorName = 'Vendor 1', isAdmin = 
         if (!editingDate || isAdmin) return;
         setVendorDateUnavailability(vendorName, editingDate, isUnavailable, editReason || '');
         reloadData();
+        logActivity(
+            currentUser?.id,
+            'vendor',
+            `Vendor Availability: ${vendorName} marked ${editingDate} as ${isUnavailable ? 'Unavailable' : 'Available'}`,
+            editReason ? `Reason: ${editReason}` : `Status: ${isUnavailable ? 'Unavailable' : 'Available'}`
+        );
         setSaveFeedback(isUnavailable ? 'Date marked unavailable' : 'Date marked available');
         setTimeout(() => {
             setSaveFeedback('');

@@ -224,7 +224,7 @@ export default function MaterialDeliveryTab({
                                 className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 shadow-md ${
                                     sendingInfo
                                         ? 'bg-stone-200 text-stone-400 cursor-wait'
-                                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/10'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/10'
                                 }`}
                             >
                                 <Mail className="w-3.5 h-3.5" />
@@ -262,33 +262,38 @@ export default function MaterialDeliveryTab({
                         <Zap size={12} /> Material Delivery Details
                     </h3>
                     <div className="flex items-center gap-3">
-                        <select
-                            disabled={!canEditDelivery}
-                            title={canEditDelivery ? undefined : 'Delivery status is set from Delivery Batches'}
-                            value={localDeliveryStatus || editData.delivery_status || 'PENDING'}
-                            onChange={async (e) => {
-                                const previousStat = localDeliveryStatus || editData.delivery_status || 'PENDING';
-                                const newStat = e.target.value;
-                                setLocalDeliveryStatus(newStat);
-                                setEditData(p => ({ ...p, delivery_status: newStat }));
-                                try {
-                                    // A failed save must stop here - otherwise the activity log below
-                                    // records a change that never reached the database.
-                                    if (await onUpdate(customer.id, { delivery_status: newStat }) === false) throw new Error('Delivery was not saved');
-                                } catch { setLocalDeliveryStatus(previousStat);setEditData(p=>({...p,delivery_status:previousStat})); }
-                            }}
-                            className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full outline-none cursor-pointer tracking-normal shadow-xs ${
-                                (localDeliveryStatus || editData.delivery_status) === 'DELIVERED' 
-                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
-                                    : (localDeliveryStatus || editData.delivery_status) === 'IN_TRANSIT'
-                                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                                        : 'bg-stone-100 text-stone-600 border border-stone-300'
-                            }`}
-                        >
-                            <option value="PENDING">Status: Pending</option>
-                            <option value="IN_TRANSIT">Status: In Transit</option>
-                            <option value="DELIVERED">Status: Delivered</option>
-                        </select>
+                        {(() => {
+                            const effectiveDeliveryStatus = localDeliveryStatus || (editData.delivery_status === 'DELIVERED' ? 'DELIVERED' : (editData.delivery_batch_id ? 'IN_TRANSIT' : (editData.delivery_status || 'PENDING')));
+                            return (
+                                <select
+                                    disabled={!canEditDelivery}
+                                    title={canEditDelivery ? undefined : 'Delivery status is set from Delivery Batches'}
+                                    value={effectiveDeliveryStatus}
+                                    onChange={async (e) => {
+                                        const previousStat = effectiveDeliveryStatus;
+                                        const newStat = e.target.value;
+                                        setLocalDeliveryStatus(newStat);
+                                        setEditData(p => ({ ...p, delivery_status: newStat }));
+                                        try {
+                                            // A failed save must stop here - otherwise the activity log below
+                                            // records a change that never reached the database.
+                                            if (await onUpdate(customer.id, { delivery_status: newStat }) === false) throw new Error('Delivery was not saved');
+                                        } catch { setLocalDeliveryStatus(previousStat);setEditData(p=>({...p,delivery_status:previousStat})); }
+                                    }}
+                                    className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full outline-none cursor-pointer tracking-normal shadow-xs ${
+                                        effectiveDeliveryStatus === 'DELIVERED' 
+                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                                            : effectiveDeliveryStatus === 'IN_TRANSIT'
+                                                ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                                : 'bg-stone-100 text-stone-600 border border-stone-300'
+                                    }`}
+                                >
+                                    <option value="PENDING">Status: Pending</option>
+                                    <option value="IN_TRANSIT">Status: In Transit</option>
+                                    <option value="DELIVERED">Status: Delivered</option>
+                                </select>
+                            );
+                        })()}
                         {canEditDelivery && (
                             <button 
                                 type="button"
@@ -664,7 +669,7 @@ export default function MaterialDeliveryTab({
                                         fetchLogs();
                                     }
                                 }}
-                                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 transition flex items-center gap-1.5 cursor-pointer"
+                                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition flex items-center gap-1.5 cursor-pointer"
                             >
                                 <Mail size={14} />
                                 Confirm & Send Email
