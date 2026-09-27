@@ -107,9 +107,16 @@ Generated on 2026-09-27 from all supported source files in \`src/\`.
 | Tailwind color utility variants | ${utility.size} |
 | Tailwind color families | ${familyTotals.size} |
 
-The app is visually fragmented because the same jobs are handled by several overlapping systems: Stone, Gray, and Slate all act as neutrals; Amber, Orange, and Yellow all act as solar accents or warnings; Emerald, Green, and Teal all act as success colors; Rose and Red both act as errors. Blue, Sky, Cyan, Indigo, Violet, and Purple add more categorical colors without one shared rule.
+The source still contains legacy family names from the original fragmented design: Stone, Gray, and Slate all appear as neutrals; Amber, Orange, and Yellow appear as solar accents or warnings; Emerald, Green, and Teal appear as success colors; Rose and Red both appear as errors. The central Tailwind theme now resolves those related legacy names to the approved SolarFlow scales, so the rendered product is cohesive while the remaining source names are gradually simplified.
 
 The quotation PDF is the one reasonable exception. Its navy and orange palette is a customer-facing document identity and can remain isolated from the admin interface.
+
+## Implementation status
+
+- The shared palette is active globally through \`tailwind.config.js\` and the semantic tokens in \`src/index.css\`.
+- Public login, credential login, pricing, Dashboard accents, Inventory, Deliveries, attendance, portals, forms, and modal surfaces now inherit the same rendered palette.
+- Active gradients were removed. Print layouts remain monochrome, and the quotation PDF retains its separate navy/orange document identity.
+- The remaining family count below describes class names still present in source, not the number of palettes visible in the built product.
 
 ## Palettes currently competing in the product
 

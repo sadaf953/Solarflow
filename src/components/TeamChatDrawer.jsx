@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     MessageSquare, Send, X, Users, AlertCircle, Sparkles, 
-    Tag, Bell, Check, Shield, Flame, CheckCircle2, ChevronDown, Minimize2, RotateCcw, Trash2
+    Tag, Bell, Check, Shield, Flame, CheckCircle2, ChevronDown, Minimize2, RotateCcw
 } from 'lucide-react';
 import { supabase } from '../supabase';
 
@@ -233,17 +233,6 @@ export default function TeamChatDrawer({ currentUser }) {
         };
     }, [isOpen]);
 
-    const handleClearChat = async () => {
-        setMessages([]);
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
-            if (broadcastChannelRef.current) {
-                broadcastChannelRef.current.postMessage({ type: 'RESET_MESSAGES', messages: [] });
-            }
-            await supabase.from('team_chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        } catch { /* ignore */ }
-    };
-
     const handleResetChat = async () => {
         const fresh = getInitialMessages();
         setMessages(fresh);
@@ -384,13 +373,6 @@ export default function TeamChatDrawer({ currentUser }) {
                                 title="Reset to Sample Updates"
                             >
                                 <RotateCcw className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={handleClearChat}
-                                className="p-1.5 text-stone-400 hover:text-rose-400 rounded-lg hover:bg-stone-800 transition-colors cursor-pointer"
-                                title="Clear All Messages"
-                            >
-                                <Trash2 className="w-4 h-4" />
                             </button>
                             <button
                                 onClick={() => setIsOpen(false)}

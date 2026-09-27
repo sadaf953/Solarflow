@@ -405,7 +405,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
 
             {/* When a specific vendor is selected: Vendor Card with Pay All Button */}
             {selectedVendor !== 'All' && (
-                <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-white p-4 rounded-2xl border border-amber-300 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-200">
+                <div className="bg-orange-50 p-4 rounded-2xl border border-amber-300 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in duration-200">
                     <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-sm shadow-amber-500/20 flex-shrink-0">
                             <Building2 size={20} />

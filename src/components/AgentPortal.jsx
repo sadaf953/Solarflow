@@ -2827,7 +2827,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
             {showValidationModal && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-sm" onClick={() => setShowValidationModal(false)}>
                     <section className="w-full max-w-md overflow-hidden rounded-[28px] border border-amber-200 bg-white shadow-2xl animate-in zoom-in-95 fade-in duration-200" onClick={event => event.stopPropagation()} role="alertdialog" aria-modal="true" aria-labelledby="requirements-title">
-                        <div className="bg-gradient-to-br from-amber-500 via-amber-500 to-orange-500 px-6 py-5 text-white">
+                        <div className="bg-orange-500 px-6 py-5 text-stone-900">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     <div className="rounded-2xl bg-white/20 p-2.5"><AlertTriangle size={21} /></div>

@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import {ensureThreeDemoVendors,demoVendorTarget} from './demo/vendors';
 import LoginScreen from './components/LoginScreen';
+import BrandMark from './components/BrandMark';
 import DemoHeader from './demo/DemoHeader';
 const PasswordRecoveryModal=lazy(()=>import('./components/PasswordRecoveryModal'));
 const TeamChatDrawer=lazy(()=>import('./components/TeamChatDrawer'));
@@ -101,7 +102,12 @@ export default function App(){
  }
  function openPlans(){setPublicView('plans');window.history.pushState(null,'','#/plans');}
  function closePlans(){setPublicView(null);window.history.pushState(null,'',window.location.pathname);}
- function chooseAgain(){clearEnteredThisTab();setUser(null);setError('');window.history.replaceState(null,'',window.location.pathname);for(const key of ['solarflow_current_view','solarflow_selected_stage','solarflow_selected_customer_id'])sessionStorage.removeItem(key);}
+ function chooseAgain(){
+  clearEnteredThisTab();
+  try { localStorage.removeItem('solarflow_visitor_name'); } catch { /* storage may be unavailable */ }
+  setUser(null);setError('');window.history.replaceState(null,'',window.location.pathname);
+  for(const key of ['solarflow_current_view','solarflow_selected_stage','solarflow_selected_customer_id'])sessionStorage.removeItem(key);
+ }
  async function switchTourRole(role){
   const {data,error}=await supabase.rpc('start_demo_session',{p_role:role});
   if(error)throw error;if(!data?.id)throw new Error('Could not open this demo role.');
@@ -128,11 +134,14 @@ export default function App(){
     /></Suspense>
    )}
    {!user ? (publicView === 'plans' ? (
-    <div className="min-h-screen bg-stone-50">
-     <div className="sticky top-0 z-20 bg-white/95 border-b border-stone-200 px-4 py-3">
+    <div className="sf-page">
+     <div className="sticky top-0 z-20 bg-white/95 border-b border-stone-200 px-4 py-3 backdrop-blur">
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-       <button type="button" onClick={closePlans} className="text-sm font-bold text-stone-700 hover:text-stone-950">← Back to SolarFlow</button>
-       <button type="button" onClick={closePlans} className="px-4 py-2 rounded-xl bg-stone-900 text-white text-xs font-bold">Open demo</button>
+       <button type="button" onClick={closePlans} className="flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400" aria-label="Back to SolarFlow home">
+        <BrandMark size="md" />
+        <span className="hidden sm:inline text-xs font-bold text-stone-600">← Back</span>
+       </button>
+       <button type="button" onClick={closePlans} className="sf-btn-primary">Open demo</button>
       </div>
      </div>
      <div className="px-4"><Suspense fallback={<Loader/>}><PricingView /></Suspense></div>

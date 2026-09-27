@@ -160,3 +160,19 @@ Re-run the updated `16_create_enquiries_table.sql` in the approved demo project 
 Re-run the complete updated `07_bom_delivery_stock.sql` in the approved demo database. It now includes `save_delivery_batch_atomic` and `delete_delivery_batch_atomic`, which were missing from the hosted project. They link/unlink customers and save/delete a batch within one transaction, reject stale or conflicting assignments, and preserve delivered batch history. Until applied, the updated frontend shows a setup error for batch save/delete instead of attempting partial writes. Existing status/stock functions are retained.
 
 Locally validated using PGlite with authenticated role and ownership policies: `PGLITE_MODULE=<path to PGlite module> node tests/delivery/batch-sql.mjs`. Hosted application and verification are still pending.
+
+### Two-step enquiries
+
+`supabase/migrations/20260927180502_two_step_enquiries.sql` enables a name-and-phone enquiry followed by optional details on the same record. It leaves existing enquiry-table permissions unchanged, stores edit keys in a private schema, and authorizes an update only with the original authenticated session and a random per-enquiry edit token. Selected plan or tools-only interest is captured in the first save. Skipping the second step retains that contact request.
+
+Until this migration is applied, the quick enquiry can still use the existing insert-only API. Optional saves show an explicit unavailable message and never insert duplicate contacts. Apply the migration only to the approved demo project `qduonewmquwayrnwyzvc`.
+
+The two-step migration was applied to the approved demo project through the CLI on 2026-09-27. `tests/enquiries/two-step.sql` passed against the hosted database with all fictional test data rolled back: same-record optional update, retry without duplication, private-key read denial, and rejection of wrong-token, cross-session and unauthenticated edits.
+
+### Enquiry email notifications
+
+The `send-enquiry-email` Edge Function and `supabase/migrations/20260927183052_enquiry_email_notifications.sql` are deployed and applied to the approved demo project `qduonewmquwayrnwyzvc`. The private worker token is configured. Each new enquiry queues an email to the fixed recipient `enquiry@deeprootsystems.in` containing only name, phone and selected plan/tools interest. Optional-detail updates do not send another email. Historical enquiries are not backfilled.
+
+The browser receives no mail credentials and does not call email functions. The database queues the first submission and starts the worker after commit; a scheduled job retries failed sends with a stable UUID provider idempotency key. Optional details remain on the original enquiry record. Skipping retains the saved contact request.
+
+Hosted `tests/enquiries/email-outbox.sql` passed with all fixtures and HTTP requests rolled back. The browser first-step flow and top skip link were verified with a fictional contact named “SolarFlow Email Test (demo)”. Brevo accepted its email and returned a message ID; inbox delivery has not been independently confirmed. Worker, enquiry and browser-isolation unit tests passed. Run the worker tests with `node --test tests/enquiries/email.test.mjs`.

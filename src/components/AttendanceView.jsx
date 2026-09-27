@@ -506,10 +506,10 @@ export default function AttendanceView({ currentUser }) {
                             setHolidayStaff(currentStaffName || staffList[0]?.name || 'Staff User');
                             setShowHolidayModal(true);
                         }}
-                        className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                        className="px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
                         title="Submit a holiday or leave request"
                     >
-                        <CalendarPlus className="w-3.5 h-3.5 text-indigo-600" />
+                        <CalendarPlus className="w-3.5 h-3.5 text-blue-600" />
                         Request Leave / Holiday
                     </button>
 
@@ -615,7 +615,7 @@ export default function AttendanceView({ currentUser }) {
                                             <span className="text-xs font-black text-stone-900">{req.staffName}</span>
                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                                 isHoliday 
-                                                    ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' 
+                                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
                                                     : 'bg-amber-100 text-amber-800 border border-amber-200'
                                             }`}>
                                                 {isHoliday ? 'Holiday / Leave Request' : 'Self-Marked Present'}
@@ -680,12 +680,12 @@ export default function AttendanceView({ currentUser }) {
                     </div>
                 </div>
 
-                <div className="p-4 bg-purple-50/70 rounded-xl border border-purple-200 shadow-xs flex items-center justify-between">
+                <div className="p-4 bg-orange-50/70 rounded-xl border border-orange-200 shadow-xs flex items-center justify-between">
                     <div>
-                        <div className="text-[10px] font-bold uppercase text-purple-700">On Duty / Field</div>
-                        <div className="text-xl font-black text-purple-900 mt-0.5">{kpiSummary.onDutyToday} Staff</div>
+                        <div className="text-[10px] font-bold uppercase text-orange-700">On Duty / Field</div>
+                        <div className="text-xl font-black text-orange-900 mt-0.5">{kpiSummary.onDutyToday} Staff</div>
                     </div>
-                    <div className="w-9 h-9 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                    <div className="w-9 h-9 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center font-bold">
                         <Briefcase className="w-4 h-4" />
                     </div>
                 </div>
@@ -736,10 +736,10 @@ export default function AttendanceView({ currentUser }) {
                     <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
                         HD = Half Day
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-sky-100 text-sky-800 border border-sky-200">
+                    <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200">
                         L = Leave
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200">
+                    <span className="px-2 py-0.5 rounded bg-orange-100 text-orange-800 border border-orange-200">
                         OD = On Duty
                     </span>
                 </div>
@@ -1058,7 +1058,7 @@ export default function AttendanceView({ currentUser }) {
                     <div className="bg-white rounded-2xl shadow-xl border border-stone-200 max-w-md w-full p-6 space-y-4">
                         <div className="flex items-center justify-between border-b border-stone-100 pb-3">
                             <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+                                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
                                     <CalendarPlus className="w-4 h-4" />
                                 </div>
                                 <div>
@@ -1081,7 +1081,7 @@ export default function AttendanceView({ currentUser }) {
                                     <select
                                         value={holidayStaff}
                                         onChange={e => setHolidayStaff(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl bg-stone-50 font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl bg-stone-50 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
                                         {staffList.map(s => (
                                             <option key={s.id || s.name} value={s.name}>{s.name} ({s.role || 'Staff'})</option>
@@ -1110,7 +1110,7 @@ export default function AttendanceView({ currentUser }) {
                                                 setHolidayEndDate(e.target.value);
                                             }
                                         }}
-                                        className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
                                 <div>
@@ -1121,7 +1121,7 @@ export default function AttendanceView({ currentUser }) {
                                         min={holidayStartDate}
                                         value={holidayEndDate}
                                         onChange={e => setHolidayEndDate(e.target.value)}
-                                        className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>
                             </div>
@@ -1134,7 +1134,7 @@ export default function AttendanceView({ currentUser }) {
                                     value={holidayReason}
                                     onChange={e => setHolidayReason(e.target.value)}
                                     placeholder="e.g. Family function, personal leave, festival..."
-                                    className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full px-3 py-2 text-xs border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
                             </div>
 
@@ -1149,7 +1149,7 @@ export default function AttendanceView({ currentUser }) {
                                 <button
                                     type="submit"
                                     disabled={holidaySubmitting}
-                                    className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                                    className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                                 >
                                     <Send className="w-3.5 h-3.5" />
                                     {holidaySubmitting ? 'Submitting...' : 'Submit Request'}

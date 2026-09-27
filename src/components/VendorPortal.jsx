@@ -1016,7 +1016,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
             {view === 'list' ? (
                 <main className={`flex-1 p-4 mx-auto w-full space-y-4 animate-in fade-in duration-300 ${activeTab === 'PAYOUTS' ? 'max-w-4xl' : 'max-w-md'}`}>
                     {/* Welcome banner */}
-                    <div className="bg-gradient-to-br from-stone-900 to-stone-800 text-white p-5 rounded-[24px] shadow-lg relative overflow-hidden">
+                    <div className="bg-stone-900 text-white p-5 rounded-[24px] shadow-lg relative overflow-hidden">
                         <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-[0.07]">
                             <BrandMark variant="white" size="lg" />
                         </div>
@@ -1438,7 +1438,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                             {/* ─── Active Tab: MATERIAL INTEGRATION & BOM ─── */}
                             {activeTab === 'MATERIAL' && (
                                 <div className="space-y-4">
-                                    <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/70 to-white p-4 shadow-xs">
+                                    <div className="rounded-2xl border border-amber-200/80 bg-orange-50 p-4 shadow-xs">
                                         <div className="flex items-start justify-between gap-3 border-b border-amber-200/70 pb-3">
                                             <div>
                                                 <p className="text-[10px] font-black uppercase tracking-widest text-amber-900">BOM Details</p>

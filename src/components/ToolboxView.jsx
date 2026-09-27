@@ -8,68 +8,121 @@ import { useState, useRef, useMemo } from 'react';
 import {
     Calculator, Receipt, IndianRupee, Sun, ShieldCheck,
     FileText, UserCheck, Truck, Printer, RotateCcw,
-    CheckCircle2, ArrowRight, Sparkles, Building2, Phone, Calendar
+    CheckCircle2, ArrowRight, Sparkles, Building2, Phone, Calendar, ChevronRight
 } from 'lucide-react';
+
+const TOOL_GROUPS = [
+    {
+        label: 'Solar calculations',
+        description: 'Customer estimates and tax working',
+        tools: [
+            { id: 'emi', label: 'Loan EMI', description: 'Monthly finance estimate', icon: Calculator },
+            { id: 'gst', label: 'GST calculation', description: 'Taxable value and GST split', icon: Receipt },
+            { id: 'savings', label: 'Savings & ROI', description: 'Generation, payback and savings', icon: Sun },
+        ],
+    },
+    {
+        label: 'Business documents',
+        description: 'Print-ready operational paperwork',
+        tools: [
+            { id: 'customer_receipt', label: 'Customer receipt', description: 'Payment acknowledgement', icon: IndianRupee },
+            { id: 'staff_receipt', label: 'Staff payment', description: 'Internal payment voucher', icon: UserCheck },
+            { id: 'vendor_receipt', label: 'Vendor payment', description: 'Contractor payment voucher', icon: Truck },
+            { id: 'warranty', label: 'Warranty certificate', description: 'Customer warranty record', icon: ShieldCheck },
+            { id: 'quick_quote', label: 'Quick quotation', description: 'One-page customer proposal', icon: FileText },
+        ],
+    },
+];
+
+const TOOL_COUNT = TOOL_GROUPS.reduce((total, group) => total + group.tools.length, 0);
 
 export default function ToolboxView({ currentUser }) {
     const [activeTool, setActiveTool] = useState('emi');
 
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-            {/* Header & Tool Switcher */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-200 pb-5">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <span className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
-                            <Calculator className="w-5 h-5" />
+        <div className="solar-toolbox max-w-[1500px] mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+            <header className="rounded-3xl border border-stone-200 bg-white px-5 py-5 md:px-7 md:py-6 print:hidden">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-4">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-orange-200 bg-orange-50 text-orange-600">
+                            <Sun className="h-6 w-6" />
                         </span>
-                        <h1 className="text-2xl font-bold text-stone-900 tracking-tight">Solar Toolbox</h1>
+                        <div>
+                            <p className="sf-kicker">Operations workspace</p>
+                            <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900">Solar Toolbox</h1>
+                            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-stone-500">
+                                Calculate project figures and prepare consistent, print-ready business documents from one workspace.
+                            </p>
+                        </div>
                     </div>
-                    <p className="text-sm text-stone-500 mt-1">
-                        Operational calculators, printable receipts, warranty certificates & 1-page proposals.
-                    </p>
+                    <div className="flex items-center gap-3 self-start sm:self-center">
+                        <div className="rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-right">
+                            <strong className="block text-sm text-stone-900">{TOOL_COUNT} tools</strong>
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">Calculation &amp; print</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Tool Selection Tabs */}
-            <div className="flex flex-wrap gap-2 pb-2 border-b border-stone-100 print:hidden">
-                <ToolTabBtn active={activeTool === 'emi'} onClick={() => setActiveTool('emi')} icon={Calculator} label="EMI Calculator" />
-                <ToolTabBtn active={activeTool === 'gst'} onClick={() => setActiveTool('gst')} icon={Receipt} label="GST Calculator" />
-                <ToolTabBtn active={activeTool === 'savings'} onClick={() => setActiveTool('savings')} icon={Sun} label="Solar Savings & ROI" />
-                <ToolTabBtn active={activeTool === 'customer_receipt'} onClick={() => setActiveTool('customer_receipt')} icon={IndianRupee} label="Customer Receipt" />
-                <ToolTabBtn active={activeTool === 'staff_receipt'} onClick={() => setActiveTool('staff_receipt')} icon={UserCheck} label="Staff Payment" />
-                <ToolTabBtn active={activeTool === 'vendor_receipt'} onClick={() => setActiveTool('vendor_receipt')} icon={Truck} label="Vendor Payment" />
-                <ToolTabBtn active={activeTool === 'warranty'} onClick={() => setActiveTool('warranty')} icon={ShieldCheck} label="Warranty Card" />
-                <ToolTabBtn active={activeTool === 'quick_quote'} onClick={() => setActiveTool('quick_quote')} icon={FileText} label="1-Page Quotation" />
-            </div>
+            <div className="toolbox-workspace grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <nav aria-label="Solar Toolbox tools" className="rounded-2xl border border-stone-200 bg-white p-3 print:hidden lg:sticky lg:top-24">
+                    {TOOL_GROUPS.map((group, groupIndex) => (
+                        <section key={group.label} className={groupIndex ? 'mt-4 border-t border-stone-100 pt-4' : ''}>
+                            <div className="px-2 pb-2">
+                                <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-stone-700">{group.label}</h2>
+                                <p className="mt-0.5 text-[11px] leading-snug text-stone-400">{group.description}</p>
+                            </div>
+                            <div className="space-y-1">
+                                {group.tools.map(tool => (
+                                    <ToolTabBtn
+                                        key={tool.id}
+                                        active={activeTool === tool.id}
+                                        onClick={() => setActiveTool(tool.id)}
+                                        icon={tool.icon}
+                                        label={tool.label}
+                                        description={tool.description}
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    ))}
+                </nav>
 
-            {/* Active Tool Content */}
-            <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-4 md:p-6">
-                {activeTool === 'emi' && <EmiCalculator />}
-                {activeTool === 'gst' && <GstCalculator />}
-                {activeTool === 'savings' && <SolarSavingsCalculator />}
-                {activeTool === 'customer_receipt' && <CustomerReceiptGenerator currentUser={currentUser} />}
-                {activeTool === 'staff_receipt' && <StaffReceiptGenerator currentUser={currentUser} />}
-                {activeTool === 'vendor_receipt' && <VendorReceiptGenerator currentUser={currentUser} />}
-                {activeTool === 'warranty' && <WarrantyCardGenerator currentUser={currentUser} />}
-                {activeTool === 'quick_quote' && <OnePageQuotationGenerator currentUser={currentUser} />}
+                <main className="toolbox-content min-w-0 rounded-3xl border border-stone-200 bg-white p-4 md:p-6 lg:p-7">
+                    {activeTool === 'emi' && <EmiCalculator />}
+                    {activeTool === 'gst' && <GstCalculator />}
+                    {activeTool === 'savings' && <SolarSavingsCalculator />}
+                    {activeTool === 'customer_receipt' && <CustomerReceiptGenerator currentUser={currentUser} />}
+                    {activeTool === 'staff_receipt' && <StaffReceiptGenerator currentUser={currentUser} />}
+                    {activeTool === 'vendor_receipt' && <VendorReceiptGenerator currentUser={currentUser} />}
+                    {activeTool === 'warranty' && <WarrantyCardGenerator currentUser={currentUser} />}
+                    {activeTool === 'quick_quote' && <OnePageQuotationGenerator currentUser={currentUser} />}
+                </main>
             </div>
         </div>
     );
 }
 
-function ToolTabBtn({ active, onClick, icon: Icon, label }) {
+function ToolTabBtn({ active, onClick, icon: Icon, label, description }) {
     return (
         <button
+            type="button"
             onClick={onClick}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+            aria-current={active ? 'page' : undefined}
+            className={`group flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
                 active
-                    ? 'bg-stone-900 text-white shadow-sm'
-                    : 'bg-stone-100/80 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
+                    ? 'border-orange-200 bg-orange-50 text-stone-900'
+                    : 'border-transparent bg-white text-stone-700 hover:border-stone-200 hover:bg-stone-50'
             }`}
         >
-            <Icon className="w-3.5 h-3.5" />
-            {label}
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-orange-500 text-stone-900' : 'bg-stone-100 text-stone-500 group-hover:text-stone-700'}`}>
+                <Icon className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+                <strong className="block truncate text-xs font-bold">{label}</strong>
+                <small className="mt-0.5 block truncate text-[10px] font-medium text-stone-400">{description}</small>
+            </span>
+            <ChevronRight className={`h-4 w-4 shrink-0 ${active ? 'text-orange-600' : 'text-stone-300'}`} />
         </button>
     );
 }
@@ -520,6 +573,86 @@ function SolarSavingsCalculator() {
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. CUSTOMER PAYMENT RECEIPT
 // ─────────────────────────────────────────────────────────────────────────────
+const money = value => `₹${Number(value || 0).toLocaleString('en-IN')}`;
+
+function ProfessionalDocument({
+    title,
+    documentNo,
+    date,
+    recipientLabel = 'Issued To',
+    recipientLines = [],
+    referenceLines = [],
+    rows = [],
+    amountHeading = 'Amount (₹)',
+    totalLabel,
+    totalValue,
+    notes = [],
+    signatures = ['Prepared By', 'Authorized Signatory', 'Recipient Signature'],
+}) {
+    return (
+        <article className="professional-document mx-auto max-w-4xl bg-white text-stone-900">
+            <div className="professional-document-header">
+                <div>
+                    <div className="professional-document-brand">SOLARFLOW ENERGY</div>
+                    <p>Rooftop Solar EPC · Engineering · Installation · Service</p>
+                    <p>GSTIN: 24AAACS1234F1Z9 · +91 98765 43210 · solarcrm.deeprootsystems.in</p>
+                </div>
+                <div className="professional-document-title">
+                    <h3>{title}</h3>
+                    <dl>
+                        <div><dt>Document No.</dt><dd>{documentNo}</dd></div>
+                        <div><dt>Date</dt><dd>{date}</dd></div>
+                    </dl>
+                </div>
+            </div>
+
+            <section className="professional-document-parties">
+                <div>
+                    <h4>{recipientLabel}</h4>
+                    {recipientLines.filter(Boolean).map((line, index) => <p key={index} className={index === 0 ? 'party-name' : ''}>{line}</p>)}
+                </div>
+                <div>
+                    <h4>Reference Details</h4>
+                    {referenceLines.filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}
+                </div>
+            </section>
+
+            <table className="professional-document-table">
+                <thead>
+                    <tr>
+                        <th className="serial-column">Sr. No.</th>
+                        <th>Description</th>
+                        <th className="amount-column">{amountHeading}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map((row, index) => (
+                        <tr key={`${row.description}-${index}`}>
+                            <td className="serial-column">{index + 1}</td>
+                            <td><strong>{row.description}</strong>{row.details && <small>{row.details}</small>}</td>
+                            <td className="amount-column">{row.amount}</td>
+                        </tr>
+                    ))}
+                    {totalLabel && <tr className="document-total-row">
+                        <td colSpan={2}>{totalLabel}</td>
+                        <td className="amount-column">{totalValue}</td>
+                    </tr>}
+                </tbody>
+            </table>
+
+            {notes.length > 0 && <section className="professional-document-notes">
+                <h4>Notes &amp; Terms</h4>
+                {notes.filter(Boolean).map((note, index) => <p key={index}>{index + 1}. {note}</p>)}
+            </section>}
+
+            <div className="professional-document-signatures">
+                {signatures.map(label => <div key={label}><span /><strong>{label}</strong><small>Signature, name and date</small></div>)}
+            </div>
+            <p className="professional-document-footer">This is a system-generated business document from SolarFlow CRM.</p>
+        </article>
+    );
+}
+
 function CustomerReceiptGenerator({ currentUser }) {
     const [receiptData, setReceiptData] = useState({
         receiptNo: `SF-REC-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -549,7 +682,7 @@ function CustomerReceiptGenerator({ currentUser }) {
                 </div>
                 <button
                     onClick={printReceipt}
-                    className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-all shadow-sm"
+                    className="sf-btn-primary shadow-sm"
                 >
                     <Printer className="w-4 h-4" /> Print / Save PDF Receipt
                 </button>
@@ -643,7 +776,20 @@ function CustomerReceiptGenerator({ currentUser }) {
             </div>
 
             {/* Printable Receipt Preview Card */}
-            <div className="max-w-3xl mx-auto p-8 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-6">
+            <ProfessionalDocument
+                title="Payment Receipt"
+                documentNo={receiptData.receiptNo}
+                date={receiptData.date}
+                recipientLabel="Received From"
+                recipientLines={[receiptData.customerName, receiptData.address, `Phone: ${receiptData.phone}`, `Consumer No.: ${receiptData.consumerNo}`]}
+                referenceLines={[`System capacity: ${receiptData.capacityKw} kWp`, `Payment mode: ${receiptData.paymentMode}`, `Transaction reference: ${receiptData.transactionRef}`]}
+                rows={[{ description: receiptData.paymentStage, details: `Payment received for ${receiptData.capacityKw} kWp rooftop solar project`, amount: money(receiptData.amount) }]}
+                totalLabel="Total Amount Received"
+                totalValue={money(receiptData.amount)}
+                notes={[receiptData.notes, 'Payment is subject to realization where received by cheque or electronic transfer.']}
+                signatures={['Received By', 'Authorized Signatory', 'Customer / Depositor']}
+            />
+            <div className="hidden max-w-3xl mx-auto p-8 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-6">
                 {/* Header */}
                 <div className="flex justify-between items-start border-b-2 border-stone-900 pb-4">
                     <div>
@@ -735,7 +881,7 @@ function StaffReceiptGenerator({ currentUser }) {
                 </div>
                 <button
                     onClick={() => window.print()}
-                    className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-all"
+                    className="sf-btn-primary"
                 >
                     <Printer className="w-4 h-4" /> Print Payment Voucher
                 </button>
@@ -804,7 +950,20 @@ function StaffReceiptGenerator({ currentUser }) {
             </div>
 
             {/* Printable Voucher Card */}
-            <div className="max-w-2xl mx-auto p-6 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-4">
+            <ProfessionalDocument
+                title="Staff Payment Voucher"
+                documentNo={staffData.voucherNo}
+                date={staffData.date}
+                recipientLabel="Paid To"
+                recipientLines={[staffData.employeeName, `Employee ID: ${staffData.employeeId}`, staffData.designation]}
+                referenceLines={[`Payment period: ${staffData.month}`, `Payment mode: ${staffData.paymentMode}`, `Category: ${staffData.paymentType}`]}
+                rows={[{ description: staffData.paymentType, details: staffData.notes, amount: money(staffData.amount) }]}
+                totalLabel="Total Amount Paid"
+                totalValue={money(staffData.amount)}
+                notes={['The recipient confirms that the stated amount has been received for the purpose described above.']}
+                signatures={['Prepared By (Accounts)', 'Authorized Signatory', 'Employee / Recipient']}
+            />
+            <div className="hidden max-w-2xl mx-auto p-6 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-4">
                 <div className="flex justify-between items-center border-b border-stone-300 pb-3">
                     <div>
                         <div className="text-xl font-black text-stone-900">SOLARFLOW ENERGY</div>
@@ -888,7 +1047,7 @@ function VendorReceiptGenerator({ currentUser }) {
                 </div>
                 <button
                     onClick={() => window.print()}
-                    className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-all"
+                    className="sf-btn-primary"
                 >
                     <Printer className="w-4 h-4" /> Print Vendor Voucher
                 </button>
@@ -952,7 +1111,23 @@ function VendorReceiptGenerator({ currentUser }) {
             </div>
 
             {/* Printable Vendor Voucher */}
-            <div className="max-w-2xl mx-auto p-6 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-4">
+            <ProfessionalDocument
+                title="Vendor Payment Voucher"
+                documentNo={vendorData.voucherNo}
+                date={vendorData.date}
+                recipientLabel="Vendor / Contractor"
+                recipientLines={[vendorData.vendorName, vendorData.serviceType, vendorData.siteReference]}
+                referenceLines={[`Payment status: ${vendorData.status}`, `Payment mode: ${vendorData.paymentMode}`, `UTR / reference: ${vendorData.utrNo}`]}
+                rows={[
+                    { description: 'Gross work / service value', details: `${vendorData.serviceType} — ${vendorData.siteReference}`, amount: money(vendorData.grossAmount) },
+                    { description: 'Less: TDS / retention deduction', details: 'Deduction from gross payable value', amount: `− ${money(vendorData.tdsDeduction)}` },
+                ]}
+                totalLabel="Net Amount Disbursed"
+                totalValue={money(netPayable)}
+                notes={['Payment is recorded against the referenced work assignment and banking reference.', 'The vendor confirms completion or acceptance of the work covered by this voucher.']}
+                signatures={['Verified By', 'Authorized Signatory', 'Vendor Stamp / Signature']}
+            />
+            <div className="hidden max-w-2xl mx-auto p-6 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-4">
                 <div className="flex justify-between items-center border-b border-stone-300 pb-3">
                     <div>
                         <div className="text-xl font-black text-stone-900">SOLARFLOW ENERGY</div>
@@ -1041,7 +1216,7 @@ function WarrantyCardGenerator({ currentUser }) {
                 </div>
                 <button
                     onClick={() => window.print()}
-                    className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-all shadow-sm"
+                    className="sf-btn-primary shadow-sm"
                 >
                     <Printer className="w-4 h-4" /> Print Warranty Certificate
                 </button>
@@ -1105,7 +1280,23 @@ function WarrantyCardGenerator({ currentUser }) {
             </div>
 
             {/* Printable Warranty Certificate */}
-            <div className="max-w-3xl mx-auto p-10 bg-white border-4 border-double border-amber-600/60 rounded-3xl shadow-sm text-stone-800 space-y-6">
+            <ProfessionalDocument
+                title="Warranty Certificate"
+                documentNo={warranty.certNo}
+                date={warranty.installationDate}
+                recipientLabel="System Owner"
+                recipientLines={[warranty.customerName, warranty.siteAddress, `Consumer No.: ${warranty.consumerNo}`]}
+                referenceLines={[`Plant capacity: ${warranty.systemCapacity}`, `Commissioning date: ${warranty.installationDate}`, 'System type: Grid-interactive rooftop solar PV']}
+                amountHeading="Warranty Coverage"
+                rows={[
+                    { description: 'Solar PV modules', details: `${warranty.moduleBrand} · Serial(s): ${warranty.moduleSerial} · Product warranty: ${warranty.panelProductWarrantyYears} years`, amount: `${warranty.panelPerformanceWarrantyYears} years` },
+                    { description: 'Solar inverter', details: `${warranty.inverterBrand} · Serial: ${warranty.inverterSerial}`, amount: `${warranty.inverterWarrantyYears} years` },
+                    { description: 'Mounting structure & workmanship', details: 'Hot-dip GI structure, civil installation and workmanship', amount: `${warranty.structureWarrantyYears} years` },
+                ]}
+                notes={['Module performance coverage remains subject to the manufacturer’s published warranty conditions.', 'Keep modules clean and provide safe site access for inspection and service.', 'For service assistance, contact SolarFlow Energy with the certificate number and equipment serial number.']}
+                signatures={['Technical Head', 'Authorized Signatory & Seal', 'Customer Acknowledgement']}
+            />
+            <div className="hidden max-w-3xl mx-auto p-10 bg-white border-4 border-double border-amber-600/60 rounded-3xl shadow-sm text-stone-800 space-y-6">
                 <div className="text-center space-y-1 border-b border-stone-200 pb-5">
                     <div className="flex items-center justify-center gap-2 text-amber-600 font-bold text-xs uppercase tracking-widest">
                         <ShieldCheck className="w-5 h-5" /> Official Quality Assurance
@@ -1209,7 +1400,7 @@ function OnePageQuotationGenerator({ currentUser }) {
                 </div>
                 <button
                     onClick={() => window.print()}
-                    className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-all shadow-sm"
+                    className="sf-btn-primary shadow-sm"
                 >
                     <Printer className="w-4 h-4" /> Print 1-Page Quotation
                 </button>
@@ -1276,7 +1467,23 @@ function OnePageQuotationGenerator({ currentUser }) {
             </div>
 
             {/* Printable 1-Page Quotation */}
-            <div className="max-w-3xl mx-auto p-8 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-6">
+            <ProfessionalDocument
+                title="Solar Project Quotation"
+                documentNo={quote.quoteNo}
+                date={quote.date}
+                recipientLabel="Quotation For"
+                recipientLines={[quote.customerName, quote.city, `Mobile: ${quote.customerPhone}`]}
+                referenceLines={[`Proposed capacity: ${quote.systemCapacityKw} kWp on-grid`, `Estimated generation: ${Math.round(Number(quote.systemCapacityKw) * 125)} units / month`, 'Offer validity: 15 days from issue date']}
+                rows={[
+                    { description: `${quote.systemCapacityKw} kWp turnkey rooftop solar power plant`, details: `${quote.moduleType}; ${quote.inverterType}; ${quote.structureType}`, amount: money(quote.grossPrice) },
+                    { description: 'Government subsidy benefit', details: 'Estimated PM Surya Ghar subsidy, subject to eligibility and approval', amount: `− ${money(quote.centralSubsidy)}` },
+                ]}
+                totalLabel="Net Cost to Customer"
+                totalValue={money(netPayable)}
+                notes={['Price includes solar modules, inverter, mounting structure, BOS protection, delivery, installation and commissioning.', `DISCOM and net-metering scope: ${quote.discomCharges}.`, 'Subsidy is credited by the competent authority and remains subject to scheme eligibility, inspection and approval.']}
+                signatures={['Prepared By / Sales', 'Authorized Signatory', 'Customer Acceptance']}
+            />
+            <div className="hidden max-w-3xl mx-auto p-8 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-6">
                 <div className="flex justify-between items-start border-b-2 border-stone-900 pb-4">
                     <div>
                         <div className="text-2xl font-black text-stone-900">SOLARFLOW ENERGY</div>

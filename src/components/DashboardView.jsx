@@ -124,7 +124,7 @@ export default function DashboardView({ metrics, loading, scoped = false }) {
                 <CustomizationEnquiryForm isModal={true} onClose={() => setShowEnquiryModal(false)} />
             )}
 
-            <div className="bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent border border-amber-500/30 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs">
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center font-black text-base flex-shrink-0 shadow-sm">
                         ☀️

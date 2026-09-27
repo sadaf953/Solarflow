@@ -7,14 +7,21 @@ Generated on 2026-09-27 from all supported source files in `src/`.
 | Measure | Count |
 | --- | ---: |
 | Source files scanned | 129 |
-| Literal hex values | 80 |
+| Literal hex values | 81 |
 | RGB/RGBA expressions | 31 |
-| Tailwind color utility variants | 510 |
+| Tailwind color utility variants | 499 |
 | Tailwind color families | 19 |
 
-The app is visually fragmented because the same jobs are handled by several overlapping systems: Stone, Gray, and Slate all act as neutrals; Amber, Orange, and Yellow all act as solar accents or warnings; Emerald, Green, and Teal all act as success colors; Rose and Red both act as errors. Blue, Sky, Cyan, Indigo, Violet, and Purple add more categorical colors without one shared rule.
+The source still contains legacy family names from the original fragmented design: Stone, Gray, and Slate all appear as neutrals; Amber, Orange, and Yellow appear as solar accents or warnings; Emerald, Green, and Teal appear as success colors; Rose and Red both appear as errors. The central Tailwind theme now resolves those related legacy names to the approved SolarFlow scales, so the rendered product is cohesive while the remaining source names are gradually simplified.
 
 The quotation PDF is the one reasonable exception. Its navy and orange palette is a customer-facing document identity and can remain isolated from the admin interface.
+
+## Implementation status
+
+- The shared palette is active globally through `tailwind.config.js` and the semantic tokens in `src/index.css`.
+- Public login, credential login, pricing, Dashboard accents, Inventory, Deliveries, attendance, portals, forms, and modal surfaces now inherit the same rendered palette.
+- Active gradients were removed. Print layouts remain monochrome, and the quotation PDF retains its separate navy/orange document identity.
+- The remaining family count below describes class names still present in source, not the number of palettes visible in the built product.
 
 ## Palettes currently competing in the product
 
@@ -129,25 +136,25 @@ These are the only colors proposed for the application interface. The palette is
 
 | Family | Shades found | Occurrences |
 | --- | --- | ---: |
-| stone | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 3911 |
-| amber | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 1197 |
-| white | base | 833 |
-| emerald | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 602 |
+| stone | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 3914 |
+| amber | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 1157 |
+| white | base | 825 |
+| emerald | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 600 |
 | rose | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 247 |
+| blue | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 141 |
 | red | 50, 100, 200, 300, 400, 500, 600, 700, 800, 950 | 141 |
-| blue | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950 | 104 |
 | black | base | 100 |
 | gray | 50, 100, 200, 800, 900, 950 | 66 |
+| orange | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900 | 55 |
 | slate | 200, 300, 400, 500, 700, 800, 900, 950 | 51 |
-| indigo | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900 | 44 |
-| sky | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900 | 41 |
-| teal | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900 | 39 |
-| purple | 50, 100, 200, 300, 400, 500, 600, 700, 800, 900 | 34 |
-| orange | 50, 100, 200, 300, 500, 600, 700, 900 | 19 |
-| yellow | 50, 100, 300, 700, 900 | 7 |
+| teal | 50, 200, 400, 500, 600, 700, 900 | 34 |
+| sky | 50, 100, 200, 400, 500, 600, 700, 800, 900 | 31 |
+| yellow | 50, 100, 300, 400, 700, 900 | 28 |
+| indigo | 50, 100, 200, 400, 500, 700 | 22 |
+| green | 50, 500, 600, 700 | 13 |
+| purple | 50, 100, 200, 400, 500, 700 | 10 |
 | cyan | 50, 200, 500, 700 | 4 |
 | violet | 50, 200, 500, 700 | 4 |
-| green | 50, 500, 700 | 3 |
 
 ## Complete literal hex inventory
 
@@ -155,85 +162,86 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 
 | Value | Occurrences | Example source files |
 | --- | ---: | --- |
-| `#1C1917` | 52 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
+| `#1C1917` | 53 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
+| `#FF8A00` | 52 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` +1 more |
 | `#78716C` | 34 | `src/components/modal-tabs/MaterialDeliveryTab.jsx`, `src/demo/demo.css`, `src/index.css`, `src/inventory/InventoryView.jsx` +2 more |
-| `#F59E0B` | 34 | `src/components/modal-tabs/shared.jsx`, `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css` +2 more |
 | `#E7E5E4` | 31 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
-| `#FFFFFF` | 22 | `src/components/BomPrintModal.jsx`, `src/components/DeliveryBatchesView.jsx`, `src/components/VendorPortal.jsx`, `src/components/agreement/AgreementPreview.jsx` +6 more |
-| `#F97316` | 21 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` +1 more |
-| `#059669` | 19 | `src/components/modal-tabs/shared.jsx`, `src/demo/demo.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` +1 more |
+| `#FFFFFF` | 21 | `src/components/BomPrintModal.jsx`, `src/components/DeliveryBatchesView.jsx`, `src/components/VendorPortal.jsx`, `src/components/agreement/AgreementPreview.jsx` +6 more |
 | `#0C3882` | 19 | `src/quotations/template/components/DocumentFooter.tsx`, `src/quotations/template/components/DocumentHeader.tsx`, `src/quotations/template/components/pages/Page2.tsx`, `src/quotations/template/components/pages/Page3.tsx` |
 | `#FFF` | 16 | `src/components/DeliveryBatchesView.jsx`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
-| `#F5F5F4` | 14 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
-| `#57534E` | 13 | `src/demo/demo.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
+| `#F5F5F4` | 15 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
+| `#57534E` | 14 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
+| `#22C55E` | 12 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css` |
 | `#FCFBFA` | 10 | `src/components/AgentPortal.jsx`, `src/components/CustomerDetailModal.jsx`, `src/components/Dashboard.jsx`, `src/components/StampPortal.jsx` +3 more |
 | `#000000` | 9 | `src/components/BomPrintModal.jsx`, `src/components/DeliveryBatchesView.jsx`, `src/components/VendorPortal.jsx`, `src/components/modal-tabs/MaterialDeliveryTab.jsx` +1 more |
+| `#059669` | 9 | `src/components/modal-tabs/shared.jsx`, `src/quotations/quotation.css`, `src/utils/staffAttendance.js` |
 | `#A8A29E` | 9 | `src/components/modal-tabs/MaterialDeliveryTab.jsx`, `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css` |
-| `#FEF3C7` | 9 | `src/components/modal-tabs/shared.jsx`, `src/demo/demo.css`, `src/index.css`, `src/quotations/QuotationForm.jsx` +1 more |
+| `#D6D3D1` | 8 | `src/components/modal-tabs/MaterialDeliveryTab.jsx`, `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css` +1 more |
 | `#44403C` | 7 | `src/demo/demo.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
-| `#D6D3D1` | 7 | `src/components/modal-tabs/MaterialDeliveryTab.jsx`, `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css` +1 more |
-| `#FAFAF9` | 7 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css` |
-| `#047857` | 6 | `src/demo/demo.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
-| `#FDE68A` | 6 | `src/demo/demo.css`, `src/quotations/quotation.css` |
+| `#FAFAF9` | 6 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css` |
 | `#FEF08A` | 6 | `src/components/AgentPortal.jsx`, `src/components/CustomerDetailModal.jsx`, `src/components/agreement/Page4.jsx`, `src/components/modal-tabs/DiscomSubmissionTab.jsx` |
-| `#FFFDFA` | 5 | `src/demo/demo.css` |
+| `#FFB000` | 6 | `src/demo/demo.css`, `src/index.css`, `src/inventory/inventory.css` |
+| `#FFDCAD` | 6 | `src/demo/demo.css`, `src/quotations/quotation.css` |
+| `#16A34A` | 5 | `src/demo/demo.css`, `src/index.css` |
+| `#2563EB` | 5 | `src/index.css`, `src/inventory/inventory.css`, `src/utils/staffAttendance.js` |
+| `#FACC15` | 5 | `src/index.css`, `src/inventory/inventory.css`, `src/utils/staffAttendance.js` |
+| `#FFF0D9` | 5 | `src/demo/demo.css`, `src/quotations/quotation.css` |
+| `#FFF8ED` | 5 | `src/demo/demo.css` |
 | `#4B5563` | 4 | `src/components/modal-tabs/shared.jsx`, `src/quotations/template/components/pages/Page1.tsx` |
 | `#92400E` | 4 | `src/components/modal-tabs/shared.jsx`, `src/demo/demo.css`, `src/quotations/QuotationForm.jsx`, `src/quotations/quotation.css` |
-| `#9F1239` | 4 | `src/demo/demo.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
-| `#FFF1F2` | 4 | `src/demo/demo.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
 | `#000` | 3 | `src/components/DeliveryBatchesView.jsx` |
 | `#292524` | 3 | `src/demo/demo.css`, `src/inventory/inventory.css` |
-| `#ECFDF5` | 3 | `src/demo/demo.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
-| `#FACC15` | 3 | `src/index.css`, `src/inventory/inventory.css` |
-| `#FBBF24` | 3 | `src/components/modal-tabs/shared.jsx`, `src/demo/demo.css`, `src/index.css` |
-| `#FECDD3` | 3 | `src/demo/demo.css`, `src/inventory/inventory.css`, `src/quotations/quotation.css` |
-| `#FFFBEB` | 3 | `src/components/modal-tabs/shared.jsx`, `src/index.css` |
-| `#0284C7` | 2 | `src/inventory/inventory.css`, `src/utils/staffAttendance.js` |
-| `#065F46` | 2 | `src/demo/demo.css`, `src/quotations/quotation.css` |
-| `#15803D` | 2 | `src/index.css`, `src/inventory/inventory.css` |
+| `#9F1239` | 3 | `src/demo/demo.css`, `src/quotations/quotation.css` |
+| `#B91C1C` | 3 | `src/index.css`, `src/inventory/inventory.css` |
+| `#F59E0B` | 3 | `src/components/modal-tabs/shared.jsx`, `src/quotations/QuotationForm.jsx` |
+| `#FEF2F2` | 3 | `src/index.css`, `src/inventory/inventory.css` |
+| `#FEF3C7` | 3 | `src/components/modal-tabs/shared.jsx`, `src/quotations/QuotationForm.jsx` |
+| `#FFF1F2` | 3 | `src/demo/demo.css`, `src/quotations/quotation.css` |
+| `#15803D` | 2 | `src/inventory/inventory.css` |
 | `#1E293B` | 2 | `src/components/agreement/AgreementPreview.jsx`, `src/index.css` |
 | `#68788B` | 2 | `src/quotations/quotation.css` |
 | `#E5E7EB` | 2 | `src/components/modal-tabs/shared.jsx` |
-| `#FF8A00` | 2 | `src/inventory/inventory.css` |
-| `#FFB000` | 2 | `src/inventory/inventory.css` |
+| `#EF4444` | 2 | `src/index.css`, `src/inventory/inventory.css` |
+| `#EFF6FF` | 2 | `src/index.css`, `src/quotations/quotation.css` |
+| `#F0FDF4` | 2 | `src/demo/demo.css`, `src/inventory/inventory.css` |
+| `#FECDD3` | 2 | `src/demo/demo.css`, `src/quotations/quotation.css` |
+| `#FEF9C3` | 2 | `src/index.css`, `src/inventory/inventory.css` |
+| `#047857` | 1 | `src/quotations/quotation.css` |
+| `#065F46` | 1 | `src/quotations/quotation.css` |
 | `#072D6B` | 1 | `src/quotations/template/components/DocumentFooter.tsx` |
 | `#083884` | 1 | `src/quotations/template/components/DocumentFooter.tsx` |
-| `#0C0A09` | 1 | `src/demo/demo.css` |
-| `#0D9488` | 1 | `src/utils/staffAttendance.js` |
 | `#101` | 1 | `src/components/BrevoModal.jsx` |
 | `#102` | 1 | `src/components/BrevoModal.jsx` |
 | `#10283C70` | 1 | `src/quotations/quotation.css` |
-| `#10B981` | 1 | `src/inventory/inventory.css` |
 | `#111827` | 1 | `src/components/modal-tabs/shared.jsx` |
-| `#16A34A` | 1 | `src/index.css` |
+| `#166534` | 1 | `src/demo/demo.css` |
 | `#1E40AF` | 1 | `src/quotations/quotation.css` |
 | `#1E488F` | 1 | `src/quotations/template/components/DocumentHeader.tsx` |
 | `#1F2937` | 1 | `src/components/modal-tabs/shared.jsx` |
-| `#4F46E5` | 1 | `src/utils/staffAttendance.js` |
 | `#555` | 1 | `src/components/DeliveryBatchesView.jsx` |
 | `#555555` | 1 | `src/components/DeliveryBatchesView.jsx` |
 | `#6B7280` | 1 | `src/components/modal-tabs/shared.jsx` |
-| `#9333EA` | 1 | `src/utils/staffAttendance.js` |
 | `#9CA3AF` | 1 | `src/components/modal-tabs/shared.jsx` |
-| `#A7F3D0` | 1 | `src/demo/demo.css` |
 | `#B45309` | 1 | `src/components/modal-tabs/shared.jsx` |
-| `#B91C1C` | 1 | `src/inventory/inventory.css` |
+| `#BBF7D0` | 1 | `src/demo/demo.css` |
 | `#CBD5E1` | 1 | `src/demo/demo.css` |
 | `#DC2626` | 1 | `src/inventory/inventory.css` |
+| `#DCFCE7` | 1 | `src/index.css` |
 | `#DFE5EE` | 1 | `src/quotations/quotation.css` |
 | `#E11D48` | 1 | `src/utils/staffAttendance.js` |
+| `#ECFDF5` | 1 | `src/quotations/quotation.css` |
 | `#EEF1F5` | 1 | `src/quotations/quotation.css` |
-| `#EF4444` | 1 | `src/inventory/inventory.css` |
-| `#EFF6FF` | 1 | `src/quotations/quotation.css` |
 | `#F3F4F6` | 1 | `src/components/modal-tabs/shared.jsx` |
 | `#F6F7F9` | 1 | `src/quotations/QuotationModule.jsx` |
 | `#F6F7F9F5` | 1 | `src/quotations/quotation.css` |
 | `#F89520` | 1 | `src/quotations/template/components/DocumentFooter.tsx` |
 | `#F9FAFB` | 1 | `src/components/modal-tabs/shared.jsx` |
+| `#FBBF24` | 1 | `src/components/modal-tabs/shared.jsx` |
+| `#FECACA` | 1 | `src/inventory/inventory.css` |
 | `#FED7AA` | 1 | `src/inventory/inventory.css` |
-| `#FEF2F2` | 1 | `src/inventory/inventory.css` |
-| `#FEF9C3` | 1 | `src/inventory/inventory.css` |
 | `#FEFCE8` | 1 | `src/inventory/inventory.css` |
+| `#FFF4E5` | 1 | `src/index.css` |
+| `#FFFBEB` | 1 | `src/components/modal-tabs/shared.jsx` |
 | `#FFFFFFED` | 1 | `src/quotations/quotation.css` |
 
 ## Complete RGB/RGBA inventory
@@ -241,8 +249,8 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | Value | Occurrences | Example source files |
 | --- | ---: | --- |
 | `rgb(1, .94, .55)` | 2 | `src/feasibilityReport.js` |
-| `rgba(245,158,11,0.08)` | 2 | `src/demo/demo.css` |
-| `rgba(245,158,11,0.25)` | 2 | `src/demo/demo.css` |
+| `rgba(255,138,0,0.08)` | 2 | `src/demo/demo.css` |
+| `rgba(255,138,0,0.25)` | 2 | `src/demo/demo.css` |
 | `rgb(.4, .4, .4)` | 1 | `src/feasibilityReport.js` |
 | `rgb(0.08, 0.08, 0.08)` | 1 | `src/feasibilityReport.js` |
 | `rgb(1, 0.94, 0.55)` | 1 | `src/feasibilityReport.js` |
@@ -259,10 +267,10 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `rgba(14,35,50,0.45)` | 1 | `src/demo/demo.css` |
 | `rgba(15,35,50,0.15)` | 1 | `src/demo/demo.css` |
 | `rgba(15,35,50,0.18)` | 1 | `src/demo/demo.css` |
-| `rgba(21, 128, 61, .18)` | 1 | `src/index.css` |
-| `rgba(245, 158, 11, .18)` | 1 | `src/index.css` |
-| `rgba(245,158,11,0.22)` | 1 | `src/quotations/quotation.css` |
-| `rgba(245,158,11,0.3)` | 1 | `src/demo/demo.css` |
+| `rgba(250, 204, 21, .28)` | 1 | `src/index.css` |
+| `rgba(255, 138, 0, .2)` | 1 | `src/index.css` |
+| `rgba(255,138,0,0.22)` | 1 | `src/quotations/quotation.css` |
+| `rgba(255,138,0,0.3)` | 1 | `src/demo/demo.css` |
 | `rgba(255,255,255,0.12)` | 1 | `src/demo/demo.css` |
 | `rgba(28, 25, 23, .04)` | 1 | `src/inventory/inventory.css` |
 | `rgba(28,25,23,.03)` | 1 | `src/inventory/inventory.css` |
@@ -277,60 +285,60 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | Utility | Occurrences |
 | --- | ---: |
 | `text-stone-400` | 666 |
-| `bg-white` | 465 |
-| `border-stone-200` | 428 |
-| `text-stone-600` | 296 |
-| `text-stone-900` | 291 |
-| `text-white` | 279 |
+| `bg-white` | 466 |
+| `border-stone-200` | 426 |
+| `text-stone-900` | 299 |
+| `text-stone-600` | 297 |
 | `text-stone-500` | 274 |
+| `text-white` | 272 |
 | `text-stone-700` | 260 |
 | `bg-stone-50` | 209 |
 | `border-stone-100` | 201 |
 | `text-stone-800` | 198 |
-| `border-stone-300` | 119 |
-| `bg-stone-100` | 115 |
+| `border-stone-300` | 120 |
+| `bg-stone-100` | 116 |
 | `bg-stone-900` | 99 |
-| `bg-amber-500` | 72 |
-| `text-amber-600` | 71 |
 | `text-amber-700` | 70 |
-| `focus:ring-amber-500` | 69 |
+| `bg-amber-500` | 68 |
 | `border-black` | 68 |
 | `text-emerald-700` | 67 |
 | `bg-amber-50` | 66 |
 | `bg-emerald-600` | 65 |
+| `text-amber-600` | 65 |
 | `bg-emerald-50` | 63 |
+| `focus:ring-amber-500` | 62 |
 | `text-emerald-600` | 60 |
 | `focus:ring-amber-300` | 58 |
 | `border-emerald-200` | 55 |
 | `text-amber-500` | 54 |
-| `hover:bg-stone-800` | 53 |
+| `hover:bg-stone-800` | 51 |
 | `hover:bg-stone-100` | 49 |
 | `border-amber-200` | 47 |
-| `text-amber-800` | 47 |
+| `text-amber-800` | 46 |
 | `text-stone-300` | 45 |
 | `hover:bg-emerald-700` | 44 |
 | `text-gray-900` | 42 |
 | `text-emerald-800` | 41 |
-| `text-amber-900` | 39 |
+| `text-amber-900` | 38 |
 | `border-stone-400` | 37 |
+| `hover:bg-stone-50` | 36 |
 | `focus:border-amber-400` | 35 |
-| `hover:bg-stone-50` | 35 |
-| `bg-amber-100` | 34 |
-| `focus:ring-amber-400` | 34 |
 | `text-rose-700` | 34 |
+| `bg-amber-100` | 32 |
 | `bg-stone-50/80` | 32 |
 | `border-rose-200` | 32 |
+| `focus:ring-amber-400` | 32 |
 | `text-red-500` | 32 |
-| `border-amber-300` | 31 |
 | `text-amber-400` | 31 |
+| `border-amber-300` | 29 |
 | `hover:bg-stone-200` | 29 |
 | `bg-rose-50` | 26 |
 | `divide-stone-200/50` | 26 |
 | `bg-emerald-100` | 25 |
+| `hover:border-stone-300` | 25 |
 | `shadow-emerald-600/10` | 25 |
 | `border-amber-500` | 24 |
 | `border-stone-200/80` | 24 |
-| `hover:border-stone-300` | 24 |
 | `hover:text-white` | 24 |
 | `text-stone-950` | 24 |
 | `hover:bg-amber-600` | 23 |
@@ -346,12 +354,12 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `disabled:text-stone-500` | 18 |
 | `hover:text-stone-600` | 18 |
 | `border-stone-900` | 17 |
+| `bg-blue-50` | 16 |
 | `bg-red-50` | 16 |
 | `bg-rose-600` | 16 |
 | `bg-rose-100` | 15 |
 | `border-stone-200/70` | 15 |
 | `hover:bg-amber-50` | 15 |
-| `bg-blue-50` | 13 |
 | `bg-stone-50/50` | 13 |
 | `bg-stone-50/70` | 13 |
 | `border-red-200` | 13 |
@@ -359,23 +367,28 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `shadow-amber-500/20` | 13 |
 | `text-gray-800` | 13 |
 | `bg-emerald-500` | 12 |
+| `text-blue-600` | 12 |
 | `text-blue-700` | 12 |
 | `text-emerald-500` | 12 |
 | `text-rose-800` | 12 |
-| `bg-amber-50/60` | 11 |
 | `hover:bg-amber-100` | 11 |
 | `hover:bg-stone-50/50` | 11 |
 | `text-amber-950` | 11 |
+| `text-orange-600` | 11 |
 | `text-red-700` | 11 |
+| `bg-amber-50/60` | 10 |
 | `bg-amber-600` | 10 |
+| `bg-orange-50` | 10 |
 | `bg-stone-300` | 10 |
+| `border-blue-200` | 10 |
 | `border-emerald-600` | 10 |
 | `hover:border-amber-300` | 10 |
 | `hover:text-stone-900` | 10 |
-| `text-blue-600` | 10 |
+| `text-blue-800` | 10 |
 | `text-red-600` | 10 |
 | `bg-amber-400` | 9 |
 | `bg-black/60` | 9 |
+| `bg-blue-100` | 9 |
 | `border-slate-800` | 9 |
 | `divide-stone-100` | 9 |
 | `shadow-amber-500/10` | 9 |
@@ -391,17 +404,16 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `hover:bg-stone-300` | 8 |
 | `hover:border-amber-400` | 8 |
 | `hover:text-emerald-700` | 8 |
+| `placeholder:text-stone-400` | 8 |
 | `text-amber-300` | 8 |
 | `text-emerald-900` | 8 |
 | `text-rose-900` | 8 |
 | `bg-black/50` | 7 |
-| `bg-indigo-50` | 7 |
+| `bg-orange-500` | 7 |
 | `bg-red-100` | 7 |
 | `bg-slate-900` | 7 |
 | `bg-white/10` | 7 |
-| `border-blue-200` | 7 |
 | `border-emerald-300` | 7 |
-| `border-indigo-200` | 7 |
 | `border-stone-500` | 7 |
 | `focus:bg-white` | 7 |
 | `hover:bg-amber-400` | 7 |
@@ -410,7 +422,6 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `hover:text-amber-800` | 7 |
 | `hover:text-red-500` | 7 |
 | `placeholder-stone-400` | 7 |
-| `placeholder:text-stone-400` | 7 |
 | `ring-amber-500` | 7 |
 | `text-emerald-400` | 7 |
 | `text-red-800` | 7 |
@@ -418,49 +429,49 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `bg-amber-500/10` | 6 |
 | `bg-rose-400` | 6 |
 | `bg-rose-500` | 6 |
-| `bg-sky-100` | 6 |
 | `bg-stone-900/60` | 6 |
 | `border-amber-200/60` | 6 |
+| `border-orange-200` | 6 |
 | `group-hover:text-amber-700` | 6 |
-| `hover:text-amber-700` | 6 |
 | `shadow-stone-900/10` | 6 |
 | `text-amber-100` | 6 |
 | `text-blue-500` | 6 |
 | `text-indigo-700` | 6 |
-| `text-purple-700` | 6 |
 | `bg-amber-50/50` | 5 |
 | `bg-amber-50/70` | 5 |
 | `bg-amber-500/20` | 5 |
+| `bg-indigo-50` | 5 |
 | `bg-red-600` | 5 |
-| `bg-sky-600` | 5 |
 | `bg-stone-50/60` | 5 |
 | `bg-stone-900/50` | 5 |
 | `bg-stone-900/70` | 5 |
 | `bg-teal-400` | 5 |
 | `bg-white/20` | 5 |
 | `border-amber-400` | 5 |
-| `border-purple-200` | 5 |
+| `border-indigo-200` | 5 |
 | `border-rose-600` | 5 |
 | `border-stone-800` | 5 |
 | `divide-stone-200` | 5 |
+| `focus:ring-blue-500` | 5 |
 | `focus:ring-emerald-500` | 5 |
 | `hover:bg-rose-50` | 5 |
+| `hover:text-amber-700` | 5 |
 | `hover:text-red-600` | 5 |
 | `hover:text-rose-700` | 5 |
-| `text-purple-600` | 5 |
+| `text-green-600` | 5 |
 | `text-sky-600` | 5 |
 | `bg-amber-100/70` | 4 |
-| `bg-blue-100` | 4 |
 | `bg-blue-400` | 4 |
+| `bg-blue-500` | 4 |
+| `bg-blue-600` | 4 |
 | `bg-emerald-50/70` | 4 |
 | `bg-indigo-400` | 4 |
-| `bg-orange-50` | 4 |
-| `bg-purple-100` | 4 |
-| `bg-purple-50` | 4 |
+| `bg-orange-100` | 4 |
+| `bg-sky-100` | 4 |
+| `bg-sky-600` | 4 |
 | `bg-stone-200/70` | 4 |
 | `bg-stone-950/60` | 4 |
-| `border-amber-200/70` | 4 |
-| `border-amber-500/30` | 4 |
+| `bg-yellow-400` | 4 |
 | `border-amber-600` | 4 |
 | `border-gray-200` | 4 |
 | `border-rose-100` | 4 |
@@ -469,8 +480,8 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `border-white/10` | 4 |
 | `disabled:bg-stone-100/50` | 4 |
 | `disabled:bg-stone-300` | 4 |
-| `focus:ring-indigo-500` | 4 |
-| `from-stone-900` | 4 |
+| `focus-visible:ring-yellow-400` | 4 |
+| `focus:ring-yellow-400` | 4 |
 | `hover:bg-amber-50/40` | 4 |
 | `hover:bg-amber-700` | 4 |
 | `hover:bg-blue-50` | 4 |
@@ -481,28 +492,29 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `hover:bg-slate-800` | 4 |
 | `hover:text-amber-900` | 4 |
 | `hover:text-slate-200` | 4 |
-| `text-blue-800` | 4 |
-| `text-orange-600` | 4 |
+| `text-orange-700` | 4 |
 | `text-red-400` | 4 |
-| `text-sky-800` | 4 |
 | `text-slate-900` | 4 |
 | `text-stone-200` | 4 |
 | `bg-blue-50/50` | 3 |
 | `bg-emerald-50/50` | 3 |
-| `bg-indigo-100` | 3 |
 | `bg-rose-50/70` | 3 |
-| `bg-sky-50` | 3 |
 | `bg-slate-800` | 3 |
 | `bg-stone-400` | 3 |
 | `bg-stone-50/40` | 3 |
 | `bg-stone-700` | 3 |
-| `bg-teal-500` | 3 |
+| `bg-yellow-100` | 3 |
 | `border-amber-100` | 3 |
+| `border-amber-200/70` | 3 |
+| `border-amber-500/30` | 3 |
+| `border-blue-300` | 3 |
 | `border-emerald-500` | 3 |
 | `border-red-600` | 3 |
 | `border-white` | 3 |
+| `border-yellow-300` | 3 |
 | `disabled:bg-stone-100/80` | 3 |
 | `focus:ring-rose-400` | 3 |
+| `hover:bg-blue-100` | 3 |
 | `hover:bg-white/20` | 3 |
 | `hover:border-amber-200` | 3 |
 | `hover:text-blue-700` | 3 |
@@ -515,23 +527,24 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `text-blue-400` | 3 |
 | `text-emerald-950` | 3 |
 | `text-gray-950` | 3 |
-| `text-purple-800` | 3 |
+| `text-orange-800` | 3 |
+| `text-orange-900` | 3 |
+| `text-purple-700` | 3 |
 | `text-slate-200` | 3 |
 | `text-white/60` | 3 |
+| `text-yellow-900` | 3 |
 | `bg-amber-100/90` | 2 |
 | `bg-amber-400/15` | 2 |
 | `bg-amber-400/20` | 2 |
 | `bg-amber-50/30` | 2 |
 | `bg-amber-50/90` | 2 |
-| `bg-amber-500/15` | 2 |
 | `bg-black/40` | 2 |
 | `bg-blue-50/80` | 2 |
 | `bg-emerald-500/10` | 2 |
 | `bg-emerald-950/70` | 2 |
-| `bg-indigo-500` | 2 |
-| `bg-indigo-600` | 2 |
-| `bg-orange-500` | 2 |
-| `bg-purple-500` | 2 |
+| `bg-green-600` | 2 |
+| `bg-purple-50` | 2 |
+| `bg-sky-50` | 2 |
 | `bg-slate-950` | 2 |
 | `bg-stone-100/50` | 2 |
 | `bg-stone-100/60` | 2 |
@@ -539,7 +552,7 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `bg-stone-800` | 2 |
 | `bg-stone-900/40` | 2 |
 | `bg-stone-950` | 2 |
-| `bg-teal-600` | 2 |
+| `bg-teal-500` | 2 |
 | `bg-white/80` | 2 |
 | `bg-white/95` | 2 |
 | `bg-yellow-50` | 2 |
@@ -547,36 +560,30 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `border-blue-200/80` | 2 |
 | `border-emerald-200/80` | 2 |
 | `border-emerald-700/60` | 2 |
-| `border-orange-200` | 2 |
+| `border-orange-300` | 2 |
+| `border-purple-200` | 2 |
 | `border-red-100` | 2 |
 | `border-red-300` | 2 |
-| `border-sky-200` | 2 |
 | `border-stone-50` | 2 |
 | `border-stone-700` | 2 |
 | `focus:ring-blue-400` | 2 |
 | `focus:ring-sky-400` | 2 |
-| `from-amber-500` | 2 |
-| `from-amber-500/15` | 2 |
 | `group-hover:bg-amber-100` | 2 |
 | `hover:bg-amber-200` | 2 |
 | `hover:bg-amber-50/20` | 2 |
-| `hover:bg-blue-100` | 2 |
 | `hover:bg-emerald-900/80` | 2 |
 | `hover:bg-white/15` | 2 |
 | `hover:border-emerald-500` | 2 |
 | `hover:text-amber-400` | 2 |
 | `hover:text-emerald-900` | 2 |
-| `ring-amber-400` | 2 |
 | `ring-white` | 2 |
 | `shadow-emerald-600/15` | 2 |
 | `shadow-sky-600/15` | 2 |
 | `text-amber-50` | 2 |
+| `text-blue-900` | 2 |
 | `text-blue-950` | 2 |
 | `text-emerald-100` | 2 |
 | `text-emerald-300` | 2 |
-| `text-indigo-600` | 2 |
-| `text-indigo-800` | 2 |
-| `text-orange-700` | 2 |
 | `text-red-300` | 2 |
 | `text-rose-500` | 2 |
 | `text-rose-950` | 2 |
@@ -585,11 +592,6 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `text-white/30` | 2 |
 | `text-white/90` | 2 |
 | `text-yellow-700` | 2 |
-| `to-orange-500` | 2 |
-| `to-stone-800` | 2 |
-| `to-white` | 2 |
-| `via-amber-500` | 2 |
-| `via-amber-500/5` | 2 |
 | `accent-amber-500` | 1 |
 | `active:bg-amber-700` | 1 |
 | `bg-amber-100/50` | 1 |
@@ -598,12 +600,12 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `bg-amber-200/60` | 1 |
 | `bg-amber-200/80` | 1 |
 | `bg-amber-400/10` | 1 |
+| `bg-amber-500/15` | 1 |
 | `bg-black/20` | 1 |
 | `bg-black/70` | 1 |
 | `bg-black/75` | 1 |
 | `bg-blue-50/20` | 1 |
 | `bg-blue-50/60` | 1 |
-| `bg-blue-500` | 1 |
 | `bg-blue-950` | 1 |
 | `bg-blue-950/70` | 1 |
 | `bg-cyan-50` | 1 |
@@ -621,31 +623,32 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `bg-gray-50/70` | 1 |
 | `bg-green-50` | 1 |
 | `bg-green-500` | 1 |
-| `bg-orange-100` | 1 |
+| `bg-indigo-100` | 1 |
+| `bg-indigo-500` | 1 |
+| `bg-orange-50/70` | 1 |
+| `bg-purple-100` | 1 |
 | `bg-purple-400` | 1 |
-| `bg-purple-50/70` | 1 |
-| `bg-purple-600` | 1 |
+| `bg-purple-500` | 1 |
 | `bg-rose-50/30` | 1 |
 | `bg-rose-50/50` | 1 |
 | `bg-rose-50/60` | 1 |
 | `bg-rose-50/80` | 1 |
 | `bg-rose-800/80` | 1 |
 | `bg-sky-50/80` | 1 |
-| `bg-sky-500` | 1 |
 | `bg-slate-900/40` | 1 |
 | `bg-stone-200/50` | 1 |
 | `bg-stone-200/60` | 1 |
 | `bg-stone-50/90` | 1 |
 | `bg-stone-500` | 1 |
+| `bg-stone-900/90` | 1 |
 | `bg-stone-900/95` | 1 |
 | `bg-stone-950/80` | 1 |
-| `bg-teal-100` | 1 |
+| `bg-teal-600` | 1 |
 | `bg-violet-50` | 1 |
 | `bg-violet-500` | 1 |
 | `bg-white/15` | 1 |
 | `bg-white/25` | 1 |
 | `bg-white/90` | 1 |
-| `bg-yellow-100` | 1 |
 | `border-amber-200/50` | 1 |
 | `border-amber-400/10` | 1 |
 | `border-amber-400/30` | 1 |
@@ -655,22 +658,19 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `border-cyan-200` | 1 |
 | `border-emerald-500/30` | 1 |
 | `border-emerald-500/40` | 1 |
-| `border-indigo-300` | 1 |
-| `border-orange-300` | 1 |
-| `border-purple-300` | 1 |
+| `border-green-600` | 1 |
+| `border-orange-500` | 1 |
 | `border-rose-200/70` | 1 |
 | `border-rose-200/80` | 1 |
 | `border-rose-200/90` | 1 |
 | `border-sky-100` | 1 |
-| `border-sky-300` | 1 |
+| `border-sky-200` | 1 |
 | `border-stone-100/70` | 1 |
 | `border-stone-100/80` | 1 |
-| `border-teal-300` | 1 |
 | `border-teal-600` | 1 |
 | `border-violet-200` | 1 |
 | `border-white/20` | 1 |
 | `border-white/5` | 1 |
-| `border-yellow-300` | 1 |
 | `divide-stone-300` | 1 |
 | `divide-stone-50` | 1 |
 | `focus-visible:outline-amber-600` | 1 |
@@ -678,11 +678,10 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `focus-within:border-amber-400` | 1 |
 | `focus:border-blue-500` | 1 |
 | `focus:border-emerald-500` | 1 |
+| `focus:border-yellow-400` | 1 |
 | `focus:ring-amber-100` | 1 |
-| `focus:ring-blue-500` | 1 |
 | `focus:ring-emerald-400` | 1 |
-| `from-amber-50/70` | 1 |
-| `from-emerald-600` | 1 |
+| `focus:ring-yellow-400/30` | 1 |
 | `group-hover:bg-amber-100/60` | 1 |
 | `group-hover:bg-amber-200` | 1 |
 | `group-hover:bg-amber-600` | 1 |
@@ -704,11 +703,12 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `hover:bg-amber-50/60` | 1 |
 | `hover:bg-black` | 1 |
 | `hover:bg-black/30` | 1 |
+| `hover:bg-blue-700` | 1 |
 | `hover:bg-blue-900/80` | 1 |
 | `hover:bg-emerald-100/60` | 1 |
 | `hover:bg-emerald-600` | 1 |
-| `hover:bg-indigo-100` | 1 |
-| `hover:bg-indigo-700` | 1 |
+| `hover:bg-green-700` | 1 |
+| `hover:bg-orange-400` | 1 |
 | `hover:bg-red-100` | 1 |
 | `hover:bg-rose-100/70` | 1 |
 | `hover:bg-slate-700` | 1 |
@@ -726,26 +726,30 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `hover:border-blue-500` | 1 |
 | `hover:border-emerald-200` | 1 |
 | `hover:border-emerald-300` | 1 |
+| `hover:border-green-700` | 1 |
+| `hover:border-orange-400` | 1 |
 | `hover:border-red-100` | 1 |
 | `hover:border-rose-200` | 1 |
 | `hover:ring-emerald-400` | 1 |
 | `hover:text-blue-600` | 1 |
+| `hover:text-orange-700` | 1 |
 | `hover:text-red-400` | 1 |
 | `hover:text-red-700` | 1 |
 | `hover:text-rose-400` | 1 |
 | `hover:text-rose-800` | 1 |
 | `hover:text-stone-300` | 1 |
 | `hover:text-stone-500` | 1 |
-| `hover:text-stone-950` | 1 |
 | `marker:text-gray-900` | 1 |
 | `placeholder:text-rose-300` | 1 |
 | `placeholder:text-stone-300` | 1 |
 | `print:bg-white` | 1 |
+| `ring-amber-400` | 1 |
 | `ring-amber-400/60` | 1 |
+| `ring-blue-400` | 1 |
 | `ring-emerald-500` | 1 |
-| `ring-indigo-400` | 1 |
 | `ring-rose-200` | 1 |
 | `ring-rose-500` | 1 |
+| `ring-yellow-400` | 1 |
 | `shadow-amber-400/5` | 1 |
 | `shadow-amber-500/25` | 1 |
 | `shadow-amber-500/30` | 1 |
@@ -762,27 +766,20 @@ This includes colors in application UI, print/PDF templates, demo CSS, and a few
 | `text-amber-950/80` | 1 |
 | `text-blue-200` | 1 |
 | `text-blue-300` | 1 |
-| `text-blue-900` | 1 |
 | `text-cyan-700` | 1 |
 | `text-emerald-200` | 1 |
 | `text-emerald-700/80` | 1 |
 | `text-emerald-800/80` | 1 |
 | `text-green-700` | 1 |
-| `text-indigo-900` | 1 |
-| `text-orange-900` | 1 |
-| `text-purple-900` | 1 |
 | `text-red-950` | 1 |
 | `text-rose-100` | 1 |
 | `text-rose-400` | 1 |
 | `text-rose-700/80` | 1 |
 | `text-sky-500` | 1 |
+| `text-sky-800` | 1 |
 | `text-sky-900` | 1 |
 | `text-slate-300` | 1 |
 | `text-slate-800` | 1 |
-| `text-teal-800` | 1 |
 | `text-teal-900` | 1 |
 | `text-violet-700` | 1 |
 | `text-white/40` | 1 |
-| `text-yellow-900` | 1 |
-| `to-emerald-700` | 1 |
-| `to-stone-900` | 1 |

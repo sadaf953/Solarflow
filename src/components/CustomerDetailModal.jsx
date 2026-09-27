@@ -106,7 +106,7 @@ const getChangedFields = (draft = {}, saved = {}) => {
 
 // ─── CustomerDetailModal ──────────────────────────────────────────────────────
 export default function CustomerDetailModal({ customer, onClose, onUpdate, onDelete, user, meta, channel_partners = [], defaultTab }) {
-    const { showAlert, showConfirm, showChoice, showImageCropper } = useGlobalPopup();
+    const { showAlert, showConfirm, showImageCropper } = useGlobalPopup();
     const [activeTab, setActiveTab] = useState(() => {
         if (customer?._autoPrintBom) return STAGE_IDS.MATERIAL_INTEGRATION;
         if (defaultTab) return defaultTab;
@@ -1689,15 +1689,10 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                         {isAdmin && <button onClick={() => setShowDeleteConfirm(true)} className="p-2 text-white/30 hover:text-red-400"><Trash2 size={18} /></button>}
                         <button onClick={async () => {
                             if (isFormDirty) {
-                                const choice = await showChoice('You have unsaved changes. Would you like to save them before closing?', { title: 'Unsaved changes', confirmLabel: 'Save & Close', discardLabel: 'Discard Changes', cancelLabel: 'Keep Editing', type: 'warning' });
-                                if (choice === 'cancel') return;
-                                if (choice === 'confirm') {
-                                    const saved = await handleSave();
-                                    if (!saved) return;
-                                } else if (choice === 'discard') {
-                                    setIsFormDirty(false);
-                                    setEditData({ ...savedDataRef.current });
-                                }
+                                const shouldSave = await showConfirm('You have unsaved changes. Save them before closing?', { title: 'Unsaved changes', confirmLabel: 'Save & Close', cancelLabel: 'Keep Editing', type: 'warning' });
+                                if (!shouldSave) return;
+                                const saved = await handleSave();
+                                if (!saved) return;
                             }
                             onClose();
                         }} className="p-2 text-white/30 hover:text-white"><X size={24} /></button>
@@ -1719,15 +1714,10 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                         ].map(tab => (
                             <button key={tab.id} onClick={async () => {
                                 if (tab.id !== activeTab && isFormDirty) {
-                                    const choice = await showChoice('You have unsaved changes. Save them before continuing?', { title: 'Unsaved changes', confirmLabel: 'Save & Continue', discardLabel: 'Discard Changes', cancelLabel: 'Keep Editing', type: 'warning' });
-                                    if (choice === 'cancel') return;
-                                    if (choice === 'confirm') {
-                                        const saved = await handleSave();
-                                        if (!saved) return;
-                                    } else if (choice === 'discard') {
-                                        setIsFormDirty(false);
-                                        setEditData({ ...savedDataRef.current });
-                                    }
+                                    const shouldSave = await showConfirm('You have unsaved changes. Save them before continuing?', { title: 'Unsaved changes', confirmLabel: 'Save & Continue', cancelLabel: 'Keep Editing', type: 'warning' });
+                                    if (!shouldSave) return;
+                                    const saved = await handleSave();
+                                    if (!saved) return;
                                 }
                                 setActiveTab(tab.id); setEditingSection(null);
                             }}
@@ -1737,7 +1727,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                         ))}
                     </div>
                     {/* Subtle right gradient fade indicating more tabs are scrollable */}
-                    <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-stone-900 to-transparent" />
+                    <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-stone-900/90" />
                 </div>
 
                 {/* Body */}
@@ -1965,7 +1955,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
             {showValidationModal && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-stone-950/60 p-4 backdrop-blur-sm" onClick={() => setShowValidationModal(false)}>
                     <section className="w-full max-w-md overflow-hidden rounded-[28px] border border-amber-200 bg-white shadow-2xl animate-in zoom-in-95 fade-in duration-200" onClick={event => event.stopPropagation()} role="alertdialog" aria-modal="true" aria-labelledby="requirements-title">
-                        <div className="bg-gradient-to-br from-amber-500 via-amber-500 to-orange-500 px-6 py-5 text-white">
+                        <div className="bg-orange-500 px-6 py-5 text-stone-900">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     <div className="rounded-2xl bg-white/20 p-2.5"><AlertTriangle size={21} /></div>

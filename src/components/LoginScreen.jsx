@@ -126,9 +126,10 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
  async function choose(role, customName){
   setBusy(role.user_type);setError('');
   try {
+   const nameToUse = (customName !== undefined ? customName : visitorName || '').trim();
+   if (!nameToUse) throw new Error('Enter your name to continue.');
    const {data:session,error:sessionError}=await supabase.auth.getSession();if(sessionError)throw sessionError;
    if(!session.session){const result=await supabase.auth.signInAnonymously();if(result.error)throw result.error;}
-   const nameToUse = (customName !== undefined ? customName : visitorName || '').trim();
    const {data,error:roleError}=await supabase.rpc('start_demo_session',{
      p_role: role.user_type,
      p_name: nameToUse || null
@@ -216,7 +217,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
     {authMode === 'credentials' ? (
      <div className="bg-white rounded-3xl border border-stone-200 p-6 md:p-8 max-w-md mx-auto w-full shadow-sm animate-in fade-in duration-200">
       <div className="flex items-center gap-3 mb-6 pb-4 border-b border-stone-150">
-       <div className="w-10 h-10 rounded-2xl bg-amber-500/15 text-amber-600 flex items-center justify-center font-bold flex-shrink-0">
+       <div className="w-10 h-10 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center font-bold flex-shrink-0">
         {forgotMode ? <Send size={20}/> : <Lock size={20}/>}
        </div>
        <div>
@@ -251,7 +252,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
          value={emailInput}
          onChange={e => setEmailInput(e.target.value)}
          placeholder="user@example.com"
-         className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+         className="sf-input text-xs font-medium"
         />
        </div>
 
@@ -262,7 +263,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
           <button 
            type="button" 
            onClick={() => { setForgotMode(true); setCredNotice({ type: '', text: '' }); }}
-           className="text-[11px] font-bold text-amber-600 hover:text-amber-700 hover:underline cursor-pointer"
+           className="text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer"
           >
            Forgot password?
           </button>
@@ -273,7 +274,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
           value={passwordInput}
           onChange={e => setPasswordInput(e.target.value)}
           placeholder="••••••••"
-          className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+          className="sf-input text-xs font-medium"
          />
         </div>
        )}
@@ -281,7 +282,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
        <button
         type="submit"
         disabled={credBusy}
-        className="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
+        className="sf-btn-primary w-full py-3 shadow-sm"
        >
         {credBusy ? <LoaderCircle size={15} className="animate-spin"/> : forgotMode ? <Send size={15}/> : <ArrowRight size={15}/>}
         <span>{credBusy ? 'Processing...' : forgotMode ? 'Send Password Reset Link' : 'Sign In'}</span>
@@ -355,10 +356,10 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
       <div className="demo-login-hero-content">
        <div className="demo-login-hero-badge">
         <ShieldCheck size={14} />
-        <span>NO SIGNUP NEEDED · COLLABORATIVE LIVE WORKSPACE</span>
+        <span>DEMO ACCESS · NO SIGNUP REQUIRED</span>
        </div>
-       <h2>Enter your name to start</h2>
-       <p>Join the team workspace. Any changes, quotation drafts, or project updates you make will be recorded under your name in the live Activity Log.</p>
+       <h2>Enter your name to explore the demo</h2>
+       <p>This demo uses name-only access so you can explore quickly. The production CRM is secured with authenticated user accounts, passwords and role-based permissions. Your demo activity will be recorded under the name you enter.</p>
        
        <div className="demo-name-entry-row">
         <div className="demo-name-input-wrap">
@@ -367,14 +368,16 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
           type="text"
           value={visitorName}
           onChange={(e) => setVisitorName(e.target.value)}
-          placeholder="Enter your name (e.g. Rahul, Priya)..."
+          placeholder="Enter your name"
           className="demo-name-input"
+          autoComplete="name"
+          required
           autoFocus
          />
         </div>
         <button 
          type="submit" 
-         disabled={!!busy} 
+         disabled={!!busy || !visitorName.trim()}
          className="demo-login-hero-btn"
         >
          {busy === adminRole.user_type ? <LoaderCircle className="animate-spin" size={19}/> : <ArrowRight size={19}/>}
@@ -579,7 +582,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
    </div>
 
    <div className="demo-next-links">
-    <div><strong>Looking for a simpler CRM?</strong><p>Explore the basic version for leads, quotations and customer tracking.</p><a href={DEFAULT_BASIC_VERSION_URL} target="_blank" rel="noopener noreferrer">Explore Basic Version <ArrowRight size={15}/></a></div>
+    <div><strong>Looking for a simpler CRM?</strong><p>Explore the basic version for leads, quotations and customer tracking.</p><p><strong>Demo credentials</strong><br/>Email: <code>admin@crm.com</code><br/>Password: <code>admin</code></p><a href={DEFAULT_BASIC_VERSION_URL} target="_blank" rel="noopener noreferrer">Explore Basic Version <ArrowRight size={15}/></a></div>
     <div><strong>Plans for every team size</strong><p>Compare the Foundation, Growth and Enterprise setup options before entering the demo.</p><button type="button" onClick={onOpenPlans}>View Plans &amp; Pricing <ArrowRight size={15}/></button></div>
     <div><strong>Make it work for your team</strong><p>Tell us about your business when you are ready to discuss setup.</p><button type="button" aria-expanded={showEnquiry} aria-controls="demo-enquiry" onClick={() => setShowEnquiry(!showEnquiry)}>{showEnquiry ? 'Hide setup request' : 'Request a setup'} <ArrowRight size={15}/></button></div>
    </div>

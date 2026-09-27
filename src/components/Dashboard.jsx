@@ -1,4 +1,5 @@
 import { useDemoTourNavigation } from '../demo/tour';
+import { DATA_EXPORTS_ENABLED } from '../demo/config';
 // ─── Dashboard.jsx ────────────────────────────────────────────────────────────
 // Main admin layout: sidebar + header + view router.
 // Features:
@@ -11,7 +12,7 @@ import { useDemoTourNavigation } from '../demo/tour';
 
 import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { supabase } from '../supabase';
-import { logActivity, exportAllToCSV, uploadDocument, parseIndianNumber, lazyWithRetry, sanitizeAdminUpdate, runWrite } from '../utils';
+import { logActivity, uploadDocument, parseIndianNumber, lazyWithRetry, sanitizeAdminUpdate, runWrite } from '../utils';
 import { PRIMARY_STAGES, STAGE_IDS, CUSTOMER_CARD_COLUMNS, getCustomerCardColumns, ADMIN_NUMERIC_COLUMNS } from '../constants';
 import DashboardView from './DashboardView';
 import CustomerCard from './CustomerCard';
@@ -32,6 +33,7 @@ const DeliveryBatchesView = lazyWithRetry(() => import('./DeliveryBatchesView'))
 const VendorCalendarView = lazyWithRetry(() => import('./VendorCalendarView'));
 const AttendanceView = lazyWithRetry(() => import('./AttendanceView'));
 const ToolboxView = lazyWithRetry(() => import('./ToolboxView'));
+const DataExportView = lazyWithRetry(() => import('./DataExportView'));
 import { useGlobalPopup } from './GlobalPopup';
 import BrandMark from './BrandMark';
 const QuotationModule = lazyWithRetry(() => import('../quotations/QuotationModule'));
@@ -195,8 +197,8 @@ function SidebarGroup({ label, activeKey, defaultOpen = false, children }) {
     const id = `nav-${label.toLowerCase().replace(/[^a-z]+/g, '-')}`;
     return <div className="pt-2">
         <button type="button" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}
-            className={`w-full flex items-center justify-between gap-2 px-3 py-3 rounded-lg text-xs font-semibold text-left hover:bg-stone-100 ${activeKey ? 'text-amber-800' : 'text-stone-600'}`}>
-            <span>{label}{!open && activeKey && <span className="ml-2 text-amber-600">•</span>}</span>
+            className={`w-full flex items-center justify-between gap-2 px-3 py-3 rounded-lg text-xs font-semibold text-left hover:bg-stone-100 ${activeKey ? 'text-[#ff8a00]' : 'text-stone-600'}`}>
+            <span>{label}{!open && activeKey && <span className="ml-2 text-[#ff8a00]">•</span>}</span>
             <ChevronDown aria-hidden="true" className={`w-4 h-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
         <div id={id} hidden={!open} className="ml-2 pl-1 border-l border-stone-200">{children}</div>
@@ -354,7 +356,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         } catch { return null; }
     });
     const [trashCount, setTrashCount] = useState(0);
-    const [exporting, setExporting] = useState(false);
     const isChannelPartnerOffice = user?.userType === 'channel_partner_office' || user?.userType === 'office2';
     // Delivery Batches is a head-office function: Admin and Office only. Neither
     // the CPO nor the CP Manager (office2) under it gets access.
@@ -386,55 +387,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         loadDealers();
         return () => { cancelled = true; };
     }, [effectivePartnerFilter]);
-
-    const handleFullExport = async () => {
-        setExporting(true);
-        try {
-
-            // Fetch all records with chunking to ensure 100% of rows beyond 1000 limit are retrieved
-            let allRows = [];
-            let from = 0;
-            const CHUNK_SIZE = 1000;
-            let keepGoing = true;
-
-            while (keepGoing) {
-                let query = supabase
-                    .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
-                    .select('*')
-                    .is('deleted_at', null)
-                    .order('created_at', { ascending: false })
-                    .range(from, from + CHUNK_SIZE - 1);
-
-                if (!isChannelPartnerOffice && channelPartnerFilter && channelPartnerFilter.trim()) {
-                    query = query.ilike('channel_partner', channelPartnerFilter.trim());
-                }
-                if (dealerFilter) query = query.ilike('sub_channel_partner', dealerFilter);
-
-                const { data, error } = await query;
-                if (error || !data || data.length === 0) {
-                    keepGoing = false;
-                } else {
-                    allRows = allRows.concat(data);
-                    if (data.length < CHUNK_SIZE) {
-                        keepGoing = false;
-                    } else {
-                        from += CHUNK_SIZE;
-                    }
-                }
-            }
-
-            if (allRows.length > 0) {
-                exportAllToCSV(allRows);
-            } else {
-                showAlert('No customer records found to export.');
-            }
-        } catch (err) {
-            console.error('Export error:', err);
-            showAlert('Failed to export data. Please try again.', { type: 'error' });
-        } finally {
-            setExporting(false);
-        }
-    };
 
     // ── Data fetching ──────────────────────────────────────────────────────────
     // `skipMeta` lets the realtime path refresh only the numbers. The metadata
@@ -1385,6 +1337,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                 : currentView === 'loan_tags' ? 'Loan tracking'
                 : currentView === 'installation_tags' ? 'Installation tracking'
                 : currentView === 'attendance' ? 'Staff Attendance & Leave'
+                : currentView === 'exports' ? 'Data Exports'
                 : currentView === 'channel_partner_mgmt' ? 'Operations'
                     : currentView === 'installation_payments' ? 'Installation Payments'
                     : currentView === 'vendor_availability' ? 'Vendor Availability & Schedule'
@@ -1415,17 +1368,17 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                         onClick={() => { setCurrentView('toolbox'); setSidebarOpen(false); }}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold mb-1 transition-all cursor-pointer ${
                             currentView === 'toolbox'
-                                ? 'bg-amber-500 text-stone-950 font-bold shadow-sm'
-                                : 'text-stone-800 bg-amber-50/80 hover:bg-amber-100/90 border border-amber-200/60'
+                                ? 'bg-[#ff8a00] text-stone-950 font-bold shadow-sm'
+                                : 'text-stone-800 bg-[#fff8ed] hover:bg-[#fff0d9] border border-[#ffdcad]'
                         }`}
                     >
-                        <Calculator className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                        <Calculator className={`w-4 h-4 flex-shrink-0 ${currentView === 'toolbox' ? 'text-stone-950' : 'text-[#ff8a00]'}`} />
                         <span className="flex-1 text-left font-bold">Solar Toolbox</span>
-                        <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded-md font-bold">8 Tools</span>
+                        <span className="text-[10px] bg-[#fff0d9] text-stone-800 px-1.5 py-0.5 rounded-md font-bold">8 Tools</span>
                     </button>
 
                     {/* Tracking & logistics directly after Quotation Maker & Toolbox */}
-                    <SidebarGroup label="Tracking & logistics" defaultOpen={true} activeKey={['delivery_batches', 'inventory', 'subsidy', 'loan_tags', 'installation_tags'].includes(currentView) ? currentView : null}>
+                    <SidebarGroup label="Tracking & logistics" defaultOpen={false} activeKey={['delivery_batches', 'inventory', 'subsidy', 'loan_tags', 'installation_tags'].includes(currentView) ? currentView : null}>
                         {canSeeDeliveryBatches && (
                             <NavBtn view="delivery_batches" icon={Truck} label="Delivery Batches" count={deliveryBatchesCount} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                         )}
@@ -1438,7 +1391,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     </SidebarGroup>
 
                     <p className="px-3 pt-4 pb-1 text-[10px] uppercase font-bold text-stone-500 tracking-widest">Project workflow</p>
-                    {STAGE_GROUPS.map((group, index) => <SidebarGroup key={group.label} label={group.label} defaultOpen={index === 0}
+                    {STAGE_GROUPS.map(group => <SidebarGroup key={group.label} label={group.label} defaultOpen={false}
                         activeKey={currentView === 'stages' && group.stages.includes(selectedStage) ? selectedStage : null}>
                         {PRIMARY_STAGES.filter(stage => group.stages.includes(stage.id)).map(s => (
                             <NavBtn key={s.id} view="stages" stage={s.id} icon={s.icon} label={s.label} count={stageCounts[s.id] || 0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
@@ -1457,6 +1410,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                             </SidebarGroup>
                             <NavBtn view="activity" icon={Activity} label="Activity Log" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             <NavBtn view="users" icon={UserCog} label="User Management" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                            {DATA_EXPORTS_ENABLED && <NavBtn view="exports" icon={Download} label="Data Exports" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />}
                             <NavBtn view="trash" icon={Trash2} label="Trash" count={trashCount} redBadge currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                         </div>
                     )}
@@ -1491,8 +1445,8 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     </div>
                     {import.meta.env.DEV && onOpenDevSwitcher && (
                         <button onClick={onOpenDevSwitcher}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-xl text-xs font-bold transition-colors mb-1.5 cursor-pointer border border-amber-200">
-                            <Terminal className="w-4 h-4 text-amber-600" /> Backdoor Terminal & Roles
+                            className="w-full flex items-center gap-2 px-3 py-2 text-stone-800 bg-[#fff8ed] hover:bg-[#fff0d9] rounded-xl text-xs font-bold transition-colors mb-1.5 cursor-pointer border border-[#ffdcad]">
+                            <Terminal className="w-4 h-4 text-[#ff8a00]" /> Backdoor Terminal & Roles
                         </button>
                     )}
                     <button onClick={onLogout}
@@ -1652,15 +1606,14 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                                 </select>
                             )}
 
-                            {user?.userType === 'admin' && (
+                            {DATA_EXPORTS_ENABLED && user?.userType === 'admin' && (
                                 <button 
-                                    onClick={handleFullExport}
-                                    disabled={exporting}
+                                    onClick={() => setCurrentView('exports')}
                                     className="flex items-center gap-1.5 border border-stone-200 text-stone-600 px-3 py-2 rounded-xl text-sm font-medium hover:bg-stone-50 transition-colors disabled:opacity-50 cursor-pointer"
-                                    aria-label="Export complete database to CSV" title="Export complete database to CSV"
+                                    aria-label="Open data exports" title="Open data exports"
                                 >
-                                    <Download className={`w-4 h-4 ${exporting ? 'animate-bounce text-amber-600' : ''}`} />
-                                    <span className="hidden sm:inline text-xs">{exporting ? 'Exporting...' : 'Export'}</span>
+                                    <Download className="w-4 h-4" />
+                                    <span className="hidden sm:inline text-xs">Export</span>
                                 </button>
                             )}
                             {(user?.userType === 'admin' || user?.userType === 'sales' || user?.userType === 'agent' || isChannelPartnerOffice) && (
@@ -1715,6 +1668,14 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     {currentView === 'activity' && user.userType === 'admin' && <ActivityLogView />}
                     {currentView === 'users' && (user.userType === 'admin' || user.userType === 'channel_partner_office') && (
                         <UserManagementView currentUser={user} initialShowCreate={userMgmtAction === 'createUser'} />
+                    )}
+                    {DATA_EXPORTS_ENABLED && currentView === 'exports' && user.userType === 'admin' && (
+                        <DataExportView
+                            isChannelPartnerOffice={isChannelPartnerOffice}
+                            channelPartnerFilter={channelPartnerFilter}
+                            dealerFilter={dealerFilter}
+                            showAlert={showAlert}
+                        />
                     )}
 
                     {/* Trash view - admin only */}

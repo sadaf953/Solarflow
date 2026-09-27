@@ -29,57 +29,57 @@ export const ATTENDANCE_STATUSES = {
         id: 'half_day',
         label: 'Half Day',
         short: 'HD',
-        bg: 'bg-amber-100 text-amber-800 border-amber-300',
-        activeBg: 'bg-amber-500 text-white',
-        dot: 'bg-amber-500',
-        color: '#f97316'
+        bg: 'bg-yellow-100 text-yellow-900 border-yellow-300',
+        activeBg: 'bg-yellow-400 text-stone-900',
+        dot: 'bg-yellow-400',
+        color: '#facc15'
     },
     leave: {
         id: 'leave',
         label: 'Leave',
         short: 'L',
-        bg: 'bg-sky-100 text-sky-800 border-sky-300',
-        activeBg: 'bg-sky-600 text-white',
-        dot: 'bg-sky-500',
-        color: '#0284c7'
+        bg: 'bg-blue-100 text-blue-800 border-blue-300',
+        activeBg: 'bg-blue-600 text-white',
+        dot: 'bg-blue-500',
+        color: '#2563eb'
     },
     on_duty: {
         id: 'on_duty',
         label: 'Field / On Duty',
         short: 'OD',
-        bg: 'bg-purple-100 text-purple-800 border-purple-300',
-        activeBg: 'bg-purple-600 text-white',
-        dot: 'bg-purple-500',
-        color: '#9333ea'
+        bg: 'bg-orange-100 text-orange-900 border-orange-300',
+        activeBg: 'bg-orange-500 text-stone-900',
+        dot: 'bg-orange-500',
+        color: '#ff8a00'
     },
     pending_present: {
         id: 'pending_present',
         label: 'Self-Marked (Pending)',
         short: 'SMP',
-        bg: 'bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-400',
-        activeBg: 'bg-amber-500 text-white',
-        dot: 'bg-amber-500 animate-pulse',
-        color: '#f97316',
+        bg: 'bg-yellow-100 text-yellow-900 border-yellow-300 ring-1 ring-yellow-400',
+        activeBg: 'bg-yellow-400 text-stone-900',
+        dot: 'bg-yellow-400 animate-pulse',
+        color: '#facc15',
         isPending: true
     },
     holiday_request: {
         id: 'holiday_request',
         label: 'Holiday Request',
         short: 'HR',
-        bg: 'bg-indigo-100 text-indigo-900 border-indigo-300 ring-1 ring-indigo-400',
-        activeBg: 'bg-indigo-600 text-white',
-        dot: 'bg-indigo-500 animate-pulse',
-        color: '#4f46e5',
+        bg: 'bg-blue-100 text-blue-900 border-blue-300 ring-1 ring-blue-400',
+        activeBg: 'bg-blue-600 text-white',
+        dot: 'bg-blue-500 animate-pulse',
+        color: '#2563eb',
         isPending: true
     },
     holiday: {
         id: 'holiday',
         label: 'Holiday / Approved Leave',
         short: 'H',
-        bg: 'bg-teal-100 text-teal-800 border-teal-300',
-        activeBg: 'bg-teal-600 text-white',
-        dot: 'bg-teal-500',
-        color: '#0d9488'
+        bg: 'bg-blue-100 text-blue-800 border-blue-300',
+        activeBg: 'bg-blue-600 text-white',
+        dot: 'bg-blue-500',
+        color: '#2563eb'
     }
 };
 

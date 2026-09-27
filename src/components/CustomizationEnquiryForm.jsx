@@ -1,334 +1,184 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-    Phone, Mail, Building2, User, ExternalLink, CheckCircle2, 
-    Sparkles, Layers, FileSpreadsheet, Check, ArrowRight, X, AlertCircle, LoaderCircle
-} from 'lucide-react';
+import { useState, useRef, useEffect, useId } from 'react';
+import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
-import { enquiryPayload, submitEnquiry } from '../enquiries/submit';
+import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
 
-// Configurable link for the basic version (user can supply exact link)
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
-const SOFTWARE_OPTIONS = [
-    { id: 'sheets_excel', label: 'Google Sheets / Excel', icon: FileSpreadsheet },
-    { id: 'tally', label: 'Tally (ERP / Prime)', icon: Layers },
-    { id: 'zoho', label: 'Zoho (CRM / Books)', icon: Building2 },
-    { id: 'other_crm', label: 'Other Third-Party CRM / ERP', icon: Sparkles },
-    { id: 'manual', label: 'Manual Paper Registers', icon: User },
-    { id: 'fresh', label: 'None / Starting Fresh', icon: Sparkles }
+const INTEREST_OPTIONS = [
+    'Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options', 'Tools only — no CRM',
+    'Customer tracking', 'Quotation maker', 'Bill / invoice maker', 'BOM',
+    'Delivery challan', 'Gate pass', 'DISCOM submission maker', 'DISCOM submission auto print',
+    'Feasibility document automation', 'Inventory', 'Warranty tracking',
+    'Vendor login', 'Stamp staff login', 'Technician login',
+    'Dealers', 'Channel partner offices (CPOs)', 'Branches', 'Staff management',
+    'Installation view', 'Installation commission view', 'Vendor commission page',
+    'Channel partner commission view', 'Operations page', 'Dealer-based filtering',
+    'MIS upload auto updater', 'Finance', 'Attendance', 'Checklists', 'Document uploads'
 ];
 
-export default function CustomizationEnquiryForm({ 
-    isModal = false, 
-    onClose = null, 
-    basicVersionUrl = DEFAULT_BASIC_VERSION_URL,
-    initialStoreFiles = true
-}) {
-    const [name, setName] = useState('');
-    const [company, setCompany] = useState('');
-    const [mobile, setMobile] = useState('');
-    const [modelType, setModelType] = useState('advance'); // 'basic' | 'advance'
-    const [storeFiles, setStoreFiles] = useState(initialStoreFiles ? 'yes' : 'no');
-    const [remarks, setRemarks] = useState('');
-    const [submitting, setSubmitting] = useState(false);
-    const [submitted, setSubmitted] = useState(false);
-    const [error, setError] = useState('');
 
-    const { showAlert, showConfirm } = useGlobalPopup();
+export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = ''}) {
+    const [name, setName] = useState('');
+    const [mobile, setMobile] = useState('');
+    const [company, setCompany] = useState('');
+    const [callDate, setCallDate] = useState('');
+    const [callTime, setCallTime] = useState('');
+    const [interests, setInterests] = useState(() => selectedInterest ? [selectedInterest] : []);
+    const [remarks, setRemarks] = useState('');
+    const [step, setStep] = useState('contact');
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState('');
+    const identityRef = useRef(null);
     const savingRef = useRef(false);
-    const dirty = !submitted && Boolean(name || company || mobile || remarks);
-    useEffect(() => { setStoreFiles(initialStoreFiles ? 'yes' : 'no'); }, [initialStoreFiles]);
+    const detailsRef = useRef(null);
+    const nameRef = useRef(null);
+    const formId = useId();
+    const {showConfirm} = useGlobalPopup();
+    const optionalDirty = Boolean(company || callDate || callTime || remarks || interests.join('|') !== selectedInterest);
+    const dirty = step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
+
+    useEffect(() => {
+        if (!isModal) return;
+        const previousFocus = document.activeElement;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        nameRef.current?.focus();
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            if (previousFocus?.isConnected) previousFocus.focus();
+        };
+    }, [isModal]);
+    useEffect(() => {
+        if (step === 'details') detailsRef.current?.focus();
+    }, [step]);
     useEffect(() => {
         if (!dirty) return;
-        const warn = event => { event.preventDefault(); event.returnValue = ''; };
+        const warn = event => {event.preventDefault(); event.returnValue = '';};
         window.addEventListener('beforeunload', warn);
         return () => window.removeEventListener('beforeunload', warn);
     }, [dirty]);
+
     const requestClose = async () => {
         if (savingRef.current) return;
-        if (dirty && !await showConfirm('Your enquiry has not been saved. Closing will discard the entered details.', {title:'Close without saving?', confirmLabel:'Discard enquiry', cancelLabel:'Keep editing', type:'warning'})) return;
+        if (dirty) {
+            const message = step === 'contact' ? 'Your name and phone number have not been saved.' : 'Your contact details are saved. These optional details have not been saved.';
+            if (!await showConfirm(message, {title:'Close this form?', confirmLabel:'Close form', cancelLabel:'Keep editing', type:'warning'})) return;
+        }
         onClose?.();
     };
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (savingRef.current || submitted) return;
+    const handleSubmit = async event => {
+        event.preventDefault();
+        if (savingRef.current || step === 'done') return;
         setError('');
+        if (!name.trim()) {setError('Please enter your name.'); return;}
+        const contactOnly = step === 'contact';
+        const storeFiles = contactOnly ? 'unspecified' : interests.includes('Document uploads') ? 'yes' : interests.includes('Checklists') ? 'no' : initialStoreFiles == null ? 'unspecified' : initialStoreFiles ? 'yes' : 'no';
+        const chosenInterests = contactOnly ? selectedInterest ? [selectedInterest] : [] : interests;
+        const modelType = chosenInterests.includes('Option 1: Small team setup') && !chosenInterests.includes('Option 2: Detailed operations') && !chosenInterests.includes('A mix of both options') ? 'basic' : chosenInterests.includes('Option 2: Detailed operations') ? 'advance' : 'both';
         let payload;
-        try { payload = enquiryPayload({name, company, mobile, modelType, storeFiles, remarks}); }
-        catch (err) {
-            setError(err.message);
-            showAlert(err.message, {title:'Check your phone number', type:'warning'});
-            return;
-        }
+        try {
+            payload = enquiryPayload({name, mobile, modelType, storeFiles, selectedInterest,
+                company: contactOnly ? '' : company, remarks: contactOnly ? '' : remarks,
+                callDate: contactOnly ? '' : callDate, callTime: contactOnly ? '' : callTime,
+                interests: chosenInterests});
+        } catch (err) {setError(err.message); return;}
+        if (!identityRef.current) identityRef.current = {id:crypto.randomUUID(), editToken:crypto.randomUUID()};
         savingRef.current = true;
         setSubmitting(true);
         try {
-            await submitEnquiry(supabase, payload);
-            setSubmitted(true);
-            showAlert('Your setup request has been saved successfully.', {title:'Enquiry saved', type:'success'});
-        } catch {
-            const message = 'We could not confirm that your enquiry was saved. Your details are still in this form. Please check your connection and try again.';
-            setError(message);
-            showAlert(message, {title:'Enquiry not confirmed', type:'error'});
-        } finally {
-            savingRef.current = false;
-            setSubmitting(false);
-        }
+            await saveEnquiryStep(supabase, payload, identityRef.current, {contactOnly});
+            setStep(contactOnly ? 'details' : 'done');
+        } catch (err) {
+            setError(err.message?.startsWith('Your contact details are saved.') ? err.message : contactOnly ? 'We could not confirm your enquiry was saved. Please try again; your details are still here.' : 'Your contact details are saved, but we could not save these extra details. Please try again or skip this step.');
+        } finally {savingRef.current = false; setSubmitting(false);}
     };
-
-    const handleReset = () => {
-        setSubmitted(false);
-        setName('');
-        setCompany('');
-        setMobile('');
-        setRemarks('');
-        setError('');
+    const reset = () => {
+        setName(''); setMobile(''); setCompany(''); setCallDate(''); setCallTime(''); setRemarks('');
+        setInterests(selectedInterest ? [selectedInterest] : []);
+        setError(''); identityRef.current = null; setStep('contact');
     };
-
+    const fieldClass = 'sf-input mt-1 w-full';
+    const handleModalKey = event => {
+        if (event.key === 'Escape') {event.preventDefault(); requestClose();}
+        if (event.key !== 'Tab') return;
+        const controls = [...event.currentTarget.querySelectorAll('button:not(:disabled), input:not(:disabled), textarea:not(:disabled)')];
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last?.focus();}
+        if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first?.focus();}
+    };
     const content = (
-        <div className="w-full bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden text-stone-900">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-stone-900 via-stone-850 to-stone-900 p-6 md:p-7 text-white relative">
-                {isModal && onClose && (
-                    <button 
-                        type="button" 
-                        onClick={requestClose}
-                        className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition cursor-pointer"
-                        aria-label="Close modal"
-                    >
-                        <X size={18} />
-                    </button>
-                )}
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 text-[11px] font-bold tracking-wide uppercase mb-2">
-                    <Sparkles size={12} />
-                    <span>Get SolarFlow For Your Business</span>
-                </div>
-                <h3 className="text-xl md:text-2xl font-bold tracking-tight text-white">
-                    Request SolarFlow Setup
-                </h3>
-                <p className="text-xs md:text-sm text-stone-300 mt-1 max-w-xl leading-relaxed">
-                    Tell us what you need and our team will get your tailored solar CRM configured.
-                </p>
+        <section className="w-full bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden text-stone-900" aria-labelledby={`${formId}-title`}>
+            <div className="bg-stone-900 p-6 md:p-7 text-white relative">
+                {isModal && step !== 'details' && <button type="button" onClick={requestClose} disabled={submitting} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20" aria-label="Close enquiry"><X size={18}/></button>}
+                {step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
+                <p className="text-xs font-bold text-amber-300 mb-2">{step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Optional details' : 'Enquiry received'}</p>
+                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Want to add a little more detail?' : 'Thank you for your interest'}</h3>
+                <p className="mt-2 text-sm text-stone-300">{step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. These extra details are completely optional.' : 'We have your contact details and will reach out to understand your needs.'}</p>
+                {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
-
-            {/* Form */}
             <div className="p-6 md:p-7">
-                {submitted ? (
-                    <div className="py-8 px-4 text-center max-w-md mx-auto animate-in fade-in zoom-in-95 duration-200">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center mb-3.5 shadow-sm">
-                            <CheckCircle2 size={28} />
-                        </div>
-                        <h4 className="text-lg font-bold text-stone-900">Enquiry Received!</h4>
-                        <p className="text-xs text-stone-600 mt-1.5 leading-relaxed">
-                            Your setup request has been saved with contact number <strong>{mobile}</strong>.
-                        </p>
-                        <div className="mt-5 flex justify-center gap-3">
-                            <button
-                                type="button"
-                                onClick={handleReset}
-                                className="px-4 py-2 rounded-xl text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 transition cursor-pointer"
-                            >
-                                Submit Another
-                            </button>
-                            {isModal && onClose && (
-                                <button
-                                    type="button"
-                                    onClick={requestClose}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-stone-900 text-white hover:bg-stone-800 transition cursor-pointer"
-                                >
-                                    Close
-                                </button>
-                            )}
-                        </div>
+                {step === 'done' ? (
+                    <div className="text-center space-y-4 py-4" role="status">
+                        <CheckCircle2 className="mx-auto w-10 h-10 text-emerald-600"/>
+                        <p className="text-sm">Your enquiry is saved with contact number <strong>{mobile}</strong>.</p>
+                        <button type="button" onClick={isModal ? requestClose : reset} className="sf-btn-secondary">{isModal ? 'Done' : 'Submit another enquiry'}</button>
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <fieldset disabled={submitting} className="space-y-4">
-                        {error && (
-                            <div role="alert" className="p-3 rounded-xl text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-2">
-                                <AlertCircle size={15} className="shrink-0 text-rose-600" />
-                                <span>{error}</span>
-                            </div>
-                        )}
-
-                        {/* 1. Model Choice: Basic vs Advance */}
-                        <div>
-                            <label className="block text-xs font-bold text-stone-800 mb-1.5">
-                                1. Model Type *
-                            </label>
-                            <div className="grid grid-cols-2 gap-2.5">
-                                <button
-                                    type="button"
-                                    onClick={() => setModelType('basic')}
-                                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                                        modelType === 'basic'
-                                            ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-bold shadow-2xs'
-                                            : 'bg-stone-50 border-stone-200 text-stone-700 hover:border-stone-300'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-bold">Basic Model</span>
-                                        {modelType === 'basic' && <Check size={14} className="text-amber-600" />}
-                                    </div>
-                                    <p className="text-[11px] font-normal text-stone-500 mt-0.5">
-                                        Leads, Quotations &amp; Customer Tracking
-                                    </p>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setModelType('advance')}
-                                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                                        modelType === 'advance'
-                                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-950 font-bold shadow-2xs'
-                                            : 'bg-stone-50 border-stone-200 text-stone-700 hover:border-stone-300'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-bold">Advanced Edition</span>
-                                        {modelType === 'advance' && <Check size={14} className="text-emerald-600" />}
-                                    </div>
-                                    <p className="text-[11px] font-normal text-stone-500 mt-0.5">
-                                        All 50 Stages, Inventory, Vendors &amp; Stamp
-                                    </p>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* 2. File Storage: Yes vs No */}
-                        <div>
-                            <label className="block text-xs font-bold text-stone-800 mb-1.5">
-                                2. File Storage *
-                            </label>
-                            <div className="grid grid-cols-2 gap-2.5">
-                                <button
-                                    type="button"
-                                    onClick={() => setStoreFiles('yes')}
-                                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-                                        storeFiles === 'yes'
-                                            ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-bold shadow-2xs'
-                                            : 'bg-stone-50 border-stone-200 text-stone-700 hover:border-stone-300'
-                                    }`}
-                                >
-                                    <div>
-                                        <span className="text-xs font-bold">Yes</span>
-                                        <span className="text-[11px] text-stone-500 font-normal ml-1.5">Upload photos &amp; docs</span>
-                                    </div>
-                                    {storeFiles === 'yes' && <Check size={14} className="text-amber-600" />}
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setStoreFiles('no')}
-                                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
-                                        storeFiles === 'no'
-                                            ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-bold shadow-2xs'
-                                            : 'bg-stone-50 border-stone-200 text-stone-700 hover:border-stone-300'
-                                    }`}
-                                >
-                                    <div>
-                                        <span className="text-xs font-bold">No</span>
-                                        <span className="text-[11px] text-stone-500 font-normal ml-1.5">Simple 1-click checklists</span>
-                                    </div>
-                                    {storeFiles === 'no' && <Check size={14} className="text-amber-600" />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* 3. Contact Details */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                            <div>
-                                <label className="block text-xs font-bold text-stone-700 mb-1">
-                                    Name
-                                </label>
-                                <div className="relative">
-                                    <User size={14} className="absolute left-3.5 top-3 text-stone-400" />
-                                    <input 
-                                        type="text"
-                                        value={name}
-                                        onChange={e => setName(e.target.value)}
-                                        placeholder="Your Name"
-                                        className="w-full pl-9 pr-3.5 py-2.5 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-                                    />
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex gap-2"><AlertCircle size={16} className="shrink-0"/>{error}</p>}
+                        <fieldset disabled={submitting} className="space-y-5">
+                            {step === 'contact' ? (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <label className="block text-xs font-bold">Name <span aria-hidden="true">*</span>
+                                        <input ref={nameRef} required maxLength={200} autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className={fieldClass}/>
+                                    </label>
+                                    <label className="block text-xs font-bold">Phone number <span aria-hidden="true">*</span>
+                                        <input required type="tel" autoComplete="tel" maxLength={20} value={mobile} onChange={e => setMobile(e.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
+                                    </label>
                                 </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-stone-700 mb-1">
-                                    Company Name
-                                </label>
-                                <div className="relative">
-                                    <Building2 size={14} className="absolute left-3.5 top-3 text-stone-400" />
-                                    <input 
-                                        type="text"
-                                        value={company}
-                                        onChange={e => setCompany(e.target.value)}
-                                        placeholder="Company / Firm Name"
-                                        className="w-full pl-9 pr-3.5 py-2.5 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-bold text-stone-700 mb-1">
-                                Phone Number *
-                            </label>
-                            <div className="relative">
-                                <Phone size={14} className="absolute left-3.5 top-3 text-stone-400" />
-                                <input 
-                                    type="tel"
-                                    required
-                                    value={mobile}
-                                    onChange={e => setMobile(e.target.value)}
-                                    placeholder="10-digit mobile number"
-                                    className="w-full pl-9 pr-3.5 py-2.5 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-                                />
-                            </div>
-                        </div>
-
-                        {/* 4. Remarks */}
-                        <div>
-                            <label className="block text-xs font-bold text-stone-700 mb-1">
-                                Any Remarks
-                            </label>
-                            <textarea
-                                rows={2}
-                                value={remarks}
-                                onChange={e => setRemarks(e.target.value)}
-                                placeholder="Any specific requirements or notes..."
-                                className="w-full px-3.5 py-2.5 border border-stone-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white resize-none"
-                            />
-                        </div>
-
-                        {/* Submit */}
-                        <div className="pt-2">
-                            <button
-                                type="submit"
-                                disabled={submitting}
-                                className="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
-                            >
-                                {submitting ? <LoaderCircle size={15} className="animate-spin" /> : <ArrowRight size={15} />}
-                                <span>{submitting ? 'Saving request...' : error ? 'Retry submission' : 'Submit Request'}</span>
+                            ) : (
+                                <>
+                                    <p ref={detailsRef} tabIndex={-1} role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 outline-none">Contact saved: {name} · {mobile}</p>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <label className="block text-xs font-bold sm:col-span-2">Company name (optional)
+                                            <input maxLength={300} autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} className={fieldClass}/>
+                                        </label>
+                                        <label className="block text-xs font-bold">Preferred call date (optional)
+                                            <input type="date" value={callDate} onChange={e => setCallDate(e.target.value)} className={fieldClass}/>
+                                        </label>
+                                        <label className="block text-xs font-bold">Preferred call time (optional, India time)
+                                            <input type="time" value={callTime} onChange={e => setCallTime(e.target.value)} className={fieldClass}/>
+                                        </label>
+                                    </div>
+                                    <fieldset className="space-y-3">
+                                        <legend className="text-sm font-bold">Interested in (optional)</legend>
+                                        <p className="text-xs text-stone-500">Choose just the tools you need, a CRM setup, or both. Tick or untick anything — you can leave these blank.</p>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            {INTEREST_OPTIONS.map(option => <label key={option} className="flex gap-2 items-center border border-stone-200 rounded-xl p-3 text-xs cursor-pointer">
+                                                <input type="checkbox" checked={interests.includes(option)} onChange={e => setInterests(current => e.target.checked ? [...current, option] : current.filter(item => item !== option))} className="accent-orange-600 w-4 h-4 shrink-0"/>{option}
+                                            </label>)}
+                                        </div>
+                                    </fieldset>
+                                    <label className="block text-xs font-bold">Anything else? (optional)
+                                        <textarea maxLength={5000} rows={3} value={remarks} onChange={e => setRemarks(e.target.value)} className={fieldClass}/>
+                                    </label>
+                                </>
+                            )}
+                            <button type="submit" className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50" disabled={submitting}>
+                                {submitting ? <LoaderCircle size={16} className="animate-spin"/> : <ArrowRight size={16}/>}
+                                {submitting ? 'Saving…' : step === 'contact' ? 'Submit enquiry' : 'Save optional details'}
                             </button>
-                        </div>
                         </fieldset>
                     </form>
                 )}
             </div>
-        </div>
+        </section>
     );
-
-    if (isModal) {
-        return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
-                <div className="relative w-full max-w-lg my-8">
-                    {content}
-                </div>
-            </div>
-        );
-    }
-
-    return content;
+    return isModal ? (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs overflow-y-auto p-4 flex items-start justify-center" role="dialog" aria-modal="true" aria-labelledby={`${formId}-title`} onKeyDown={handleModalKey}>
+            <div className="w-full max-w-2xl my-8">{content}</div>
+        </div>
+    ) : content;
 }

@@ -6,14 +6,25 @@
 :root {
     --sf-canvas: #FAFAF9;
     --sf-surface: #FFFFFF;
-    --sf-surface-soft: #FFFBEB;
+    --sf-surface-soft: #F5F5F4;
     --sf-ink: #1C1917;
+    --sf-ink-secondary: #57534E;
     --sf-muted: #78716C;
     --sf-border: #E7E5E4;
-    --sf-orange: #F97316;
+    --sf-border-strong: #D6D3D1;
+    --sf-orange: #FF8A00;
+    --sf-orange-hover: #FFB000;
+    --sf-orange-soft: #FFF4E5;
     --sf-yellow: #FACC15;
-    --sf-green: #16A34A;
-    --sf-green-dark: #15803D;
+    --sf-yellow-soft: #FEF9C3;
+    --sf-green: #22C55E;
+    --sf-green-dark: #16A34A;
+    --sf-green-soft: #DCFCE7;
+    --sf-blue: #2563EB;
+    --sf-blue-soft: #EFF6FF;
+    --sf-red: #EF4444;
+    --sf-red-dark: #B91C1C;
+    --sf-red-soft: #FEF2F2;
     --sf-focus: #FACC15;
     --sf-radius: 14px;
 }
@@ -90,12 +101,12 @@ h6 {
 }
 
 .stage-btn:hover {
-    background-color: #FFFBEB;
-    border-left-color: #F59E0B;
+    background-color: var(--sf-orange-soft);
+    border-left-color: var(--sf-orange);
 }
 
 .stage-btn.active {
-    background-color: #FEF3C7;
+    background-color: var(--sf-orange-soft);
     border-left-color: var(--sf-orange);
     color: var(--sf-ink);
     font-weight: 700;
@@ -107,21 +118,51 @@ select:focus,
 textarea:focus {
     outline: none;
     border-color: var(--sf-focus);
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, .18);
+    box-shadow: 0 0 0 3px rgba(250, 204, 21, .28);
 }
 
 /* Button Animations */
 .btn-primary {
-    border-color: var(--sf-green);
-    background: var(--sf-green);
-    color: #FFFFFF;
+    border-color: var(--sf-orange);
+    background: var(--sf-orange);
+    color: var(--sf-ink);
     transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
 
 .btn-primary:hover {
-    border-color: var(--sf-green-dark);
-    background: var(--sf-green-dark);
-    box-shadow: 0 3px 10px rgba(21, 128, 61, .18);
+    border-color: var(--sf-orange-hover);
+    background: var(--sf-orange-hover);
+    box-shadow: 0 3px 10px rgba(255, 138, 0, .2);
+}
+
+@layer components {
+    .sf-page {
+        @apply min-h-screen bg-stone-50 text-stone-900;
+    }
+
+    .sf-card {
+        @apply rounded-2xl border border-stone-200 bg-white;
+    }
+
+    .sf-btn-primary {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl border border-orange-500 bg-orange-500 px-4 py-2.5 text-xs font-bold text-stone-900 transition-colors hover:border-orange-400 hover:bg-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .sf-btn-secondary {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-xs font-bold text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    }
+
+    .sf-btn-success {
+        @apply inline-flex items-center justify-center gap-2 rounded-xl border border-green-600 bg-green-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:border-green-700 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400 focus-visible:ring-offset-2;
+    }
+
+    .sf-kicker {
+        @apply text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600;
+    }
+
+    .sf-input {
+        @apply w-full rounded-xl border border-stone-300 bg-white px-3.5 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-yellow-400 focus:outline-none focus:ring-2 focus:ring-yellow-400/30;
+    }
 }
 
 /* Follow-up Chat Style */
@@ -146,16 +187,157 @@ textarea:focus {
 
     0%,
     100% {
-        border-color: #F59E0B;
+        border-color: var(--sf-orange);
     }
 
     50% {
-        border-color: #FBBF24;
+        border-color: var(--sf-orange-hover);
     }
 }
 
 .new-item {
     animation: pulse-border 2s ease-in-out 3;
+}
+
+/* Solar Toolbox business document system */
+.professional-document {
+    width: 100%;
+    min-height: 860px;
+    padding: 38px 42px 30px;
+    border: 1px solid var(--sf-border-strong);
+    border-radius: 4px;
+    box-shadow: 0 8px 28px rgba(28, 25, 23, 0.08);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.professional-document-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 28px;
+    padding-bottom: 18px;
+    border-bottom: 3px solid var(--sf-ink);
+}
+
+.professional-document-brand {
+    color: var(--sf-ink);
+    font-size: 23px;
+    font-weight: 900;
+    letter-spacing: .04em;
+}
+
+.professional-document-header p {
+    margin-top: 3px;
+    color: var(--sf-muted);
+    font-size: 10px;
+}
+
+.professional-document-title {
+    min-width: 235px;
+    text-align: right;
+}
+
+.professional-document-title h3 {
+    margin-bottom: 9px;
+    color: var(--sf-orange);
+    font-size: 18px;
+    font-weight: 900;
+    letter-spacing: .055em;
+    text-transform: uppercase;
+}
+
+.professional-document-title dl > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 2px 0;
+}
+
+.professional-document-title dt { color: var(--sf-muted); }
+.professional-document-title dd { color: var(--sf-ink); font-weight: 750; }
+
+.professional-document-parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    margin: 22px 0;
+    padding: 15px 17px;
+    border: 1px solid var(--sf-border);
+    background: var(--sf-canvas);
+}
+
+.professional-document-parties > div:last-child { text-align: right; }
+.professional-document h4 {
+    margin-bottom: 6px;
+    color: var(--sf-muted);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+}
+.professional-document-parties p { color: var(--sf-ink-secondary); }
+.professional-document-parties .party-name { color: var(--sf-ink); font-size: 14px; font-weight: 800; }
+
+.professional-document-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.professional-document-table th,
+.professional-document-table td {
+    padding: 11px 12px;
+    border: 1px solid var(--sf-border-strong);
+    vertical-align: top;
+}
+
+.professional-document-table th {
+    background: var(--sf-ink);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .07em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.professional-document-table .serial-column { width: 70px; text-align: center; }
+.professional-document-table .amount-column { width: 170px; text-align: right; font-weight: 750; }
+.professional-document-table td strong { display: block; color: var(--sf-ink); font-size: 12px; }
+.professional-document-table td small { display: block; margin-top: 4px; color: var(--sf-muted); font-size: 10px; line-height: 1.45; }
+.professional-document-table .document-total-row td {
+    border-top: 2px solid var(--sf-ink);
+    background: var(--sf-orange-soft);
+    color: var(--sf-ink);
+    font-size: 13px;
+    font-weight: 900;
+    text-align: right;
+}
+
+.professional-document-notes {
+    margin-top: 20px;
+    padding: 13px 15px;
+    border-left: 3px solid var(--sf-orange);
+    background: var(--sf-canvas);
+}
+.professional-document-notes p { margin-top: 3px; color: var(--sf-ink-secondary); font-size: 10px; }
+
+.professional-document-signatures {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 34px;
+    margin-top: 72px;
+}
+.professional-document-signatures > div { text-align: center; }
+.professional-document-signatures span { display: block; border-top: 1px solid var(--sf-ink); }
+.professional-document-signatures strong { display: block; margin-top: 7px; color: var(--sf-ink); font-size: 10px; }
+.professional-document-signatures small { display: block; margin-top: 2px; color: var(--sf-muted); font-size: 8px; }
+.professional-document-footer { margin-top: 25px; padding-top: 8px; border-top: 1px solid var(--sf-border); color: var(--sf-muted); font-size: 8px; text-align: center; }
+
+@media (max-width: 720px) {
+    .professional-document { min-width: 680px; padding: 30px; }
+    .toolbox-content:has(.professional-document) { overflow-x: auto; }
 }
 
 /* Keep mobile stage drawers touch-scrollable without a scrollbar covering labels. */
@@ -293,6 +475,38 @@ textarea:focus {
     left: 15mm !important;
     right: 15mm !important;
   }
+
+  .solar-toolbox,
+  .toolbox-workspace,
+  .toolbox-content {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .professional-document {
+    width: 210mm !important;
+    min-width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 auto !important;
+    padding: 14mm 15mm 13mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .professional-document-table thead { display: table-header-group !important; }
+  .professional-document-table tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+  .professional-document-signatures { margin-top: 24mm !important; }
 }
 
 /* Screen Document Page view */
@@ -342,7 +556,7 @@ textarea:focus {
 
 /* Keyboard focus must remain visible even on controls using outline-none. */
 :where(button, a[href], input, select, textarea, summary, [tabindex]):focus-visible {
-    outline: 3px solid #f59e0b !important;
+    outline: 3px solid var(--sf-focus) !important;
     outline-offset: 2px;
 }
 .delivery-editor-dialog {
@@ -356,3 +570,42 @@ textarea:focus {
     border-radius: 1.5rem;
 }
 .delivery-editor-dialog::backdrop { background: rgb(28 25 23 / 60%); backdrop-filter: blur(4px); }
+
+/* Solar Toolbox uses one restrained workspace treatment across calculators and documents. */
+.solar-toolbox .toolbox-content > div > div:first-child:not([class*="grid"]) {
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--sf-border);
+}
+
+.solar-toolbox :where(input:not([type="radio"]):not([type="checkbox"]), select, textarea) {
+    border-color: var(--sf-border-strong);
+    border-radius: 10px;
+    background-color: var(--sf-surface);
+    color: var(--sf-ink);
+}
+
+.solar-toolbox :where(input:not([type="radio"]):not([type="checkbox"]), select, textarea):focus {
+    border-color: var(--sf-focus);
+    box-shadow: 0 0 0 3px rgb(250 204 21 / 22%);
+}
+
+.solar-toolbox label {
+    color: var(--sf-ink-secondary);
+}
+
+@media print {
+    .solar-toolbox {
+        max-width: none !important;
+        padding: 0 !important;
+    }
+
+    .solar-toolbox .toolbox-workspace {
+        display: block !important;
+    }
+
+    .solar-toolbox .toolbox-content {
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+    }
+}

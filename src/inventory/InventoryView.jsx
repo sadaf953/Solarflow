@@ -1,4 +1,5 @@
 import {useDemoTourNavigation} from '../demo/tour';
+import {DATA_EXPORTS_ENABLED} from '../demo/config';
 import {useEffect,useRef,useState} from 'react';
 import {Package,History,CalendarDays,RefreshCw,Download,PackageCheck,PackageX,Activity} from 'lucide-react';
 import {supabase} from '../supabase';
@@ -194,18 +195,18 @@ export default function InventoryView({currentUser}){
    {tab==='daily'&&(
      <>
        <label>Report date (India time)<input type="date" value={reportDay} max={stockDay(Date.now())} onChange={e=>{if(e.target.value)setReportDay(e.target.value);}}/></label>
-       <button type="button" className="inventory-download-btn" onClick={downloadDailyReport} disabled={loading||loadFailed||historyLoading||!historyLoaded} title="Download daily inventory report as CSV">
+       {DATA_EXPORTS_ENABLED && <button type="button" className="inventory-download-btn" onClick={downloadDailyReport} disabled={loading||loadFailed||historyLoading||!historyLoaded} title="Download daily inventory report as CSV">
          <Download size={14}/> Download Daily Report (CSV)
-       </button>
+       </button>}
      </>
    )}
-   {tab==='stock'&&(
+   {DATA_EXPORTS_ENABLED && tab==='stock'&&(
      <button type="button" className="inventory-download-btn" onClick={downloadCurrentStock} disabled={loading||loadFailed} title="Export current stock inventory as CSV">
        <Download size={14}/> Export Stock (CSV)
      </button>
    )}
  </div>
- <p className="inventory-help">{tab==='stock'?'Receive new material here. Delivered batches deduct their BOM quantities automatically.':tab==='daily'?'Opening + incoming − outgoing = closing. Use the date picker to review or export any day.':'Every receipt and issue is recorded with its reference and team member.'}</p>
+ <p className="inventory-help">{tab==='stock'?'Receive new material here. Delivered batches deduct their BOM quantities automatically.':tab==='daily'?'Opening + incoming − outgoing = closing. Use the date picker to review any day.':'Every receipt and issue is recorded with its reference and team member.'}</p>
  {loading||((tab==='movements'||tab==='daily')&&historyLoading)?<div className="inventory-loading" role="status"><RefreshCw size={18}/><span>{loading?'Loading stock…':'Loading movement history…'}</span></div>:loadFailed?<div className="inventory-empty"><h3>Inventory couldn’t be loaded</h3><p>Your stock records have not been changed. Choose Refresh to try again.</p></div>:<div className="inventory-table"><table><thead><tr>{(tab==='stock'?['Material','Stock health','Available','Actions']:tab==='daily'?['Material','Unit','Opening','Incoming','Outgoing','Closing']:['Material','Movement','Quantity','Reference','By','Recorded']).map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>
  {visible.map((row,index)=>tab==='stock'?(()=>{const state=stockState(row);const reorder=Number(row.reorder_level)||0;const stock=Number(row.stock_on_hand)||0;const fill=reorder>0?Math.min(100,Math.round((stock/(reorder*2))*100)):stock>0?100:0;return <tr key={row.id}><td><strong>{row.product_name}</strong><small>{row.sku} · {row.uom}</small></td><td><span className={`inventory-badge ${state}`}>{state==='out'?'Out of stock':state==='low'?'Low stock':'In stock'}</span></td><td><div className="inventory-level"><div><strong>{fmt(stock)} {row.uom}</strong><small>Reorder at {fmt(reorder)}</small></div><span><i className={state} style={{width:`${fill}%`}}/></span></div></td><td><div className="inventory-row-actions"><button className="inventory-primary" onClick={()=>openStock(row)}>Receive</button><button onClick={()=>openStock(row,'issue')} disabled={stock<=0}>Issue</button></div></td></tr>;})():tab==='daily'?<tr key={row.id}><td>{row.product_name}</td><td>{row.uom}</td><td>{fmt(row.opening)}</td><td className="inventory-in">+{fmt(row.incoming)}</td><td className="inventory-out">−{fmt(row.outgoing)}</td><td><strong>{fmt(row.closing)}</strong></td></tr>:(()=>{const parsed=formatMovementRow(row);return <tr key={row.id||index}><td>{itemMap.get(row.item_id)?.product_name||'Material'}</td><td><span className={`inventory-badge ${row.kind==='issue'?'low':'good'}`}>{row.kind}</span></td><td>{row.kind==='issue'?'−':'+'}{fmt(row.quantity)} {itemMap.get(row.item_id)?.uom}</td><td>{parsed.displayNote}</td><td><span className="inventory-badge inventory-author">{parsed.author}</span></td><td>{new Date(row.created_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}</td></tr>;})())}
  </tbody></table>{!visible.length&&<p className="inventory-empty">No matching records.</p>}</div>}
