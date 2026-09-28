@@ -56,11 +56,12 @@ export default function PricingView() {
                 <p className="sf-kicker">SolarFlow for your team</p>
                 <h1 className="text-3xl md:text-4xl font-black text-stone-900">Choose the setup that fits your business</h1>
                 <p className="text-sm leading-relaxed text-stone-600">Simple customer tracking or detailed operations — tell us what your team needs and we’ll help you find the right mix.</p>
+                {!preparedBriefId && <button type="button" onClick={() => document.getElementById('setup-enquiry')?.scrollIntoView({behavior:'smooth', block:'start'})} className="sm:hidden mt-2 w-full min-h-12 rounded-xl bg-orange-500 px-4 py-3 text-sm font-bold text-stone-950">Fill the quick form <ArrowRight className="inline w-4 h-4 ml-1"/></button>}
             </header>
             {preparedBriefId && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-stone-800">A form has been prepared for you. Enter the separate access code below to open its saved answers.</p>}
             <div className="grid gap-5 lg:grid-cols-3">
                 {OPTIONS.map((option, index) => (
-                    <article key={option.title} className={`rounded-3xl p-6 flex flex-col border ${index === 1 ? 'bg-stone-900 text-white border-stone-900 shadow-lg' : 'bg-white text-stone-900 border-stone-200'}`}>
+                    <article key={option.title} className={`rounded-3xl p-4 sm:p-6 flex flex-col border ${index === 1 ? 'bg-stone-900 text-white border-stone-900 shadow-lg' : 'bg-white text-stone-900 border-stone-200'}`}>
                         <p className={`text-xs font-bold ${index === 1 ? 'text-amber-300' : 'text-orange-700'}`}>{option.label}</p>
                         <h2 className="mt-3 text-xl font-black">{option.title}</h2>
                         <p className={`mt-2 text-xs font-bold ${index === 1 ? 'text-amber-300' : 'text-stone-700'}`}>{option.team}</p>
@@ -73,17 +74,17 @@ export default function PricingView() {
                                 </li>
                             ))}
                         </ul>
-                        <button type="button" onClick={() => setEnquiryChoice(choices[index])} className={`rounded-xl px-4 py-3 text-xs font-bold text-center ${index === 1 ? 'bg-amber-500 text-stone-950' : 'bg-stone-100 text-stone-900'}`}>Interested in this <ArrowRight className="inline w-4 h-4 ml-1" /></button>
+                        <button type="button" onClick={() => setEnquiryChoice(choices[index])} className={`min-h-11 rounded-xl px-4 py-3 text-xs font-bold text-center ${index === 1 ? 'bg-amber-500 text-stone-950' : 'bg-stone-100 text-stone-900'}`}>Interested in this <ArrowRight className="inline w-4 h-4 ml-1" /></button>
                     </article>
                 ))}
             </div>
-            <section className="rounded-3xl border border-orange-200 bg-orange-50 p-6 md:p-8 flex flex-col sm:flex-row gap-6 items-start sm:items-center justify-between">
+            <section className="rounded-3xl border border-orange-200 bg-orange-50 p-4 sm:p-6 md:p-8 flex flex-col sm:flex-row gap-6 items-start sm:items-center justify-between">
                 <div className="max-w-2xl">
                     <p className="sf-kicker">Tools only</p>
                     <h2 className="mt-2 text-xl font-black text-stone-900">Don’t need a CRM? Choose just the tools.</h2>
                     <p className="mt-2 text-sm leading-relaxed text-stone-600">Quotation maker, BOM, DISCOM submission auto print, feasibility documents, MIS upload auto updater and more. Tell us which tools you’re interested in.</p>
                 </div>
-                <button type="button" onClick={() => setEnquiryChoice('Tools only — no CRM')} className="sf-btn-primary shrink-0">Interested in tools <ArrowRight className="w-4 h-4 inline ml-1"/></button>
+                <button type="button" onClick={() => setEnquiryChoice('Tools only — no CRM')} className="sf-btn-primary min-h-11 w-full sm:w-auto shrink-0">Interested in tools <ArrowRight className="w-4 h-4 inline ml-1"/></button>
             </section>
             <div id="setup-enquiry" className="scroll-mt-24 max-w-4xl mx-auto">
                 <CustomizationEnquiryForm key={preparedBriefId || 'standard'} preparedBriefId={preparedBriefId} allowPrepare={!preparedBriefId}/>

@@ -161,7 +161,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         } catch (err) { setError(err.message || 'Could not prepare the client form.'); }
         finally { savingRef.current = false; setSubmitting(false); }
     };
-    const fieldClass = 'sf-input mt-1 w-full';
+    const fieldClass = 'sf-input mt-1 w-full min-h-11';
     const choiceField = (label, key, value, setValue, options) => <label className="block text-xs font-bold" key={key}>
         {label} {locked[key] && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
         <select className={fieldClass} value={value} onChange={event => setValue(event.target.value)} disabled={Boolean(locked[key])}>
@@ -189,7 +189,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const compactChoices = options => <div className="grid gap-x-5 gap-y-1 sm:grid-cols-2 md:grid-cols-3">
         {options.map(option => {
             const isLocked = (locked.interests || []).includes(option);
-            return <label key={option} className={`flex items-center gap-2 py-2 text-xs font-medium border-b border-stone-100 ${isLocked ? 'text-stone-500' : 'cursor-pointer hover:text-orange-700'}`}>
+            return <label key={option} className={`flex items-center gap-2 min-h-11 py-2 text-sm font-medium border-b border-stone-100 ${isLocked ? 'text-stone-500' : 'cursor-pointer hover:text-orange-700'}`}>
                 <input type="checkbox" checked={interests.includes(option)} disabled={isLocked} onChange={event => toggleList(setInterests, option, event.target.checked)} className="accent-orange-600 w-4 h-4 shrink-0"/>
                 <span>{option}</span>{isLocked && <LockKeyhole size={11} className="ml-auto text-amber-700" aria-label="Prepared answer locked"/>}
             </label>;
@@ -205,7 +205,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     };
     const content = (
         <section className="w-full bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden text-stone-900" aria-labelledby={`${formId}-title`}>
-            <div className="bg-stone-900 p-6 md:p-7 text-white relative">
+            <div className="bg-stone-900 p-4 sm:p-6 md:p-7 text-white relative">
                 {isModal && step !== 'details' && <button type="button" onClick={requestClose} disabled={submitting} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20" aria-label="Close enquiry"><X size={18}/></button>}
                 {!prepareMode && step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
                 <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Prepared client form' : prepareMode ? 'Prepare a client form' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
@@ -213,17 +213,17 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Your prepared answers are saved securely. Enter the code sent with this link to open them, then fill in the remaining questions.' : prepareMode ? 'Answer any questions below, then share the link and separate code with your client. Your prepared answers will be locked in their form.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
                 {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
-            <div className="p-6 md:p-7">
+            <div className="p-4 sm:p-6 md:p-7">
                 {allowPrepare && step === 'contact' && <div className="mb-5 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => {setPrepareMode(false); setError('');}} className={`rounded-xl px-4 py-2 text-xs font-bold ${!prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>I’m enquiring</button>
-                    <button type="button" onClick={() => {setPrepareMode(true); setError('');}} className={`rounded-xl px-4 py-2 text-xs font-bold ${prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>Prepare a form for a client</button>
+                    <button type="button" onClick={() => {setPrepareMode(false); setError('');}} className={`min-h-11 w-full sm:w-auto rounded-xl px-4 py-2 text-xs font-bold ${!prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>I’m enquiring</button>
+                    <button type="button" onClick={() => {setPrepareMode(true); setError('');}} className={`min-h-11 w-full sm:w-auto rounded-xl px-4 py-2 text-xs font-bold ${prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>Prepare a form for a client</button>
                 </div>}
                 {needsUnlock ? <form onSubmit={handleUnlock} className="space-y-4">
                     {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}
                     <label className="block text-xs font-bold">Access code
                         <input required maxLength={17} autoComplete="one-time-code" inputMode="text" value={accessCode} onChange={event => setAccessCode(event.target.value)} placeholder="12-character code" className="sf-input mt-1 w-full uppercase"/>
                     </label>
-                    <button type="submit" disabled={submitting} className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm disabled:opacity-50">{submitting ? 'Opening…' : 'Open prepared form'}</button>
+                    <button type="submit" disabled={submitting} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm disabled:opacity-50">{submitting ? 'Opening…' : 'Open prepared form'}</button>
                     <a href="#/plans" className="block text-center text-xs text-stone-600 underline">Start a new form instead</a>
                 </form> : !prepareMode && step === 'done' ? (
                     <div className="text-center space-y-4 py-4" role="status">
@@ -346,9 +346,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                             )}
                             {prepareMode ? <>
                                 <p className="text-xs text-stone-500">Share the link and access code with your client. The form stays available for 30 days.</p>
-                                <button type="button" disabled={submitting} onClick={makeShareLink} className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Preparing…' : 'Create and copy client link'}</button>
+                                <button type="button" disabled={submitting} onClick={makeShareLink} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Preparing…' : 'Create and copy client link'}</button>
                                 {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-2" role="status"><p className="text-xs font-bold text-emerald-800">Client form ready — send the link and code to your client.</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><label className="block text-xs font-bold">Access code<input readOnly value={shareCode} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form code"/></label><p className="text-xs text-stone-600">Keep this code; it is shown only now and cannot be retrieved later.</p></div>}
-                            </> : <button type="submit" className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50" disabled={submitting}>
+                            </> : <button type="submit" className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50" disabled={submitting}>
                                 {submitting ? <LoaderCircle size={16} className="animate-spin"/> : <ArrowRight size={16}/>}
                                 {submitting ? 'Saving…' : step === 'contact' ? 'Submit enquiry' : 'Save additional details'}
                             </button>}
@@ -359,8 +359,8 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         </section>
     );
     return isModal ? (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs overflow-y-auto p-4 flex items-start justify-center" role="dialog" aria-modal="true" aria-labelledby={`${formId}-title`} onKeyDown={handleModalKey}>
-            <div className="w-full max-w-2xl my-8">{content}</div>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs overflow-y-auto p-3 sm:p-4 flex items-start justify-center" role="dialog" aria-modal="true" aria-labelledby={`${formId}-title`} onKeyDown={handleModalKey}>
+            <div className="w-full max-w-2xl my-3 sm:my-8">{content}</div>
         </div>
     ) : content;
 }
