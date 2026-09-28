@@ -5,7 +5,7 @@ function fixture(){
  const names=Array.from({length:50},(_,i)=>i===0?'Demo Vendor':`Demo Vendor ${String(i+1).padStart(2,'0')}`);
  const tables={vendors:names.map((name,i)=>({id:String(i),name})),admin:names.map((vendor,i)=>({id:String(i),vendor})),delivery_batches:names.map((vendor,i)=>({id:String(i),vendor})),profiles:[{id:'p',user_type:'vendor',name:'Demo Vendor'}],demo_profiles:[{id:'d',user_type:'vendor',name:'Demo Vendor'}]};
  let fail=false;
- return {tables,setFail(value){fail=value;},rpc:async()=>({error:{code:'PGRST202'}}),from(table){let action='read',body;const filters=[];const q={select(){return q;},in(k,values){filters.push(r=>values.includes(r[k]));return q;},eq(k,value){filters.push(r=>r[k]===value);return q;},update(data){action='update';body=data;return q;},upsert(data){action='upsert';body=data;return q;},delete(){action='delete';return q;},then(resolve,reject){return Promise.resolve().then(()=>{
+ return {tables,setFail(value){fail=value;},rpc:async()=>{throw new Error('Legacy vendor RPC must not run');},from(table){let action='read',body;const filters=[];const q={select(){return q;},in(k,values){filters.push(r=>values.includes(r[k]));return q;},eq(k,value){filters.push(r=>r[k]===value);return q;},update(data){action='update';body=data;return q;},upsert(data){action='upsert';body=data;return q;},delete(){action='delete';return q;},then(resolve,reject){return Promise.resolve().then(()=>{
   if(fail&&table==='delivery_batches'&&action==='update')return {error:{message:'Connection failed'}};
   let rows=tables[table].filter(r=>filters.every(f=>f(r)));
   if(action==='upsert'){if(!tables[table].some(r=>r.name===body.name))tables[table].push({id:body.name,...body});}

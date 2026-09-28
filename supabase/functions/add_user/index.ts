@@ -70,7 +70,6 @@ serve(async (req: Request) => {
       // Upsert profile in public.profiles
       const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
         id: userId,
-        demo_session_id: userId,
         name: formattedName,
         email: email.trim().toLowerCase(),
         role: role || "Staff",

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
     Mail, MessageSquare, Send, CheckCircle2, ShieldCheck, 
-    Key, Sliders, Smartphone, AlertCircle, Sparkles, Copy, Check, ExternalLink, X, Terminal
+    Key, Sliders, Smartphone, AlertCircle, Sparkles, Copy, Check, ExternalLink, X, Terminal, Save
 } from 'lucide-react';
 import BrandMark from './BrandMark';
 

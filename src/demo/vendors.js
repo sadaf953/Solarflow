@@ -4,8 +4,6 @@ export const demoVendorTarget=name=>{
  return match?`Vendor ${match[1]?1+(Number(match[1])-1)%3:1}`:null;
 };
 export async function ensureThreeDemoVendors(client){
- const rpc=await client.rpc('consolidate_demo_vendors');
- if(rpc.error && !['PGRST202','42883'].includes(rpc.error.code))throw rpc.error;
  const read=await client.from('vendors').select('*');if(read.error)throw read.error;
  const obsolete=(read.data||[]).filter(v=>demoVendorTarget(v.name)&&v.name!==demoVendorTarget(v.name));
  if(!obsolete.length&&read.data?.length===3&&read.data.every(v=>demoVendorTarget(v.name)===v.name))return;

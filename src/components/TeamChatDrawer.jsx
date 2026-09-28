@@ -160,7 +160,7 @@ export default function TeamChatDrawer({ currentUser }) {
                         timeFormatted: formatTime(r.created_at)
                     }));
                     setMessages(mapped);
-                    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped)); } catch {}
+                    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped)); } catch { /* Storage may be unavailable in private browsing. */ }
                 } else if (!error && data && data.length === 0 && isMounted) {
                     // Seed initial announcements
                     const starters = getInitialMessages();

@@ -221,6 +221,7 @@ function AddLeadChecklistItem({ label, field, checked, onToggle, pendingFile, on
 }
 
 export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, channel_partners = [], user, initialValues = null }) {
+    const fillSampleIndex = useRef(0);
     const { showAlert, showConfirm } = useGlobalPopup();
     const [formData, setFormData] = useState({ ...DEFAULT_LEAD_FORM });
     const [pendingFiles, setPendingFiles] = useState({}); // { [doc_type]: File }
@@ -360,7 +361,6 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
         handleChange('system_capacity_kwp', String(kwp));
     };
 
-    const fillSampleIndex = useRef(0);
     const handleFillTestData = () => {
         setShowOptional(true);
         const samples = [

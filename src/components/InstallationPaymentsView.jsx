@@ -65,7 +65,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
             if (!error && data) {
                 setInstallations(data);
             } else {
-                console.error("Error fetching completed installations for ledger:", error);
+                console.error('Error fetching completed installations for ledger:', error?.code, error?.message);
                 // Fallback: try fetching where installation_status is not null and filter in memory
                 const { data: allData } = await supabase
                     .from('admin')

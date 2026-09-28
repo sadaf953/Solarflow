@@ -13,6 +13,5 @@ export const setChecklistMode = (mode) => {
     try {
         localStorage.setItem('solarflow_checklist_mode', mode);
         window.dispatchEvent(new CustomEvent('solarflow-checklist-mode-changed', { detail: { mode } }));
-    } catch {}
+    } catch { /* The in-memory mode remains available when storage is blocked. */ }
 };
-
