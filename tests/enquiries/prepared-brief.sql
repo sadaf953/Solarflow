@@ -6,6 +6,7 @@ with created as (
     select public.create_prepared_brief(jsonb_build_object(
         'hasWebsite','Yes','teamSize','4–9','software',jsonb_build_array('Tally','Other third-party software'),
         'otherSoftware','Example ERP',
+        'fileStorage','Yes','storageProvider','Google Workspace business account',
         'interests',jsonb_build_array('DISCOM submission document maker'))) as result
 )
 select set_config('qa.brief_id',result->>'id',true),
@@ -23,6 +24,10 @@ begin
     if public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
         current_setting('qa.brief_code'))->>'otherSoftware' <> 'Example ERP' then
         raise exception 'FAIL: other software name did not restore';
+    end if;
+    if public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
+        current_setting('qa.brief_code'))->>'storageProvider' <> 'Google Workspace business account' then
+        raise exception 'FAIL: storage preference did not restore';
     end if;
     begin
         perform count(*) from enquiry_private.prepared_briefs;

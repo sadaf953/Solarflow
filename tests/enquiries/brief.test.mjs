@@ -44,3 +44,10 @@ test('other software name is kept only with the selected checkbox', () => {
  assert.equal(createPreparedBrief({...withOther,software:['Tally']}).otherSoftware,undefined);
  assert.equal(createPreparedBrief({...withOther,otherSoftware:'x'.repeat(250)}).otherSoftware.length,200);
 });
+
+test('storage provider stays only when file storage is selected', () => {
+ const choice={fileStorage:'Yes',storageProvider:'Google Workspace business account'};
+ assert.deepEqual(createPreparedBrief(choice),choice);
+ assert.deepEqual(createPreparedBrief({...choice,fileStorage:'No'}),{fileStorage:'No'});
+ assert.deepEqual(createPreparedBrief({...choice,storageProvider:'Unknown'}),{fileStorage:'Yes'});
+});

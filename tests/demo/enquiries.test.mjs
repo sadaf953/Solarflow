@@ -6,7 +6,7 @@ test('payload uses the existing enquiry schema and normalizes phone',()=>{
  const result=enquiryPayload(draft);
  assert.equal(result.mobile_number,'9000000001');
  assert.equal(result.version_type,'advance');
- assert.equal(result.notes,'File storage: No\nInterested in: Not specified — discuss on call\nDemo only');
+ assert.equal(result.notes,'File storage: No — simple checklists\nInterested in: Not specified — discuss on call\nDemo only');
  assert.equal('model_type' in result,false);
  for(const mobile of ['abc9000000001','123','999999999999999']) assert.throws(()=>enquiryPayload({...draft,mobile}));
 });
@@ -39,6 +39,12 @@ test('named third-party software is included only when selected', () => {
  const businessDetails={software:['Other third-party software'],otherSoftware:'Example ERP'};
  assert.match(enquiryPayload({...draft,businessDetails}).notes,/Other software: Example ERP/);
  assert.doesNotMatch(enquiryPayload({...draft,businessDetails:{...businessDetails,software:['Tally']}}).notes,/Other software:/);
+});
+
+test('storage provider is included when files are chosen', () => {
+ const payload=enquiryPayload({...draft,storeFiles:'yes',storageProvider:'Supabase Storage'});
+ assert.match(payload.notes,/File storage: Yes\nPreferred storage provider: Supabase Storage/);
+ assert.doesNotMatch(enquiryPayload({...draft,storeFiles:'no',storageProvider:'Supabase Storage'}).notes,/Preferred storage provider/);
 });
 
 test('quick enquiries retain the selected plan or tools interest in notes', () => {

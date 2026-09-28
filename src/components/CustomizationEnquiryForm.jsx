@@ -3,11 +3,22 @@ import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy, LockKeyho
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
-import { DOCUMENT_OPTIONS, INTEREST_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, preparedBriefLink, unlockSavedBrief } from '../enquiries/brief';
+import { CORE_DOCUMENT_OPTIONS, DOCUMENT_OPTIONS, INTEREST_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, preparedBriefLink, unlockSavedBrief } from '../enquiries/brief';
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
-const OTHER_INTEREST_OPTIONS = INTEREST_OPTIONS.filter(option => !DOCUMENT_OPTIONS.includes(option));
+const OTHER_INTEREST_OPTIONS = INTEREST_OPTIONS.filter(option => !DOCUMENT_OPTIONS.includes(option) && !['Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options', 'Tools only — no CRM', 'Checklists', 'Document uploads'].includes(option));
+const DOCUMENT_COPY = {
+    'Feasibility document maker':['Bank feasibility document','Prepare the document for bank submission.'],
+    'DISCOM submission document maker':['DISCOM submission document','Prepare the document for upload to the PM Surya Ghar portal.'],
+    'Quotation maker':['Quotation maker','Create customer quotations.'],
+    'BOM maker':['BOM maker','Generate the bill of materials.']
+};
+const STORAGE_PRICING = [
+    {name:'Google personal account', price:'15 GB free; Google One paid plans vary by account', detail:'Uses the customer’s Google account.', href:'https://one.google.com/about/plans?hl=en_IN'},
+    {name:'Google Workspace business account', price:'From ₹99/user/month on an annual plan; 20 GB pooled per user', detail:'Monthly billing starts at ₹120/user/month.', href:'https://workspace.google.com/intl/en_in/business/'},
+    {name:'Supabase Storage', price:'1 GB free; Pro from $25/month with 100 GB included', detail:'Extra storage on Pro: $0.0213/GB/month.', href:'https://supabase.com/pricing'}
+];
 
 
 export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, allowPrepare = false}) {
@@ -26,6 +37,8 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [liveCustomerCount, setLiveCustomerCount] = useState('');
     const [software, setSoftware] = useState([]);
     const [otherSoftware, setOtherSoftware] = useState('');
+    const [fileStorage, setFileStorage] = useState(() => initialStoreFiles == null ? '' : initialStoreFiles ? 'Yes' : 'No');
+    const [storageProvider, setStorageProvider] = useState('');
     const [branches, setBranches] = useState('');
     const [partnerOffices, setPartnerOffices] = useState('');
     const [channelPartners, setChannelPartners] = useState('');
@@ -43,7 +56,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const nameRef = useRef(null);
     const formId = useId();
     const {showConfirm} = useGlobalPopup();
-    const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || branches || partnerOffices || channelPartners || interests.join('|') !== selectedInterest);
+    const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || branches || partnerOffices || channelPartners || fileStorage || storageProvider || interests.join('|') !== selectedInterest);
     const dirty = prepareMode ? optionalDirty : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
 
     useEffect(() => {
@@ -81,12 +94,12 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setError('');
         if (!name.trim()) {setError('Please enter your name.'); return;}
         const contactOnly = step === 'contact';
-        const storeFiles = contactOnly ? 'unspecified' : interests.includes('Document uploads') ? 'yes' : interests.includes('Checklists') ? 'no' : initialStoreFiles == null ? 'unspecified' : initialStoreFiles ? 'yes' : 'no';
+        const storeFiles = contactOnly ? 'unspecified' : fileStorage === 'Yes' ? 'yes' : fileStorage === 'No' ? 'no' : 'unspecified';
         const chosenInterests = contactOnly ? selectedInterest ? [selectedInterest] : [] : interests;
         const modelType = chosenInterests.includes('Option 1: Small team setup') && !chosenInterests.includes('Option 2: Detailed operations') && !chosenInterests.includes('A mix of both options') ? 'basic' : chosenInterests.includes('Option 2: Detailed operations') ? 'advance' : 'both';
         let payload;
         try {
-            payload = enquiryPayload({name, mobile, modelType, storeFiles, selectedInterest,
+            payload = enquiryPayload({name, mobile, modelType, storeFiles, storageProvider:storeFiles === 'yes' ? storageProvider : '', selectedInterest,
                 company: contactOnly ? '' : company, remarks: contactOnly ? '' : remarks,
                 callDate: contactOnly ? '' : callDate, callTime: contactOnly ? '' : callTime,
                 interests: chosenInterests,
@@ -108,6 +121,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setHasWebsite(locked.hasWebsite || ''); setTeamSize(locked.teamSize || '');
         setCustomerCount(locked.customerCount || ''); setLiveCustomerCount(locked.liveCustomerCount || '');
         setSoftware(locked.software || []); setOtherSoftware(locked.otherSoftware || ''); setBranches(locked.branches || '');
+        setFileStorage(locked.fileStorage || (initialStoreFiles == null ? '' : initialStoreFiles ? 'Yes' : 'No')); setStorageProvider(locked.storageProvider || '');
         setPartnerOffices(locked.partnerOffices || ''); setChannelPartners(locked.channelPartners || '');
         setError(''); identityRef.current = null; setStep('contact');
     };
@@ -122,6 +136,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
             setHasWebsite(brief.hasWebsite || ''); setTeamSize(brief.teamSize || '');
             setCustomerCount(brief.customerCount || ''); setLiveCustomerCount(brief.liveCustomerCount || '');
             setSoftware(brief.software || []); setOtherSoftware(brief.otherSoftware || ''); setBranches(brief.branches || '');
+            setFileStorage(brief.fileStorage || ''); setStorageProvider(brief.storageProvider || '');
             setPartnerOffices(brief.partnerOffices || ''); setChannelPartners(brief.channelPartners || '');
             setAccessCode('');
         } catch (err) { setError(err.message || 'Could not open this prepared form.'); }
@@ -133,7 +148,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         savingRef.current = true; setSubmitting(true); setError('');
         try {
             const saved = await createSavedBrief(supabase, {
-                hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, interests
+                hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, fileStorage, storageProvider, interests
             });
             const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
             setShareLink(link); setShareCode(saved.code);
@@ -154,6 +169,26 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
             <input type="checkbox" checked={values.includes(option)} disabled={lockedValues.includes(option)} onChange={event => toggleList(setter, option, event.target.checked)} className="accent-orange-600 w-4 h-4 shrink-0"/>
             <span>{option}</span>{lockedValues.includes(option) && <LockKeyhole size={12} className="ml-auto text-amber-700" aria-label="Prepared answer locked"/>}
         </label>)}
+    </div>;
+    const documentChoices = (options, showDescription = false) => <div className="grid gap-2 sm:grid-cols-2">
+        {options.map(option => {
+            const isLocked = (locked.interests || []).includes(option);
+            const [title, description] = DOCUMENT_COPY[option] || [option, ''];
+            return <label key={option} className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${isLocked ? 'border-amber-200 bg-amber-50' : 'border-stone-200 cursor-pointer hover:border-orange-300'}`}>
+                <input type="checkbox" checked={interests.includes(option)} disabled={isLocked} onChange={event => toggleList(setInterests, option, event.target.checked)} className="mt-0.5 accent-orange-600 w-4 h-4 shrink-0"/>
+                <span><span className="font-semibold">{title}</span>{showDescription && description && <span className="block mt-1 text-xs text-stone-500 leading-relaxed">{description}</span>}</span>
+                {isLocked && <LockKeyhole size={12} className="ml-auto text-amber-700" aria-label="Prepared answer locked"/>}
+            </label>;
+        })}
+    </div>;
+    const compactChoices = options => <div className="grid gap-x-5 gap-y-1 sm:grid-cols-2 md:grid-cols-3">
+        {options.map(option => {
+            const isLocked = (locked.interests || []).includes(option);
+            return <label key={option} className={`flex items-center gap-2 py-2 text-xs font-medium border-b border-stone-100 ${isLocked ? 'text-stone-500' : 'cursor-pointer hover:text-orange-700'}`}>
+                <input type="checkbox" checked={interests.includes(option)} disabled={isLocked} onChange={event => toggleList(setInterests, option, event.target.checked)} className="accent-orange-600 w-4 h-4 shrink-0"/>
+                <span>{option}</span>{isLocked && <LockKeyhole size={11} className="ml-auto text-amber-700" aria-label="Prepared answer locked"/>}
+            </label>;
+        })}
     </div>;
     const handleModalKey = event => {
         if (event.key === 'Escape') {event.preventDefault(); requestClose();}
@@ -248,14 +283,38 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                         </div>
                                     </fieldset>
                                     <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">
-                                        <legend className="px-2 text-sm font-black">3 · Document makers and automation</legend>
-                                        <p className="text-xs text-stone-500">Tick the documents you want to create or automate.</p>
-                                        {checkGrid(DOCUMENT_OPTIONS, interests, setInterests, locked.interests || [])}
+                                        <legend className="px-2 text-sm font-black">3 · File storage</legend>
+                                        <p className="text-xs text-stone-500">Do you want to store uploaded files with customer records?</p>
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            {['Yes','No'].map(option => <label key={option} className={`flex gap-3 rounded-xl border p-3 cursor-pointer ${fileStorage === option ? 'border-orange-400 bg-orange-50' : 'border-stone-200'}`}>
+                                                <input type="radio" name={`${formId}-file-storage`} value={option} checked={fileStorage === option} disabled={Boolean(locked.fileStorage)} onChange={() => setFileStorage(option)} className="accent-orange-600 mt-0.5"/>
+                                                <span className="text-xs"><strong className="block text-sm">{option === 'Yes' ? 'Yes, store files' : 'No, use simple checklists'}</strong>{option === 'No' && <span className="block mt-1 text-stone-600"><s>Extra storage charge</s> Included at no extra cost.</span>}</span>
+                                            </label>)}
+                                        </div>
+                                        {fileStorage === 'Yes' && <div className="space-y-2 pt-2">
+                                            <p className="text-xs font-bold">Which storage account would you prefer? (optional)</p>
+                                            <div className="space-y-2">
+                                                {STORAGE_PRICING.map(provider => <label key={provider.name} className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${storageProvider === provider.name ? 'border-orange-400 bg-orange-50' : 'border-stone-200'}`}>
+                                                    <input type="radio" name={`${formId}-storage-provider`} checked={storageProvider === provider.name} disabled={Boolean(locked.storageProvider)} onChange={() => setStorageProvider(provider.name)} className="accent-orange-600 mt-0.5"/>
+                                                    <span className="text-xs leading-relaxed"><strong className="block text-sm">{provider.name}</strong><span className="block mt-1">{provider.price}</span><span className="block text-stone-500">{provider.detail}</span><a href={provider.href} target="_blank" rel="noopener noreferrer" onClick={event => event.stopPropagation()} className="text-orange-700 underline">Provider pricing</a></span>
+                                                </label>)}
+                                            </div>
+                                            <p className="text-[11px] text-stone-500">Storage plans are third-party charges paid to the provider. Prices and taxes can change; check the linked plan before buying.</p>
+                                        </div>}
                                     </fieldset>
                                     <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">
-                                        <legend className="px-2 text-sm font-black">4 · Other tools and setup</legend>
-                                        <p className="text-xs text-stone-500">Choose only what is useful to you. Everything here is optional.</p>
-                                        {checkGrid(OTHER_INTEREST_OPTIONS, interests, setInterests, locked.interests || [])}
+                                        <legend className="px-2 text-sm font-black">4 · Automated documents</legend>
+                                        <p className="text-xs text-stone-500">Select the documents you want us to automate.</p>
+                                        {documentChoices(CORE_DOCUMENT_OPTIONS, true)}
+                                    </fieldset>
+                                    <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">
+                                        <legend className="px-2 text-sm font-black">5 · Optional document makers</legend>
+                                        {documentChoices(OPTIONAL_DOCUMENT_OPTIONS)}
+                                    </fieldset>
+                                    <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">
+                                        <legend className="px-2 text-sm font-black">6 · Other features</legend>
+                                        <p className="text-xs text-stone-500">Pick anything else your team needs. MIS upload automation is an extra feature.</p>
+                                        {compactChoices(OTHER_INTEREST_OPTIONS)}
                                     </fieldset>
                                     {!prepareMode && <label className="block text-xs font-bold">Anything else? (optional)
                                         <textarea maxLength={5000} rows={3} value={remarks} onChange={e => setRemarks(e.target.value)} className={fieldClass}/>
@@ -263,7 +322,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                 </>
                             )}
                             {prepareMode ? <>
-                                <p className="text-xs text-stone-500">The link contains only a random reference. Your answers are saved in the backend for 30 days and require the separate code to open.</p>
+                                <p className="text-xs text-stone-500">Share the link and access code with your client. The form stays available for 30 days.</p>
                                 <button type="button" disabled={submitting} onClick={makeShareLink} className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Preparing…' : 'Create and copy client link'}</button>
                                 {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-2" role="status"><p className="text-xs font-bold text-emerald-800">Client form ready — send the link and code to your client.</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><label className="block text-xs font-bold">Access code<input readOnly value={shareCode} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form code"/></label><p className="text-xs text-stone-600">Keep this code; it is shown only now and cannot be retrieved later.</p></div>}
                             </> : <button type="submit" className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50" disabled={submitting}>

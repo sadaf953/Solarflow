@@ -1,8 +1,11 @@
 export const DOCUMENT_OPTIONS = [
   'Quotation maker', 'Bill / invoice maker', 'BOM maker', 'Delivery challan maker',
   'Gate pass maker', 'DISCOM submission document maker', 'DISCOM submission auto print',
-  'Feasibility document maker', 'MIS upload auto updater'
+  'Feasibility document maker'
 ];
+export const CORE_DOCUMENT_OPTIONS = ['Feasibility document maker', 'DISCOM submission document maker', 'Quotation maker', 'BOM maker'];
+export const OPTIONAL_DOCUMENT_OPTIONS = DOCUMENT_OPTIONS.filter(option => !CORE_DOCUMENT_OPTIONS.includes(option));
+export const STORAGE_PROVIDER_OPTIONS = ['Google personal account', 'Google Workspace business account', 'Supabase Storage'];
 export const SOFTWARE_OPTIONS = ['Tally', 'Google Sheets', 'Microsoft Excel', 'Zoho', 'Odoo', 'Other third-party software'];
 export const TEAM_SIZE_OPTIONS = ['1–3', '4–9', '10–29', '30–49', '50+', 'Not sure'];
 export const YES_NO_OPTIONS = ['Yes', 'No', 'Not sure'];
@@ -13,12 +16,12 @@ export const INTEREST_OPTIONS = [
   'Channel partner offices (CPOs)', 'Branches', 'Staff management',
   'Installation view', 'Installation commission view', 'Vendor commission page',
   'Channel partner commission view', 'Operations page', 'Dealer-based filtering',
-  'Finance', 'Attendance', 'Checklists', 'Document uploads'
+  'Finance', 'Attendance', 'MIS upload auto updater', 'Checklists', 'Document uploads'
 ];
 
-const SINGLE_FIELDS = ['hasWebsite', 'teamSize', 'customerCount', 'liveCustomerCount', 'branches', 'partnerOffices', 'channelPartners'];
+const SINGLE_FIELDS = ['hasWebsite', 'teamSize', 'customerCount', 'liveCustomerCount', 'branches', 'partnerOffices', 'channelPartners', 'fileStorage', 'storageProvider'];
 const CHOICES = {hasWebsite:YES_NO_OPTIONS, teamSize:TEAM_SIZE_OPTIONS, branches:YES_NO_OPTIONS,
-  partnerOffices:YES_NO_OPTIONS, channelPartners:YES_NO_OPTIONS};
+  partnerOffices:YES_NO_OPTIONS, channelPartners:YES_NO_OPTIONS, fileStorage:['Yes', 'No'], storageProvider:STORAGE_PROVIDER_OPTIONS};
 
 export function createPreparedBrief(draft) {
   const prepared = {};
@@ -31,6 +34,7 @@ export function createPreparedBrief(draft) {
     const values = [...new Set((Array.isArray(draft[key]) ? draft[key] : []).filter(value => allowed.includes(value)))];
     if (values.length) prepared[key] = values;
   }
+  if (prepared.fileStorage !== 'Yes') delete prepared.storageProvider;
   if (prepared.software?.includes('Other third-party software')) {
     const otherSoftware = String(draft.otherSoftware || '').trim().replace(/[\r\n]+/g, ' ').slice(0, 200).trim();
     if (otherSoftware) prepared.otherSoftware = otherSoftware;
