@@ -25,6 +25,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [customerCount, setCustomerCount] = useState('');
     const [liveCustomerCount, setLiveCustomerCount] = useState('');
     const [software, setSoftware] = useState([]);
+    const [otherSoftware, setOtherSoftware] = useState('');
     const [branches, setBranches] = useState('');
     const [partnerOffices, setPartnerOffices] = useState('');
     const [channelPartners, setChannelPartners] = useState('');
@@ -42,7 +43,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const nameRef = useRef(null);
     const formId = useId();
     const {showConfirm} = useGlobalPopup();
-    const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || branches || partnerOffices || channelPartners || interests.join('|') !== selectedInterest);
+    const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || branches || partnerOffices || channelPartners || interests.join('|') !== selectedInterest);
     const dirty = prepareMode ? optionalDirty : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
 
     useEffect(() => {
@@ -89,7 +90,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 company: contactOnly ? '' : company, remarks: contactOnly ? '' : remarks,
                 callDate: contactOnly ? '' : callDate, callTime: contactOnly ? '' : callTime,
                 interests: chosenInterests,
-                businessDetails: contactOnly ? {} : {hasWebsite, teamSize, customerCount, liveCustomerCount, software, branches, partnerOffices, channelPartners}});
+                businessDetails: contactOnly ? {} : {hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware:software.includes('Other third-party software') ? otherSoftware : '', branches, partnerOffices, channelPartners}});
         } catch (err) {setError(err.message); return;}
         if (!identityRef.current) identityRef.current = {id:crypto.randomUUID(), editToken:crypto.randomUUID()};
         savingRef.current = true;
@@ -106,7 +107,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setInterests([...new Set([...(locked.interests || []), ...(selectedInterest ? [selectedInterest] : [])])]);
         setHasWebsite(locked.hasWebsite || ''); setTeamSize(locked.teamSize || '');
         setCustomerCount(locked.customerCount || ''); setLiveCustomerCount(locked.liveCustomerCount || '');
-        setSoftware(locked.software || []); setBranches(locked.branches || '');
+        setSoftware(locked.software || []); setOtherSoftware(locked.otherSoftware || ''); setBranches(locked.branches || '');
         setPartnerOffices(locked.partnerOffices || ''); setChannelPartners(locked.channelPartners || '');
         setError(''); identityRef.current = null; setStep('contact');
     };
@@ -120,7 +121,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
             setInterests(current => [...new Set([...(brief.interests || []), ...current])]);
             setHasWebsite(brief.hasWebsite || ''); setTeamSize(brief.teamSize || '');
             setCustomerCount(brief.customerCount || ''); setLiveCustomerCount(brief.liveCustomerCount || '');
-            setSoftware(brief.software || []); setBranches(brief.branches || '');
+            setSoftware(brief.software || []); setOtherSoftware(brief.otherSoftware || ''); setBranches(brief.branches || '');
             setPartnerOffices(brief.partnerOffices || ''); setChannelPartners(brief.channelPartners || '');
             setAccessCode('');
         } catch (err) { setError(err.message || 'Could not open this prepared form.'); }
@@ -132,7 +133,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         savingRef.current = true; setSubmitting(true); setError('');
         try {
             const saved = await createSavedBrief(supabase, {
-                hasWebsite, teamSize, customerCount, liveCustomerCount, software, branches, partnerOffices, channelPartners, interests
+                hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, interests
             });
             const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
             setShareLink(link); setShareCode(saved.code);
@@ -234,6 +235,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                         </div>
                                         <p className="text-xs font-bold">What software do you currently use? <span className="font-normal text-stone-500">Tick any that apply.</span></p>
                                         {checkGrid(SOFTWARE_OPTIONS, software, setSoftware, locked.software || [])}
+                                        {software.includes('Other third-party software') && <label className="block text-xs font-bold">Which other software do you use? (optional) {locked.otherSoftware && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
+                                            <input type="text" maxLength={200} value={otherSoftware} disabled={Boolean(locked.otherSoftware)} onChange={event => setOtherSoftware(event.target.value)} placeholder="Enter software name" className={fieldClass}/>
+                                        </label>}
                                     </fieldset>
                                     <fieldset className="space-y-4 rounded-2xl border border-stone-200 p-4 md:p-5">
                                         <legend className="px-2 text-sm font-black">2 · Offices and partners</legend>

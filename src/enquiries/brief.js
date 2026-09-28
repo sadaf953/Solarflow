@@ -31,6 +31,10 @@ export function createPreparedBrief(draft) {
     const values = [...new Set((Array.isArray(draft[key]) ? draft[key] : []).filter(value => allowed.includes(value)))];
     if (values.length) prepared[key] = values;
   }
+  if (prepared.software?.includes('Other third-party software')) {
+    const otherSoftware = String(draft.otherSoftware || '').trim().replace(/[\r\n]+/g, ' ').slice(0, 200).trim();
+    if (otherSoftware) prepared.otherSoftware = otherSoftware;
+  }
   return prepared;
 }
 

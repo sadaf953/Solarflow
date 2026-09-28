@@ -35,6 +35,12 @@ test('guided business answers are saved with the same enquiry', () => {
  for(const detail of ['Website: Yes','Employees: 4–9','Total customers: 420','Live customers: 67','Current software: Tally, Google Sheets','Branches: No','Channel partner offices: Yes','Channel partners: Not sure']) assert.ok(payload.notes.includes(detail));
 });
 
+test('named third-party software is included only when selected', () => {
+ const businessDetails={software:['Other third-party software'],otherSoftware:'Example ERP'};
+ assert.match(enquiryPayload({...draft,businessDetails}).notes,/Other software: Example ERP/);
+ assert.doesNotMatch(enquiryPayload({...draft,businessDetails:{...businessDetails,software:['Tally']}}).notes,/Other software:/);
+});
+
 test('quick enquiries retain the selected plan or tools interest in notes', () => {
  for (const selectedInterest of ['Option 1: Small team setup', 'Option 2: Detailed operations', 'Tools only — no CRM']) {
   const result = enquiryPayload({...draft, company:'', remarks:'', selectedInterest, interests:[selectedInterest]});

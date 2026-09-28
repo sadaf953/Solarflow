@@ -4,7 +4,9 @@ export function enquiryPayload({name, company, mobile, modelType, storeFiles, re
  const detailLines = [
   ['Website', businessDetails.hasWebsite], ['Employees', businessDetails.teamSize],
   ['Total customers', businessDetails.customerCount], ['Live customers', businessDetails.liveCustomerCount],
-  ['Current software', businessDetails.software?.join(', ')], ['Branches', businessDetails.branches],
+  ['Current software', businessDetails.software?.join(', ')],
+  ['Other software', businessDetails.software?.includes('Other third-party software') ? businessDetails.otherSoftware?.trim().replace(/[\r\n]+/g, ' ').slice(0, 200) : ''],
+  ['Branches', businessDetails.branches],
   ['Channel partner offices', businessDetails.partnerOffices], ['Channel partners', businessDetails.channelPartners]
  ].filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`);
  return {

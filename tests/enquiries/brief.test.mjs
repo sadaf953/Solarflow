@@ -37,3 +37,10 @@ test('preparing and unlocking use authenticated RPCs and sanitize returned answe
 test('empty prepared forms cannot be saved',async()=>{
  await assert.rejects(createSavedBrief({auth:{getSession(){assert.fail('must not authenticate');}}},{}),/Choose at least one/);
 });
+
+test('other software name is kept only with the selected checkbox', () => {
+ const withOther={...draft,software:['Other third-party software'],otherSoftware:'  Example ERP  '};
+ assert.equal(createPreparedBrief(withOther).otherSoftware,'Example ERP');
+ assert.equal(createPreparedBrief({...withOther,software:['Tally']}).otherSoftware,undefined);
+ assert.equal(createPreparedBrief({...withOther,otherSoftware:'x'.repeat(250)}).otherSoftware.length,200);
+});
