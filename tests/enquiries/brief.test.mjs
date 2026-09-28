@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createPreparedBrief, createSavedBrief, preparedBriefLink, readPreparedBriefId, unlockSavedBrief} from '../../src/enquiries/brief.js';
+import {createPreparedBrief, createSavedBrief, preparedBriefLink, readPreparedBriefId, unlockSavedBrief, verifyPreparationPin} from '../../src/enquiries/brief.js';
 
 const id='b391c08f-5c13-4b40-b73e-f1c7eec12205';
-const code='A1B2C3D4E5F6';
+const code='0001';
 const draft={name:'Private Name',mobile:'9000000001',company:'Example Solar',hasWebsite:'Yes',teamSize:'4–9',
  customerCount:'420',liveCustomerCount:'67',software:['Tally','Google Sheets','Unknown'],
  branches:'No',interests:['DISCOM submission document maker','Quotation maker','Unknown']};
@@ -27,9 +27,11 @@ test('preparing and unlocking use authenticated RPCs and sanitize returned answe
  const client={auth:{getSession:async()=>({data:{session:null}}),signInAnonymously:async()=>({error:null})},
   rpc:async(name,args)=>{calls.push({name,args});return name==='create_prepared_brief'
    ? {data:{id,code},error:null} : {data:{...draft,unknown:'discard'},error:null};}};
- const created=await createSavedBrief(client,draft);
+ const created=await createSavedBrief(client,draft,'0905');
  assert.deepEqual(created,{id,code});
+ assert.equal(code,draft.mobile.slice(-4));
  assert.deepEqual(calls[0].args.p_answers,createPreparedBrief(draft));
+ assert.equal(calls[0].args.p_prepare_code,'0905');
  const opened=await unlockSavedBrief(client,id,code);
  assert.deepEqual(opened,createPreparedBrief(draft));
  assert.deepEqual(calls.map(call=>call.name),['create_prepared_brief','unlock_prepared_brief']);
@@ -38,7 +40,17 @@ test('preparing and unlocking use authenticated RPCs and sanitize returned answe
 });
 
 test('empty prepared forms cannot be saved',async()=>{
- await assert.rejects(createSavedBrief({auth:{getSession(){assert.fail('must not authenticate');}}},{}),/Choose at least one/);
+ await assert.rejects(createSavedBrief({auth:{getSession(){assert.fail('must not authenticate');}}}, {}, '0905'),/client name.*phone number.*company name/);
+});
+
+test('preparation code is checked by the backend, and contact fields are required',async()=>{
+ const calls=[];
+ const client={auth:{getSession:async()=>({data:{session:{}}})},rpc:async(name,args)=>{calls.push({name,args});return {data:args.p_pin==='0905',error:null};}};
+ assert.equal(await verifyPreparationPin(client,'0000'),false);
+ assert.equal(await verifyPreparationPin(client,'0905'),true);
+ assert.deepEqual(calls.map(call=>call.name),['verify_preparation_pin','verify_preparation_pin']);
+ await assert.rejects(createSavedBrief(client,{...draft,company:''},'0905'),/company name/);
+ await assert.rejects(createSavedBrief(client,draft,''),/4-digit preparation code/);
 });
 
 test('other software name is kept only with the selected checkbox', () => {

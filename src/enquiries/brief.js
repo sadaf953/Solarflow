@@ -69,13 +69,22 @@ async function ensureSession(client) {
   }
 }
 
-export async function createSavedBrief(client, draft) {
-  const prepared = createPreparedBrief(draft);
-  if (!Object.keys(prepared).length) throw new Error('Choose at least one answer to prepare for the client.');
+export async function verifyPreparationPin(client, pin) {
+  if (!/^\d{4}$/.test(pin)) return false;
   await ensureSession(client);
-  const {data, error} = await client.rpc('create_prepared_brief', {p_answers:prepared});
+  const {data, error} = await client.rpc('verify_preparation_pin', {p_pin:pin});
   if (error) throw error;
-  if (!data || !UUID.test(data.id) || !/^[0-9A-F]{12}$/.test(data.code)) throw new Error('The prepared form was not confirmed. Please try again.');
+  return data === true;
+}
+
+export async function createSavedBrief(client, draft, preparationPin) {
+  const prepared = createPreparedBrief(draft);
+  if (!prepared.name || !prepared.mobile || !prepared.company) throw new Error('Enter the client name, a valid 10-digit phone number, and company name.');
+  if (!/^\d{4}$/.test(preparationPin || '')) throw new Error('Enter the 4-digit preparation code.');
+  await ensureSession(client);
+  const {data, error} = await client.rpc('create_prepared_brief', {p_answers:prepared, p_prepare_code:preparationPin});
+  if (error) throw error;
+  if (!data || !UUID.test(data.id) || !/^\d{4}$/.test(data.code)) throw new Error('The prepared form was not confirmed. Please try again.');
   return data;
 }
 

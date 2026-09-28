@@ -2,19 +2,52 @@
 begin;
 select set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
 set local role authenticated;
+do $$
+begin
+    if not public.verify_preparation_pin('0905') or public.verify_preparation_pin('0000') then
+        raise exception 'FAIL: preparation PIN check did not enforce the configured code';
+    end if;
+    if to_regprocedure('public.create_prepared_brief(jsonb)') is not null then
+        raise exception 'FAIL: old creation endpoint still bypasses the PIN';
+    end if;
+    begin
+        perform public.create_prepared_brief(jsonb_build_object(
+            'name','Test Client','mobile','9000000001','company','Example Solar'), '0000');
+        raise exception 'FAIL: wrong PIN created a prepared form';
+    exception when insufficient_privilege then null; end;
+    begin
+        perform public.create_prepared_brief(jsonb_build_object(
+            'name','Test Client','mobile','9000000001'), '0905');
+        raise exception 'FAIL: missing company created a prepared form';
+    exception when invalid_parameter_value then null; end;
+end $$;
 with created as (
     select public.create_prepared_brief(jsonb_build_object(
         'name','Test Client','mobile','9000000001','company','Example Solar',
         'hasWebsite','Yes','teamSize','4–9','software',jsonb_build_array('Tally','Other third-party software'),
         'otherSoftware','Example ERP',
         'fileStorage','Yes','storageProvider','Google Workspace business account',
-        'interests',jsonb_build_array('DISCOM submission document maker'))) as result
+        'interests',jsonb_build_array('DISCOM submission document maker')), '0905') as result
 )
 select set_config('qa.brief_id',result->>'id',true),
        set_config('qa.brief_code',result->>'code',true) from created;
 
+with created as (
+    select public.create_prepared_brief(jsonb_build_object(
+        'name','Second Client','mobile','8000000001','company','Second Solar'), '0905') as result
+)
+select set_config('qa.second_id',result->>'id',true) from created;
+
 do $$
 begin
+    if current_setting('qa.brief_code') <> '0001'
+        or current_setting('qa.brief_id') = current_setting('qa.second_id') then
+        raise exception 'FAIL: phone suffix or per-client links are incorrect';
+    end if;
+    if public.unlock_prepared_brief(current_setting('qa.second_id')::uuid,
+        current_setting('qa.brief_code'))->>'company' <> 'Second Solar' then
+        raise exception 'FAIL: second client link loaded the wrong answers';
+    end if;
     if public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid, 'WRONG-CODE') is not null then
         raise exception 'FAIL: wrong code opened prepared form';
     end if;
@@ -34,6 +67,14 @@ begin
         current_setting('qa.brief_code'))->>'storageProvider' <> 'Google Workspace business account' then
         raise exception 'FAIL: storage preference did not restore';
     end if;
+    for attempt in 1..5 loop
+        if public.unlock_prepared_brief(current_setting('qa.second_id')::uuid, '0000') is not null then
+            raise exception 'FAIL: wrong phone suffix opened second client form';
+        end if;
+    end loop;
+    if public.unlock_prepared_brief(current_setting('qa.second_id')::uuid, '0001') is not null then
+        raise exception 'FAIL: repeated wrong codes did not temporarily lock the form';
+    end if;
     begin
         perform count(*) from enquiry_private.prepared_briefs;
         raise exception 'FAIL: signed-in visitor could read private drafts';
@@ -50,6 +91,14 @@ begin
     exception when insufficient_privilege then null; end;
 end $$;
 reset role;
+with legacy as (select gen_random_uuid() as id), inserted as (
+    insert into enquiry_private.prepared_briefs(id, owner_id, answers, code_hash)
+    select id, current_setting('request.jwt.claim.sub')::uuid,
+        '{"hasWebsite":"No"}'::jsonb,
+        encode(sha256(convert_to(id::text || 'A1B2C3D4E5F6', 'UTF8')), 'hex')
+    from legacy returning id
+)
+select set_config('qa.legacy_id',id::text,true) from inserted;
 do $$
 begin
     if exists(select 1 from enquiry_private.prepared_briefs
@@ -63,6 +112,10 @@ update enquiry_private.prepared_briefs set expires_at=now()-interval '1 minute'
 set local role authenticated;
 do $$
 begin
+    if public.unlock_prepared_brief(current_setting('qa.legacy_id')::uuid,
+        'A1B2C3D4E5F6')->>'hasWebsite' <> 'No' then
+        raise exception 'FAIL: older 12-character access code stopped working';
+    end if;
     if public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
         current_setting('qa.brief_code')) is not null then
         raise exception 'FAIL: expired draft still opens';

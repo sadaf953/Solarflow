@@ -3,7 +3,7 @@ import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy, LockKeyho
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
-import { CORE_DOCUMENT_OPTIONS, DOCUMENT_OPTIONS, INTEREST_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, preparedBriefLink, unlockSavedBrief } from '../enquiries/brief';
+import { CORE_DOCUMENT_OPTIONS, DOCUMENT_OPTIONS, INTEREST_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, preparedBriefLink, unlockSavedBrief, verifyPreparationPin } from '../enquiries/brief';
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
@@ -43,6 +43,8 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [partnerOffices, setPartnerOffices] = useState('');
     const [channelPartners, setChannelPartners] = useState('');
     const [prepareMode, setPrepareMode] = useState(false);
+    const [prepareUnlocked, setPrepareUnlocked] = useState(false);
+    const [preparePin, setPreparePin] = useState('');
     const [shareLink, setShareLink] = useState('');
     const [shareCode, setShareCode] = useState('');
     const [accessCode, setAccessCode] = useState('');
@@ -144,17 +146,30 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         finally { savingRef.current = false; setSubmitting(false); }
     };
     const toggleList = (setter, option, checked) => setter(current => checked ? [...new Set([...current, option])] : current.filter(item => item !== option));
+    const handlePrepareUnlock = async event => {
+        event.preventDefault();
+        if (savingRef.current) return;
+        savingRef.current = true; setSubmitting(true); setError('');
+        try {
+            if (!await verifyPreparationPin(supabase, preparePin)) {
+                setError('Incorrect preparation code.');
+                return;
+            }
+            setPrepareUnlocked(true);
+        } catch { setError('Could not check the preparation code. Please try again.'); }
+        finally { savingRef.current = false; setSubmitting(false); }
+    };
     const makeShareLink = async () => {
         if (savingRef.current) return;
-        if (mobile.trim() && !/^\d{10}$/.test(mobile.trim().replace(/[\s()-]/g, '').replace(/^\+91/, ''))) {
-            setError('Enter a valid 10-digit client phone number, or leave it blank for the client.');
+        if (!name.trim() || !company.trim() || !/^\d{10}$/.test(mobile.trim().replace(/[\s()-]/g, '').replace(/^\+91/, ''))) {
+            setError('Enter the client name, a valid 10-digit phone number, and company name.');
             return;
         }
         savingRef.current = true; setSubmitting(true); setError('');
         try {
             const saved = await createSavedBrief(supabase, {
                 name, mobile, company, hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, fileStorage, storageProvider, interests
-            });
+            }, preparePin);
             const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
             setShareLink(link); setShareCode(saved.code);
             try { await navigator.clipboard?.writeText(link); } catch { /* The link remains selectable below. */ }
@@ -209,22 +224,28 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 {isModal && step !== 'details' && <button type="button" onClick={requestClose} disabled={submitting} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20" aria-label="Close enquiry"><X size={18}/></button>}
                 {!prepareMode && step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
                 <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Prepared client form' : prepareMode ? 'Prepare a client form' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
-                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Enter your access code' : prepareMode ? 'Fill what you already know' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
-                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Your prepared answers are saved securely. Enter the code sent with this link to open them, then fill in the remaining questions.' : prepareMode ? 'Answer any questions below, then share the link and separate code with your client. Your prepared answers will be locked in their form.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
+                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Enter your access code' : prepareMode && !prepareUnlocked ? 'Enter the preparation code' : prepareMode ? 'Prepare the client form' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
+                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the last four digits of your phone number to open this form. Older prepared links still use their original access code.' : prepareMode && !prepareUnlocked ? 'This section is for preparing a form for a client.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The completed fields will be locked in their form.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
                 {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
             <div className="p-4 sm:p-6 md:p-7">
                 {allowPrepare && step === 'contact' && <div className="mb-5 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => {setPrepareMode(false); setError('');}} className={`min-h-11 w-full sm:w-auto rounded-xl px-4 py-2 text-xs font-bold ${!prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>I’m enquiring</button>
+                    <button type="button" onClick={() => {setPrepareMode(false); setPrepareUnlocked(false); setPreparePin(''); setError('');}} className={`min-h-11 w-full sm:w-auto rounded-xl px-4 py-2 text-xs font-bold ${!prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>I’m enquiring</button>
                     <button type="button" onClick={() => {setPrepareMode(true); setError('');}} className={`min-h-11 w-full sm:w-auto rounded-xl px-4 py-2 text-xs font-bold ${prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>Prepare a form for a client</button>
                 </div>}
                 {needsUnlock ? <form onSubmit={handleUnlock} className="space-y-4">
                     {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}
                     <label className="block text-xs font-bold">Access code
-                        <input required maxLength={17} autoComplete="one-time-code" inputMode="text" value={accessCode} onChange={event => setAccessCode(event.target.value)} placeholder="12-character code" className="sf-input mt-1 w-full uppercase"/>
+                        <input required maxLength={17} autoComplete="one-time-code" inputMode="text" value={accessCode} onChange={event => setAccessCode(event.target.value)} placeholder="Last 4 phone digits" className="sf-input mt-1 w-full uppercase"/>
                     </label>
                     <button type="submit" disabled={submitting} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm disabled:opacity-50">{submitting ? 'Opening…' : 'Open prepared form'}</button>
                     <a href="#/plans" className="block text-center text-xs text-stone-600 underline">Start a new form instead</a>
+                </form> : prepareMode && !prepareUnlocked ? <form onSubmit={handlePrepareUnlock} className="space-y-4">
+                    {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}
+                    <label className="block text-xs font-bold">Preparation code
+                        <input required type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} autoComplete="off" value={preparePin} onChange={event => setPreparePin(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="4-digit code" className={fieldClass}/>
+                    </label>
+                    <button type="submit" disabled={submitting} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Checking…' : 'Open preparation form'}</button>
                 </form> : !prepareMode && step === 'done' ? (
                     <div className="text-center space-y-4 py-4" role="status">
                         <CheckCircle2 className="mx-auto w-10 h-10 text-emerald-600"/>
@@ -232,7 +253,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                         <button type="button" onClick={isModal ? requestClose : reset} className="sf-btn-secondary">{isModal ? 'Done' : 'Submit another enquiry'}</button>
                     </div>
                 ) : (
-                    <form onSubmit={prepareMode ? event => event.preventDefault() : handleSubmit} className="space-y-5">
+                    <form onSubmit={prepareMode ? event => {event.preventDefault(); makeShareLink();} : handleSubmit} className="space-y-5">
                         {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex gap-2"><AlertCircle size={16} className="shrink-0"/>{error}</p>}
                         <fieldset disabled={submitting} className="space-y-5">
                             {step === 'contact' && !prepareMode ? (
@@ -254,16 +275,16 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                 <>
                                     {prepareMode && <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">
                                         <legend className="px-2 text-sm font-black">Client contact</legend>
-                                        <p className="text-xs text-stone-500">Fill in what you know. Your client can complete any blanks.</p>
+                                        <p className="text-xs text-stone-500">These three fields are required. You can fill the remaining questions for the client.</p>
                                         <div className="grid gap-4 sm:grid-cols-2">
-                                            <label className="block text-xs font-bold">Client name (optional)
-                                                <input maxLength={200} autoComplete="off" value={name} onChange={event => setName(event.target.value)} placeholder="Client name" className={fieldClass}/>
+                                            <label className="block text-xs font-bold">Client name <span aria-hidden="true">*</span>
+                                                <input required maxLength={200} autoComplete="off" value={name} onChange={event => setName(event.target.value)} placeholder="Client name" className={fieldClass}/>
                                             </label>
-                                            <label className="block text-xs font-bold">Client phone number (optional)
-                                                <input type="tel" maxLength={20} autoComplete="off" value={mobile} onChange={event => setMobile(event.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
+                                            <label className="block text-xs font-bold">Client phone number <span aria-hidden="true">*</span>
+                                                <input required type="tel" maxLength={20} autoComplete="off" value={mobile} onChange={event => setMobile(event.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
                                             </label>
-                                            <label className="block text-xs font-bold sm:col-span-2">Company name (optional)
-                                                <input maxLength={300} autoComplete="off" value={company} onChange={event => setCompany(event.target.value)} placeholder="Company name" className={fieldClass}/>
+                                            <label className="block text-xs font-bold sm:col-span-2">Company name <span aria-hidden="true">*</span>
+                                                <input required maxLength={300} autoComplete="off" value={company} onChange={event => setCompany(event.target.value)} placeholder="Company name" className={fieldClass}/>
                                             </label>
                                         </div>
                                     </fieldset>}
@@ -345,9 +366,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                 </>
                             )}
                             {prepareMode ? <>
-                                <p className="text-xs text-stone-500">Share the link and access code with your client. The form stays available for 30 days.</p>
-                                <button type="button" disabled={submitting} onClick={makeShareLink} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Preparing…' : 'Create and copy client link'}</button>
-                                {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-2" role="status"><p className="text-xs font-bold text-emerald-800">Client form ready — send the link and code to your client.</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><label className="block text-xs font-bold">Access code<input readOnly value={shareCode} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form code"/></label><p className="text-xs text-stone-600">Keep this code; it is shown only now and cannot be retrieved later.</p></div>}
+                                <p className="text-xs text-stone-500">Share the link with your client. They unlock it with the last four digits of their phone number. The form stays available for 30 days.</p>
+                                <button type="submit" disabled={submitting} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Preparing…' : 'Create and copy client link'}</button>
+                                {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-2" role="status"><p className="text-xs font-bold text-emerald-800">Client form ready — send the link to your client.</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><p className="text-xs text-stone-600">Unlock code: last four digits of the client phone number ({shareCode}). Each link opens only its own client form.</p></div>}
                             </> : <button type="submit" className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50" disabled={submitting}>
                                 {submitting ? <LoaderCircle size={16} className="animate-spin"/> : <ArrowRight size={16}/>}
                                 {submitting ? 'Saving…' : step === 'contact' ? 'Submit enquiry' : 'Save additional details'}
