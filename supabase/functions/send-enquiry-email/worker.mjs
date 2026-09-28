@@ -6,11 +6,13 @@ export function emailMessage(job, senderEmail, senderName = 'Deep Root Systems')
     return {
         sender: {email:senderEmail, name:senderName},
         to: [{email:ENQUIRY_RECIPIENT}],
-        subject: `New SolarFlow enquiry — ${name}`,
+        subject: `${job.kind === 'details' ? 'Completed' : 'New'} SolarFlow enquiry — ${name}`,
         textContent: [
             `Enquiry reference: ${job.enquiry_id}`, `Name: ${data.name || 'Not provided'}`,
-            `Phone: ${data.mobile_number}`, `Interested in: ${data.selected_interest || 'Not specified'}`
-        ].join('\n'),
+            `Phone: ${data.mobile_number}`, `Interested in: ${data.selected_interest || 'Not specified'}`,
+            job.kind === 'details' && data.company_name && `Company: ${data.company_name}`,
+            job.kind === 'details' && data.notes && `Form answers:\n${data.notes}`
+        ].filter(Boolean).join('\n'),
         headers: {idempotencyKey:job.id}
     };
 }

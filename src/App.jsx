@@ -53,7 +53,7 @@ function scheduleBackgroundDemoCleanup(client) {
 export default function App(){
  const [user,setUser]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
  const [recoveryMode, setRecoveryMode]=useState(false);
- const [publicView,setPublicView]=useState(()=>typeof window!=='undefined'&&window.location.hash==='#/plans'?'plans':null);
+ const [publicView,setPublicView]=useState(()=>typeof window!=='undefined'&&window.location.hash.startsWith('#/plans')?'plans':null);
  useEffect(()=>{
   let active=true;
   if(typeof window !== 'undefined' && window.location.hash && window.location.hash.includes('type=recovery')){

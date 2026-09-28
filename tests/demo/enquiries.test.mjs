@@ -30,6 +30,11 @@ test('optional interests and call preferences are saved in existing notes', () =
  assert.doesNotMatch(skipped.notes, /Preferred call/);
 });
 
+test('guided business answers are saved with the same enquiry', () => {
+ const payload=enquiryPayload({...draft,businessDetails:{hasWebsite:'Yes',teamSize:'4–9',customerCount:'420',liveCustomerCount:'67',software:['Tally','Google Sheets'],branches:'No',partnerOffices:'Yes',channelPartners:'Not sure'}});
+ for(const detail of ['Website: Yes','Employees: 4–9','Total customers: 420','Live customers: 67','Current software: Tally, Google Sheets','Branches: No','Channel partner offices: Yes','Channel partners: Not sure']) assert.ok(payload.notes.includes(detail));
+});
+
 test('quick enquiries retain the selected plan or tools interest in notes', () => {
  for (const selectedInterest of ['Option 1: Small team setup', 'Option 2: Detailed operations', 'Tools only — no CRM']) {
   const result = enquiryPayload({...draft, company:'', remarks:'', selectedInterest, interests:[selectedInterest]});

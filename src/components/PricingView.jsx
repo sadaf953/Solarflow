@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, ArrowRight } from 'lucide-react';
 import CustomizationEnquiryForm from './CustomizationEnquiryForm';
+import { readPreparedBrief } from '../enquiries/brief';
 
 const OPTIONS = [
     {
@@ -41,6 +42,8 @@ const OPTIONS = [
 
 export default function PricingView() {
     const [enquiryChoice, setEnquiryChoice] = useState(null);
+    const [preparedBrief] = useState(() => readPreparedBrief(window.location.hash));
+    useEffect(() => { if (preparedBrief) document.getElementById('setup-enquiry')?.scrollIntoView(); }, [preparedBrief]);
     const choices = ['Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options'];
     return (
         <div className="max-w-7xl mx-auto py-8 md:py-12 space-y-8">
@@ -49,6 +52,7 @@ export default function PricingView() {
                 <h1 className="text-3xl md:text-4xl font-black text-stone-900">Choose the setup that fits your business</h1>
                 <p className="text-sm leading-relaxed text-stone-600">Simple customer tracking or detailed operations — tell us what your team needs and we’ll help you find the right mix.</p>
             </header>
+            {preparedBrief && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-stone-800">We’ve prepared some answers for you below. Add your name and phone number, then complete any remaining questions that apply.</p>}
             <div className="grid gap-5 lg:grid-cols-3">
                 {OPTIONS.map((option, index) => (
                     <article key={option.title} className={`rounded-3xl p-6 flex flex-col border ${index === 1 ? 'bg-stone-900 text-white border-stone-900 shadow-lg' : 'bg-white text-stone-900 border-stone-200'}`}>
@@ -77,7 +81,7 @@ export default function PricingView() {
                 <button type="button" onClick={() => setEnquiryChoice('Tools only — no CRM')} className="sf-btn-primary shrink-0">Interested in tools <ArrowRight className="w-4 h-4 inline ml-1"/></button>
             </section>
             <div id="setup-enquiry" className="scroll-mt-24 max-w-4xl mx-auto">
-                <CustomizationEnquiryForm />
+                <CustomizationEnquiryForm preparedBrief={preparedBrief} allowPrepare={!preparedBrief}/>
             </div>
             {enquiryChoice !== null && <CustomizationEnquiryForm key={enquiryChoice} isModal selectedInterest={enquiryChoice} onClose={() => setEnquiryChoice(null)}/>}
         </div>

@@ -1,10 +1,16 @@
-export function enquiryPayload({name, company, mobile, modelType, storeFiles, remarks, callDate = '', callTime = '', interests = [], selectedInterest = ''}) {
+export function enquiryPayload({name, company, mobile, modelType, storeFiles, remarks, callDate = '', callTime = '', interests = [], selectedInterest = '', businessDetails = {}}) {
  const phone = mobile.trim().replace(/[\s()-]/g, '').replace(/^\+91/, '');
  if (!/^\d{10}$/.test(phone)) throw new Error('Please enter a valid 10-digit mobile number.');
+ const detailLines = [
+  ['Website', businessDetails.hasWebsite], ['Employees', businessDetails.teamSize],
+  ['Total customers', businessDetails.customerCount], ['Live customers', businessDetails.liveCustomerCount],
+  ['Current software', businessDetails.software?.join(', ')], ['Branches', businessDetails.branches],
+  ['Channel partner offices', businessDetails.partnerOffices], ['Channel partners', businessDetails.channelPartners]
+ ].filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`);
  return {
   name: name.trim() || 'Prospective Client', company_name: company.trim() || null,
   mobile_number: phone, version_type: modelType,
-  notes: [selectedInterest && `Selected option: ${selectedInterest}`, `File storage: ${storeFiles === 'yes' ? 'Yes' : storeFiles === 'no' ? 'No' : 'Discuss on call'}`, callDate && `Preferred call date: ${callDate}`, callTime && `Preferred call time (Asia/Kolkata): ${callTime}`, `Interested in: ${interests.length ? interests.join(', ') : 'Not specified — discuss on call'}`, remarks.trim()].filter(Boolean).join('\n'),
+  notes: [selectedInterest && `Selected option: ${selectedInterest}`, `File storage: ${storeFiles === 'yes' ? 'Yes' : storeFiles === 'no' ? 'No' : 'Discuss on call'}`, callDate && `Preferred call date: ${callDate}`, callTime && `Preferred call time (Asia/Kolkata): ${callTime}`, ...detailLines, `Interested in: ${interests.length ? interests.join(', ') : 'Not specified — discuss on call'}`, remarks.trim()].filter(Boolean).join('\n'),
   status: 'new'
  };
 }

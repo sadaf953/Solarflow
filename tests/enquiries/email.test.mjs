@@ -15,6 +15,15 @@ test('notification contains contact and selected interest, and recipient is fixe
  assert.equal(emailMessage({...job,id:'b699afe3-bac4-4ec8-80bd-dc14715058df'},options.senderEmail).headers.idempotencyKey.length,36);
 });
 
+test('completed enquiry email includes the optional answers and preferred call time',()=>{
+ const completed=emailMessage({...job,kind:'details',snapshot:{...job.snapshot,company_name:'Fictional Solar',notes:'Website: Yes\nEmployees: 4–9\nInterested in: DISCOM submission document maker\nPreferred call time (Asia/Kolkata): 14:30'}},options.senderEmail);
+ assert.match(completed.subject,/Completed SolarFlow enquiry/);
+ assert.match(completed.textContent,/Company: Fictional Solar/);
+ assert.match(completed.textContent,/DISCOM submission document maker/);
+ assert.match(completed.textContent,/14:30/);
+ assert.equal(completed.to[0].email,ENQUIRY_RECIPIENT);
+});
+
 test('unauthorized requests and missing credentials never claim contact data or send mail',async()=>{
  const storage={claim(){assert.fail('must not claim');}};
  const fetchImpl=()=>assert.fail('must not send');

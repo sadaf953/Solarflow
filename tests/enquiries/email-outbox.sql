@@ -27,17 +27,22 @@ end $$;
 reset role;
 do $$
 begin
-    if (select count(*) from enquiry_private.email_outbox where enquiry_id=current_setting('qa.enquiry_id')::uuid) <> 1 then
-        raise exception 'FAIL: expected only the initial contact email; optional updates must not create emails';
+    if (select count(*) from enquiry_private.email_outbox where enquiry_id=current_setting('qa.enquiry_id')::uuid) <> 2 then
+        raise exception 'FAIL: expected one contact and one completed-details email';
     end if;
     if not exists(select 1 from enquiry_private.email_outbox where enquiry_id=current_setting('qa.enquiry_id')::uuid
         and kind='new' and snapshot->>'mobile_number'='0000000852' and snapshot->>'selected_interest'='Tools only — no CRM') then
         raise exception 'FAIL: initial contact and selected interest not captured';
     end if;
     if exists(select 1 from enquiry_private.email_outbox where enquiry_id=current_setting('qa.enquiry_id')::uuid
-        and (snapshot ? 'notes' or snapshot ? 'company_name')) then
-        raise exception 'FAIL: optional private details included in email';
+        and kind='new' and (snapshot ? 'notes' or snapshot ? 'company_name')) then
+        raise exception 'FAIL: initial contact email contains optional details';
+    end if;
+    if not exists(select 1 from enquiry_private.email_outbox where enquiry_id=current_setting('qa.enquiry_id')::uuid
+        and kind='details' and snapshot->>'company_name'='Fictional QA company'
+        and snapshot->>'notes' like '%Quotation maker%') then
+        raise exception 'FAIL: completed details email missing answers';
     end if;
 end $$;
-select 'PASS: only initial contact queued, optional updates and duplicate retry ignored, queue and worker token private' as verification;
+select 'PASS: contact and completed details queued once each; duplicate retry ignored; queue and token private' as verification;
 rollback;
