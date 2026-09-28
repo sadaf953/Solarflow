@@ -34,20 +34,44 @@ export function createPreparedBrief(draft) {
   return prepared;
 }
 
-export function preparedBriefLink(baseUrl, draft) {
-  const prepared = createPreparedBrief(draft);
-  if (!Object.keys(prepared).length) throw new Error('Choose at least one answer to prepare for the client.');
-  const token = btoa(encodeURIComponent(JSON.stringify(prepared))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `${baseUrl.replace(/\/$/, '')}/#/plans?brief=${token}`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function preparedBriefLink(baseUrl, id) {
+  if (!UUID.test(id)) throw new Error('Invalid prepared form reference.');
+  return `${baseUrl.replace(/\/$/, '')}/#/plans?brief=${id}`;
 }
 
-export function readPreparedBrief(hash) {
-  const token = new URLSearchParams(hash.split('?')[1] || '').get('brief');
-  if (!token || token.length > 5000 || !/^[A-Za-z0-9_-]+$/.test(token)) return null;
-  try {
-    const parsed = JSON.parse(decodeURIComponent(atob(token.replace(/-/g, '+').replace(/_/g, '/'))));
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-    const clean = createPreparedBrief(parsed);
-    return Object.keys(clean).length ? clean : null;
-  } catch { return null; }
+export function readPreparedBriefId(hash) {
+  const id = new URLSearchParams(hash.split('?')[1] || '').get('brief');
+  return id && UUID.test(id) ? id : null;
+}
+
+async function ensureSession(client) {
+  const {data, error} = await client.auth.getSession();
+  if (error) throw error;
+  if (!data?.session) {
+    const {error: signInError} = await client.auth.signInAnonymously();
+    if (signInError) throw signInError;
+  }
+}
+
+export async function createSavedBrief(client, draft) {
+  const prepared = createPreparedBrief(draft);
+  if (!Object.keys(prepared).length) throw new Error('Choose at least one answer to prepare for the client.');
+  await ensureSession(client);
+  const {data, error} = await client.rpc('create_prepared_brief', {p_answers:prepared});
+  if (error) throw error;
+  if (!data || !UUID.test(data.id) || !/^[0-9A-F]{12}$/.test(data.code)) throw new Error('The prepared form was not confirmed. Please try again.');
+  return data;
+}
+
+export async function unlockSavedBrief(client, id, code) {
+  if (!UUID.test(id)) throw new Error('This prepared form link is invalid.');
+  await ensureSession(client);
+  const {data, error} = await client.rpc('unlock_prepared_brief', {p_id:id, p_code:code});
+  if (error) throw error;
+  if (!data) throw new Error('That code is incorrect or the prepared form has expired.');
+  const prepared = createPreparedBrief(data);
+  if (!Object.keys(prepared).length) throw new Error('The prepared form has no usable answers.');
+  return prepared;
 }

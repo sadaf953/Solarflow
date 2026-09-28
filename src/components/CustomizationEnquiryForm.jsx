@@ -3,31 +3,35 @@ import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy, LockKeyho
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
-import { DOCUMENT_OPTIONS, INTEREST_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, preparedBriefLink } from '../enquiries/brief';
+import { DOCUMENT_OPTIONS, INTEREST_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, preparedBriefLink, unlockSavedBrief } from '../enquiries/brief';
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
 const OTHER_INTEREST_OPTIONS = INTEREST_OPTIONS.filter(option => !DOCUMENT_OPTIONS.includes(option));
 
 
-export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBrief = null, allowPrepare = false}) {
+export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, allowPrepare = false}) {
+    const [preparedBrief, setPreparedBrief] = useState(null);
     const locked = preparedBrief || {};
+    const needsUnlock = Boolean(preparedBriefId && !preparedBrief);
     const [name, setName] = useState('');
     const [mobile, setMobile] = useState('');
     const [company, setCompany] = useState('');
     const [callDate, setCallDate] = useState('');
     const [callTime, setCallTime] = useState('');
-    const [interests, setInterests] = useState(() => [...new Set([...(preparedBrief?.interests || []), ...(selectedInterest ? [selectedInterest] : [])])]);
-    const [hasWebsite, setHasWebsite] = useState(preparedBrief?.hasWebsite || '');
-    const [teamSize, setTeamSize] = useState(preparedBrief?.teamSize || '');
-    const [customerCount, setCustomerCount] = useState(preparedBrief?.customerCount || '');
-    const [liveCustomerCount, setLiveCustomerCount] = useState(preparedBrief?.liveCustomerCount || '');
-    const [software, setSoftware] = useState(preparedBrief?.software || []);
-    const [branches, setBranches] = useState(preparedBrief?.branches || '');
-    const [partnerOffices, setPartnerOffices] = useState(preparedBrief?.partnerOffices || '');
-    const [channelPartners, setChannelPartners] = useState(preparedBrief?.channelPartners || '');
+    const [interests, setInterests] = useState(() => selectedInterest ? [selectedInterest] : []);
+    const [hasWebsite, setHasWebsite] = useState('');
+    const [teamSize, setTeamSize] = useState('');
+    const [customerCount, setCustomerCount] = useState('');
+    const [liveCustomerCount, setLiveCustomerCount] = useState('');
+    const [software, setSoftware] = useState([]);
+    const [branches, setBranches] = useState('');
+    const [partnerOffices, setPartnerOffices] = useState('');
+    const [channelPartners, setChannelPartners] = useState('');
     const [prepareMode, setPrepareMode] = useState(false);
     const [shareLink, setShareLink] = useState('');
+    const [shareCode, setShareCode] = useState('');
+    const [accessCode, setAccessCode] = useState('');
     const [remarks, setRemarks] = useState('');
     const [step, setStep] = useState('contact');
     const [submitting, setSubmitting] = useState(false);
@@ -106,15 +110,35 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setPartnerOffices(locked.partnerOffices || ''); setChannelPartners(locked.channelPartners || '');
         setError(''); identityRef.current = null; setStep('contact');
     };
+    const handleUnlock = async event => {
+        event.preventDefault();
+        if (savingRef.current) return;
+        savingRef.current = true; setSubmitting(true); setError('');
+        try {
+            const brief = await unlockSavedBrief(supabase, preparedBriefId, accessCode);
+            setPreparedBrief(brief);
+            setInterests(current => [...new Set([...(brief.interests || []), ...current])]);
+            setHasWebsite(brief.hasWebsite || ''); setTeamSize(brief.teamSize || '');
+            setCustomerCount(brief.customerCount || ''); setLiveCustomerCount(brief.liveCustomerCount || '');
+            setSoftware(brief.software || []); setBranches(brief.branches || '');
+            setPartnerOffices(brief.partnerOffices || ''); setChannelPartners(brief.channelPartners || '');
+            setAccessCode('');
+        } catch (err) { setError(err.message || 'Could not open this prepared form.'); }
+        finally { savingRef.current = false; setSubmitting(false); }
+    };
     const toggleList = (setter, option, checked) => setter(current => checked ? [...new Set([...current, option])] : current.filter(item => item !== option));
     const makeShareLink = async () => {
+        if (savingRef.current) return;
+        savingRef.current = true; setSubmitting(true); setError('');
         try {
-            const link = preparedBriefLink(window.location.origin + window.location.pathname, {
+            const saved = await createSavedBrief(supabase, {
                 hasWebsite, teamSize, customerCount, liveCustomerCount, software, branches, partnerOffices, channelPartners, interests
             });
-            setShareLink(link); setError('');
-            await navigator.clipboard?.writeText(link);
-        } catch (err) { if (err.message?.includes('Choose at least')) setError(err.message); }
+            const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
+            setShareLink(link); setShareCode(saved.code);
+            try { await navigator.clipboard?.writeText(link); } catch { /* The link remains selectable below. */ }
+        } catch (err) { setError(err.message || 'Could not prepare the client form.'); }
+        finally { savingRef.current = false; setSubmitting(false); }
     };
     const fieldClass = 'sf-input mt-1 w-full';
     const choiceField = (label, key, value, setValue, options) => <label className="block text-xs font-bold" key={key}>
@@ -143,9 +167,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
             <div className="bg-stone-900 p-6 md:p-7 text-white relative">
                 {isModal && step !== 'details' && <button type="button" onClick={requestClose} disabled={submitting} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20" aria-label="Close enquiry"><X size={18}/></button>}
                 {!prepareMode && step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
-                <p className="text-xs font-bold text-amber-300 mb-2">{prepareMode ? 'Prepare a client form' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
-                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{prepareMode ? 'Fill what you already know' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
-                <p className="mt-2 text-sm text-stone-300">{prepareMode ? 'Answer any questions below, then copy a link for your client. Your prepared answers will be locked in their form.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
+                <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Prepared client form' : prepareMode ? 'Prepare a client form' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
+                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Enter your access code' : prepareMode ? 'Fill what you already know' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
+                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Your prepared answers are saved securely. Enter the code sent with this link to open them, then fill in the remaining questions.' : prepareMode ? 'Answer any questions below, then share the link and separate code with your client. Your prepared answers will be locked in their form.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
                 {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
             <div className="p-6 md:p-7">
@@ -153,7 +177,14 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                     <button type="button" onClick={() => {setPrepareMode(false); setError('');}} className={`rounded-xl px-4 py-2 text-xs font-bold ${!prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>I’m enquiring</button>
                     <button type="button" onClick={() => {setPrepareMode(true); setError('');}} className={`rounded-xl px-4 py-2 text-xs font-bold ${prepareMode ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700'}`}>Prepare a form for a client</button>
                 </div>}
-                {!prepareMode && step === 'done' ? (
+                {needsUnlock ? <form onSubmit={handleUnlock} className="space-y-4">
+                    {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}
+                    <label className="block text-xs font-bold">Access code
+                        <input required maxLength={17} autoComplete="one-time-code" inputMode="text" value={accessCode} onChange={event => setAccessCode(event.target.value)} placeholder="12-character code" className="sf-input mt-1 w-full uppercase"/>
+                    </label>
+                    <button type="submit" disabled={submitting} className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm disabled:opacity-50">{submitting ? 'Opening…' : 'Open prepared form'}</button>
+                    <a href="#/plans" className="block text-center text-xs text-stone-600 underline">Start a new form instead</a>
+                </form> : !prepareMode && step === 'done' ? (
                     <div className="text-center space-y-4 py-4" role="status">
                         <CheckCircle2 className="mx-auto w-10 h-10 text-emerald-600"/>
                         <p className="text-sm">Your enquiry is saved with contact number <strong>{mobile}</strong>.</p>
@@ -164,13 +195,16 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                         {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex gap-2"><AlertCircle size={16} className="shrink-0"/>{error}</p>}
                         <fieldset disabled={submitting} className="space-y-5">
                             {step === 'contact' && !prepareMode ? (
-                                <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-4">
+                                    {preparedBrief && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">Prepared answers loaded. Your name and phone number are the only required fields; the saved answers will appear in the next step.</p>}
+                                    <div className="grid gap-4 sm:grid-cols-2">
                                     <label className="block text-xs font-bold">Name <span aria-hidden="true">*</span>
                                         <input ref={nameRef} required maxLength={200} autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className={fieldClass}/>
                                     </label>
                                     <label className="block text-xs font-bold">Phone number <span aria-hidden="true">*</span>
                                         <input required type="tel" autoComplete="tel" maxLength={20} value={mobile} onChange={e => setMobile(e.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
                                     </label>
+                                    </div>
                                 </div>
                             ) : (
                                 <>
@@ -225,9 +259,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                 </>
                             )}
                             {prepareMode ? <>
-                                <p className="text-xs text-stone-500">The link includes only the business answers above. It does not include a name, phone number, company name or private notes.</p>
-                                <button type="button" onClick={makeShareLink} className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2"><Copy size={16}/> Create and copy client link</button>
-                                {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-2"><p className="text-xs font-bold text-emerald-800">Client link ready — send this link to your client.</p><input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></div>}
+                                <p className="text-xs text-stone-500">The link contains only a random reference. Your answers are saved in the backend for 30 days and require the separate code to open.</p>
+                                <button type="button" disabled={submitting} onClick={makeShareLink} className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Preparing…' : 'Create and copy client link'}</button>
+                                {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-2" role="status"><p className="text-xs font-bold text-emerald-800">Client form ready — send the link and code to your client.</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><label className="block text-xs font-bold">Access code<input readOnly value={shareCode} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form code"/></label><p className="text-xs text-stone-600">Keep this code; it is shown only now and cannot be retrieved later.</p></div>}
                             </> : <button type="submit" className="w-full py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50" disabled={submitting}>
                                 {submitting ? <LoaderCircle size={16} className="animate-spin"/> : <ArrowRight size={16}/>}
                                 {submitting ? 'Saving…' : step === 'contact' ? 'Submit enquiry' : 'Save additional details'}
