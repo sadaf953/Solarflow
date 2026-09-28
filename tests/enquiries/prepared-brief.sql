@@ -4,6 +4,7 @@ select set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
 set local role authenticated;
 with created as (
     select public.create_prepared_brief(jsonb_build_object(
+        'name','Test Client','mobile','9000000001','company','Example Solar',
         'hasWebsite','Yes','teamSize','4–9','software',jsonb_build_array('Tally','Other third-party software'),
         'otherSoftware','Example ERP',
         'fileStorage','Yes','storageProvider','Google Workspace business account',
@@ -20,6 +21,10 @@ begin
     if public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
         current_setting('qa.brief_code'))->>'hasWebsite' <> 'Yes' then
         raise exception 'FAIL: correct code did not restore prepared answers';
+    end if;
+    if public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
+        current_setting('qa.brief_code'))->>'company' <> 'Example Solar' then
+        raise exception 'FAIL: prepared contact details did not restore';
     end if;
     if public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
         current_setting('qa.brief_code'))->>'otherSoftware' <> 'Example ERP' then

@@ -7,7 +7,7 @@ import { CORE_DOCUMENT_OPTIONS, DOCUMENT_OPTIONS, INTEREST_OPTIONS, OPTIONAL_DOC
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
-const OTHER_INTEREST_OPTIONS = INTEREST_OPTIONS.filter(option => !DOCUMENT_OPTIONS.includes(option) && !['Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options', 'Tools only — no CRM', 'Checklists', 'Document uploads'].includes(option));
+const OTHER_INTEREST_OPTIONS = INTEREST_OPTIONS.filter(option => !DOCUMENT_OPTIONS.includes(option) && !['Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options', 'Tools only — no CRM', 'Checklists', 'Document uploads', 'Channel partner offices (CPOs)', 'Branches', 'Customer tracking', 'Operations page', 'Dealer-based filtering', 'Warranty tracking', 'Staff management', 'Dealers', 'Finance'].includes(option));
 const DOCUMENT_COPY = {
     'Feasibility document maker':['Bank feasibility document','Prepare the document for bank submission.'],
     'DISCOM submission document maker':['DISCOM submission document','Prepare the document for upload to the PM Surya Ghar portal.'],
@@ -57,7 +57,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const formId = useId();
     const {showConfirm} = useGlobalPopup();
     const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || branches || partnerOffices || channelPartners || fileStorage || storageProvider || interests.join('|') !== selectedInterest);
-    const dirty = prepareMode ? optionalDirty : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
+    const dirty = prepareMode ? Boolean(name || mobile || optionalDirty) : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
 
     useEffect(() => {
         if (!isModal) return;
@@ -100,7 +100,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         let payload;
         try {
             payload = enquiryPayload({name, mobile, modelType, storeFiles, storageProvider:storeFiles === 'yes' ? storageProvider : '', selectedInterest,
-                company: contactOnly ? '' : company, remarks: contactOnly ? '' : remarks,
+                company: contactOnly && !preparedBrief ? '' : company, remarks: contactOnly ? '' : remarks,
                 callDate: contactOnly ? '' : callDate, callTime: contactOnly ? '' : callTime,
                 interests: chosenInterests,
                 businessDetails: contactOnly ? {} : {hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware:software.includes('Other third-party software') ? otherSoftware : '', branches, partnerOffices, channelPartners}});
@@ -116,7 +116,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         } finally {savingRef.current = false; setSubmitting(false);}
     };
     const reset = () => {
-        setName(''); setMobile(''); setCompany(''); setCallDate(''); setCallTime(''); setRemarks('');
+        setName(locked.name || ''); setMobile(locked.mobile || ''); setCompany(locked.company || ''); setCallDate(''); setCallTime(''); setRemarks('');
         setInterests([...new Set([...(locked.interests || []), ...(selectedInterest ? [selectedInterest] : [])])]);
         setHasWebsite(locked.hasWebsite || ''); setTeamSize(locked.teamSize || '');
         setCustomerCount(locked.customerCount || ''); setLiveCustomerCount(locked.liveCustomerCount || '');
@@ -132,6 +132,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         try {
             const brief = await unlockSavedBrief(supabase, preparedBriefId, accessCode);
             setPreparedBrief(brief);
+            setName(brief.name || ''); setMobile(brief.mobile || ''); setCompany(brief.company || '');
             setInterests(current => [...new Set([...(brief.interests || []), ...current])]);
             setHasWebsite(brief.hasWebsite || ''); setTeamSize(brief.teamSize || '');
             setCustomerCount(brief.customerCount || ''); setLiveCustomerCount(brief.liveCustomerCount || '');
@@ -145,10 +146,14 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const toggleList = (setter, option, checked) => setter(current => checked ? [...new Set([...current, option])] : current.filter(item => item !== option));
     const makeShareLink = async () => {
         if (savingRef.current) return;
+        if (mobile.trim() && !/^\d{10}$/.test(mobile.trim().replace(/[\s()-]/g, '').replace(/^\+91/, ''))) {
+            setError('Enter a valid 10-digit client phone number, or leave it blank for the client.');
+            return;
+        }
         savingRef.current = true; setSubmitting(true); setError('');
         try {
             const saved = await createSavedBrief(supabase, {
-                hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, fileStorage, storageProvider, interests
+                name, mobile, company, hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, fileStorage, storageProvider, interests
             });
             const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
             setShareLink(link); setShareCode(saved.code);
@@ -232,22 +237,40 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                         <fieldset disabled={submitting} className="space-y-5">
                             {step === 'contact' && !prepareMode ? (
                                 <div className="space-y-4">
-                                    {preparedBrief && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">Prepared answers loaded. Your name and phone number are the only required fields; the saved answers will appear in the next step.</p>}
+                                    {preparedBrief && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">Prepared answers loaded. Fill any blank contact fields, then continue.</p>}
                                     <div className="grid gap-4 sm:grid-cols-2">
-                                    <label className="block text-xs font-bold">Name <span aria-hidden="true">*</span>
-                                        <input ref={nameRef} required maxLength={200} autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className={fieldClass}/>
+                                    <label className="block text-xs font-bold">Name <span aria-hidden="true">*</span> {locked.name && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
+                                        <input ref={nameRef} required maxLength={200} autoComplete="name" value={name} disabled={Boolean(locked.name)} onChange={e => setName(e.target.value)} placeholder="Your name" className={fieldClass}/>
                                     </label>
-                                    <label className="block text-xs font-bold">Phone number <span aria-hidden="true">*</span>
-                                        <input required type="tel" autoComplete="tel" maxLength={20} value={mobile} onChange={e => setMobile(e.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
+                                    <label className="block text-xs font-bold">Phone number <span aria-hidden="true">*</span> {locked.mobile && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
+                                        <input required type="tel" autoComplete="tel" maxLength={20} value={mobile} disabled={Boolean(locked.mobile)} onChange={e => setMobile(e.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
                                     </label>
+                                    {locked.company && <label className="block text-xs font-bold sm:col-span-2">Company name <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>
+                                        <input value={company} disabled className={fieldClass}/>
+                                    </label>}
                                     </div>
                                 </div>
                             ) : (
                                 <>
+                                    {prepareMode && <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">
+                                        <legend className="px-2 text-sm font-black">Client contact</legend>
+                                        <p className="text-xs text-stone-500">Fill in what you know. Your client can complete any blanks.</p>
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            <label className="block text-xs font-bold">Client name (optional)
+                                                <input maxLength={200} autoComplete="off" value={name} onChange={event => setName(event.target.value)} placeholder="Client name" className={fieldClass}/>
+                                            </label>
+                                            <label className="block text-xs font-bold">Client phone number (optional)
+                                                <input type="tel" maxLength={20} autoComplete="off" value={mobile} onChange={event => setMobile(event.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
+                                            </label>
+                                            <label className="block text-xs font-bold sm:col-span-2">Company name (optional)
+                                                <input maxLength={300} autoComplete="off" value={company} onChange={event => setCompany(event.target.value)} placeholder="Company name" className={fieldClass}/>
+                                            </label>
+                                        </div>
+                                    </fieldset>}
                                     {!prepareMode && <p ref={detailsRef} tabIndex={-1} role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 outline-none">Contact saved: {name} · {mobile}</p>}
                                     {!prepareMode && <div className="grid gap-4 sm:grid-cols-2">
-                                        <label className="block text-xs font-bold sm:col-span-2">Company name (optional)
-                                            <input maxLength={300} autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} className={fieldClass}/>
+                                        <label className="block text-xs font-bold sm:col-span-2">Company name (optional) {locked.company && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
+                                            <input maxLength={300} autoComplete="organization" value={company} disabled={Boolean(locked.company)} onChange={e => setCompany(e.target.value)} className={fieldClass}/>
                                         </label>
                                         <label className="block text-xs font-bold">Preferred call date (optional)
                                             <input type="date" value={callDate} onChange={e => setCallDate(e.target.value)} className={fieldClass}/>
@@ -288,7 +311,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                         <div className="grid gap-2 sm:grid-cols-2">
                                             {['Yes','No'].map(option => <label key={option} className={`flex gap-3 rounded-xl border p-3 cursor-pointer ${fileStorage === option ? 'border-orange-400 bg-orange-50' : 'border-stone-200'}`}>
                                                 <input type="radio" name={`${formId}-file-storage`} value={option} checked={fileStorage === option} disabled={Boolean(locked.fileStorage)} onChange={() => setFileStorage(option)} className="accent-orange-600 mt-0.5"/>
-                                                <span className="text-xs"><strong className="block text-sm">{option === 'Yes' ? 'Yes, store files' : 'No, use simple checklists'}</strong>{option === 'No' && <span className="block mt-1 text-stone-600"><s>Extra storage charge</s> Included at no extra cost.</span>}</span>
+                                                <span className="text-xs"><strong className="block text-sm">{option === 'Yes' ? 'Yes, store files' : 'No, use simple checklists'}</strong>{option === 'No' && <span className="block mt-1 text-stone-600">Included at no extra cost.</span>}</span>
                                             </label>)}
                                         </div>
                                         {fileStorage === 'Yes' && <div className="space-y-2 pt-2">

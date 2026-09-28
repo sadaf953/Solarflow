@@ -4,7 +4,7 @@ import {createPreparedBrief, createSavedBrief, preparedBriefLink, readPreparedBr
 
 const id='b391c08f-5c13-4b40-b73e-f1c7eec12205';
 const code='A1B2C3D4E5F6';
-const draft={name:'Private Name',mobile:'9000000001',hasWebsite:'Yes',teamSize:'4–9',
+const draft={name:'Private Name',mobile:'9000000001',company:'Example Solar',hasWebsite:'Yes',teamSize:'4–9',
  customerCount:'420',liveCustomerCount:'67',software:['Tally','Google Sheets','Unknown'],
  branches:'No',interests:['DISCOM submission document maker','Quotation maker','Unknown']};
 
@@ -12,7 +12,10 @@ test('client link contains only the backend draft ID; supported answers stay in 
  const link=preparedBriefLink('https://example.com/',id);
  assert.equal(link,`https://example.com/#/plans?brief=${id}`);
  assert.equal(readPreparedBriefId(new URL(link).hash),id);
- assert.doesNotMatch(link,/Private Name|9000000001|Tally|Website/);
+ assert.doesNotMatch(link,/Private Name|9000000001|Example Solar|Tally|Website/);
+ assert.equal(createPreparedBrief(draft).name,'Private Name');
+ assert.equal(createPreparedBrief(draft).mobile,'9000000001');
+ assert.equal(createPreparedBrief(draft).company,'Example Solar');
  assert.deepEqual(createPreparedBrief(draft).software,['Tally','Google Sheets']);
  assert.deepEqual(createPreparedBrief(draft).interests,['DISCOM submission document maker','Quotation maker']);
  assert.equal(readPreparedBriefId('#/plans?brief=not-a-uuid'),null);
@@ -50,4 +53,10 @@ test('storage provider stays only when file storage is selected', () => {
  assert.deepEqual(createPreparedBrief(choice),choice);
  assert.deepEqual(createPreparedBrief({...choice,fileStorage:'No'}),{fileStorage:'No'});
  assert.deepEqual(createPreparedBrief({...choice,storageProvider:'Unknown'}),{fileStorage:'Yes'});
+});
+
+test('prepared client contact is trimmed, phone-normalized, and invalid phones are omitted', () => {
+ const prepared=createPreparedBrief({name:'  A Client  ',mobile:'+91 90000 00001',company:'  Solar Co  '});
+ assert.deepEqual(prepared,{name:'A Client',company:'Solar Co',mobile:'9000000001'});
+ assert.equal(createPreparedBrief({mobile:'123'}).mobile,undefined);
 });

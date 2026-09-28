@@ -16,7 +16,7 @@ export const INTEREST_OPTIONS = [
   'Channel partner offices (CPOs)', 'Branches', 'Staff management',
   'Installation view', 'Installation commission view', 'Vendor commission page',
   'Channel partner commission view', 'Operations page', 'Dealer-based filtering',
-  'Finance', 'Attendance', 'MIS upload auto updater', 'Checklists', 'Document uploads'
+  'Finance', 'Attendance', 'Calendar', 'MIS upload auto updater', 'Checklists', 'Document uploads'
 ];
 
 const SINGLE_FIELDS = ['hasWebsite', 'teamSize', 'customerCount', 'liveCustomerCount', 'branches', 'partnerOffices', 'channelPartners', 'fileStorage', 'storageProvider'];
@@ -25,6 +25,12 @@ const CHOICES = {hasWebsite:YES_NO_OPTIONS, teamSize:TEAM_SIZE_OPTIONS, branches
 
 export function createPreparedBrief(draft) {
   const prepared = {};
+  for (const [key, limit] of [['name', 200], ['company', 300]]) {
+    const value = String(draft[key] || '').trim().replace(/[\r\n]+/g, ' ').slice(0, limit).trim();
+    if (value) prepared[key] = value;
+  }
+  const mobile = String(draft.mobile || '').trim().replace(/[\s()-]/g, '').replace(/^\+91/, '');
+  if (/^\d{10}$/.test(mobile)) prepared.mobile = mobile;
   for (const key of SINGLE_FIELDS) {
     const value = String(draft[key] || '').trim();
     if (!value) continue;
