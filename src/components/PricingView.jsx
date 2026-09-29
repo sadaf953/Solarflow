@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, ArrowRight } from 'lucide-react';
 import CustomizationEnquiryForm from './CustomizationEnquiryForm';
 import { readPreparedBriefId } from '../enquiries/brief';
+import { readSubmittedEnquiryId } from '../enquiries/reopen';
 
 const OPTIONS = [
     {
@@ -43,20 +44,21 @@ const OPTIONS = [
 export default function PricingView() {
     const [enquiryChoice, setEnquiryChoice] = useState(null);
     const [preparedBriefId, setPreparedBriefId] = useState(() => readPreparedBriefId(window.location.hash));
+    const [submittedEnquiryId, setSubmittedEnquiryId] = useState(() => readSubmittedEnquiryId(window.location.hash));
     useEffect(() => {
-        const update = () => setPreparedBriefId(readPreparedBriefId(window.location.hash));
+        const update = () => {setPreparedBriefId(readPreparedBriefId(window.location.hash));setSubmittedEnquiryId(readSubmittedEnquiryId(window.location.hash));};
         window.addEventListener('hashchange', update);
         return () => window.removeEventListener('hashchange', update);
     }, []);
     const choices = ['Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options'];
-    if (preparedBriefId) return (
+    if (preparedBriefId || submittedEnquiryId) return (
         <main className="mx-auto max-w-2xl py-5 sm:py-10 pb-16 space-y-5">
             <header className="px-1 sm:px-0">
                 <p className="sf-kicker">Your custom SolarFlow quotation</p>
                 <h1 className="mt-2 text-2xl sm:text-3xl font-black leading-tight text-stone-900">Tell us what your team needs</h1>
                 <p className="mt-2 text-sm leading-relaxed text-stone-600">We’ve started this form with the details shared with us. Enter the code, review the answers, and choose anything else you need. We’ll use your responses to prepare a quotation for you.</p>
             </header>
-            <CustomizationEnquiryForm key={preparedBriefId} preparedBriefId={preparedBriefId}/>
+            <CustomizationEnquiryForm key={preparedBriefId || submittedEnquiryId} preparedBriefId={preparedBriefId} submittedEnquiryId={submittedEnquiryId}/>
         </main>
     );
     return (

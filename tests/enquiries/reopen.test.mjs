@@ -1,6 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseSubmittedEnquiryNotes} from '../../src/enquiries/reopen.js';
+import {listAdminEnquiries, openSubmittedEnquiry, parseSubmittedEnquiryNotes, readSubmittedEnquiryId, submittedEnquiryLink} from '../../src/enquiries/reopen.js';
+
+const id = 'b391c08f-5c13-4b40-b73e-f1c7eec12205';
+
+test('a submitted enquiry gets its own shareable client link', () => {
+  const link = submittedEnquiryLink('https://example.com/', id);
+  assert.equal(link, `https://example.com/#/quote?enquiry=${id}`);
+  assert.equal(readSubmittedEnquiryId(new URL(link).hash), id);
+  assert.equal(readSubmittedEnquiryId('#/quote?enquiry=bad'), null);
+  assert.throws(() => submittedEnquiryLink('https://example.com', 'bad'));
+});
+
+test('the 0905 overview and client resume use separate database calls', async () => {
+  const calls = [];
+  const entry = {kind:'enquiry', id, name:'Client', mobile:'9000000683', company:'Solar', notes:''};
+  const client = {auth:{getSession:async()=>({data:{session:{}}})}, rpc:async(name,args)=>{
+    calls.push([name,args]);
+    return {data:name==='verify_preparation_pin' ? args.p_pin==='0905'
+      : name==='admin_enquiry_catalog' ? [entry] : entry, error:null};
+  }};
+  assert.deepEqual(await listAdminEnquiries(client,'0905'), [entry]);
+  assert.deepEqual(await openSubmittedEnquiry(client,id,'0683'), entry);
+  assert.deepEqual(calls.map(([name])=>name), ['verify_preparation_pin','admin_enquiry_catalog','open_submitted_enquiry']);
+  await assert.rejects(listAdminEnquiries(client,'0000'),/Incorrect preparation code/);
+  await assert.rejects(openSubmittedEnquiry(client,id,'9999'),/did not open/);
+});
 
 test('saved enquiry notes restore form selections and retain unfamiliar lines', () => {
   const fields = parseSubmittedEnquiryNotes([

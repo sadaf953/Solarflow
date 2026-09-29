@@ -3,8 +3,8 @@ import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy, LockKeyho
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
-import { CORE_DOCUMENT_OPTIONS, DATA_START_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, findOwnedPreparedBriefs, preparedBriefLink, unlockSavedBrief, verifyPreparationPin } from '../enquiries/brief';
-import { findSubmittedEnquiries, parseSubmittedEnquiryNotes, updateSubmittedEnquiry } from '../enquiries/reopen';
+import { CORE_DOCUMENT_OPTIONS, DATA_START_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, findOwnedPreparedBriefs, preparedBriefLink, unlockSavedBrief } from '../enquiries/brief';
+import { findSubmittedEnquiries, listAdminEnquiries, openSubmittedEnquiry, parseSubmittedEnquiryNotes, submittedEnquiryLink, updateSubmittedEnquiry } from '../enquiries/reopen';
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
@@ -26,12 +26,13 @@ const STORAGE_PRICING = [
 ];
 
 
-export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, allowPrepare = false}) {
+export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, submittedEnquiryId = null, allowPrepare = false}) {
     const [preparedBrief, setPreparedBrief] = useState(null);
     const [loadedEnquiry, setLoadedEnquiry] = useState(null);
     const [extraNoteLines, setExtraNoteLines] = useState([]);
     const locked = preparedBrief || {};
-    const needsUnlock = Boolean(preparedBriefId && !preparedBrief);
+    const clientQuoteLink = Boolean(preparedBriefId || submittedEnquiryId);
+    const needsUnlock = Boolean((preparedBriefId && !preparedBrief) || (submittedEnquiryId && !loadedEnquiry));
     const [name, setName] = useState('');
     const [mobile, setMobile] = useState('');
     const [company, setCompany] = useState('');
@@ -55,6 +56,11 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [technicianLogin, setTechnicianLogin] = useState('');
     const [prepareMode, setPrepareMode] = useState(false);
     const [prepareUnlocked, setPrepareUnlocked] = useState(false);
+    const [adminScreen, setAdminScreen] = useState('list');
+    const [adminCatalog, setAdminCatalog] = useState([]);
+    const [adminFilter, setAdminFilter] = useState('all');
+    const [adminSearch, setAdminSearch] = useState('');
+    const [selectedAdminItem, setSelectedAdminItem] = useState(null);
     const [preparePin, setPreparePin] = useState('');
     const [savedMatches, setSavedMatches] = useState([]);
     const [shareLink, setShareLink] = useState('');
@@ -75,7 +81,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const {showConfirm} = useGlobalPopup();
     const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || dataStart || branches || partnerOffices || channelPartners || installationTeams || stampStaffLogin || technicianLogin || fileStorage || storageProvider || interests.join('|') !== selectedInterest);
     const dirty = prepareMode ? Boolean(name || mobile || optionalDirty) : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
-    const guidedMobile = Boolean(preparedBriefId && preparedBrief && step === 'details');
+    const guidedMobile = Boolean(((preparedBriefId && preparedBrief) || (submittedEnquiryId && loadedEnquiry)) && step === 'details');
     const mobileSectionClass = index => guidedMobile && mobileQuestionStep !== index ? 'hidden sm:block' : '';
     const goToMobileQuestion = index => {
         setMobileQuestionStep(index);
@@ -187,7 +193,10 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         event.preventDefault();
         if (savingRef.current) return;
         savingRef.current = true; setSubmitting(true); setError('');
-        try { applyBrief(await unlockSavedBrief(supabase, preparedBriefId, accessCode)); }
+        try {
+            if (submittedEnquiryId) applyEnquiry(await openSubmittedEnquiry(supabase, submittedEnquiryId, accessCode));
+            else applyBrief(await unlockSavedBrief(supabase, preparedBriefId, accessCode));
+        }
         catch (err) { setError(err.message || 'Could not open this prepared form.'); }
         finally { savingRef.current = false; setSubmitting(false); }
     };
@@ -198,8 +207,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         savingRef.current = true; setSubmitting(true); setError('');
         try {
             if (preparePin === '0905') {
-                if (!await verifyPreparationPin(supabase, preparePin)) throw new Error('Incorrect preparation code.');
+                setAdminCatalog(await listAdminEnquiries(supabase, preparePin));
                 setPrepareUnlocked(true);
+                setAdminScreen('list');
             } else {
                 await findSavedMatches();
             }
@@ -238,6 +248,8 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
             }, preparePin);
             const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
             setShareLink(link); setShareCode(saved.code); setInviteCopied(false);
+            setAdminCatalog(current => [{kind:'prepared', id:saved.id, name:name.trim(), mobile:mobile.trim().replace(/[\s()-]/g, '').replace(/^\+91/, ''), company:company.trim(), created_at:new Date().toISOString(), can_share:true, expires_at:new Date(Date.now()+30*86400000).toISOString()}, ...current]);
+            setSelectedAdminItem(null); setAdminScreen('list');
             try { await navigator.clipboard?.writeText(link); } catch { /* The link remains selectable below. */ }
         } catch (err) { setError(err.message || 'Could not prepare the client form.'); }
         finally { savingRef.current = false; setSubmitting(false); }
@@ -247,6 +259,30 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         try { await navigator.clipboard.writeText(message); setInviteCopied(true); setError(''); }
         catch { setError('Could not copy the message. You can still copy the client link above.'); }
     };
+    const startNewPreparedForm = () => {
+        reset(); setPreparedBrief(null); setShareLink(''); setShareCode(''); setSelectedAdminItem(null); setAdminScreen('new');
+    };
+    const selectAdminItem = item => {
+        setSelectedAdminItem(item); setShareLink(''); setShareCode(''); setInviteCopied(false); setError('');
+    };
+    const shareAdminItem = async item => {
+        if (item.kind === 'prepared' && !item.can_share) {setError('This prepared link has expired or uses an older access code. Prepare a new form to share it again.'); return;}
+        const link = item.kind === 'prepared' ? preparedBriefLink(window.location.origin + window.location.pathname, item.id) : submittedEnquiryLink(window.location.origin + window.location.pathname, item.id);
+        setShareLink(link); setShareCode(item.mobile.slice(-4)); setInviteCopied(false); setError('');
+        try { await navigator.clipboard?.writeText(link); } catch { /* The link remains selectable below. */ }
+    };
+    const refreshAdminCatalog = async () => {
+        if (savingRef.current) return;
+        savingRef.current = true; setSubmitting(true); setError('');
+        try {
+            const latest = await listAdminEnquiries(supabase, preparePin);
+            setAdminCatalog(latest);
+            if (selectedAdminItem) setSelectedAdminItem(latest.find(item => item.id === selectedAdminItem.id && item.kind === selectedAdminItem.kind) || null);
+        } catch (err) { setError(err.message || 'Could not refresh forms.'); }
+        finally { savingRef.current = false; setSubmitting(false); }
+    };
+    const visibleAdminItems = adminCatalog.filter(item => (adminFilter === 'all' || item.kind === adminFilter)
+        && `${item.name} ${item.company || ''} ${item.mobile}`.toLowerCase().includes(adminSearch.trim().toLowerCase()));
     const fieldClass = 'sf-input mt-1 w-full min-h-11';
     const choiceField = (label, key, value, setValue, options) => <label className="block text-xs font-bold" key={key}>
         {label} {locked[key] && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
@@ -294,9 +330,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
             <div className="bg-stone-900 p-4 sm:p-6 md:p-7 text-white relative">
                 {isModal && step !== 'details' && <button type="button" onClick={requestClose} disabled={submitting} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20" aria-label="Close enquiry"><X size={18}/></button>}
                 {!prepareMode && step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
-                <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Your custom quotation form' : prepareMode ? 'Prepare a client form' : loadedEnquiry ? 'Saved enquiry' : preparedBriefId ? 'Your custom quotation' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
-                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Open your quotation form' : prepareMode && !prepareUnlocked ? 'Open a client form' : prepareMode ? 'Prepare the client form' : loadedEnquiry && step === 'details' ? 'Update the saved enquiry' : preparedBriefId && step === 'contact' ? 'Confirm your contact details' : preparedBriefId && step === 'details' ? 'Choose what you need' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
-                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the last four digits of your phone number to open the answers already prepared for you.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to prepare a new client form, or the last four digits of a client’s phone number to reopen a prepared form or submitted enquiry.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The completed fields will be locked in their form.' : loadedEnquiry && step === 'details' ? 'These details were saved earlier. Update them here, or leave them as they are.' : preparedBriefId && step === 'contact' ? 'Your name, phone number and any answers already prepared are filled in. Continue to request your quotation.' : preparedBriefId && step === 'details' ? 'Tap through these short sections. Answer only what you know, then send your requirements for a custom quotation.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
+                <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Your custom quotation form' : prepareMode && prepareUnlocked ? 'Form overview' : prepareMode ? 'Prepare a client form' : clientQuoteLink ? 'Your custom quotation' : loadedEnquiry ? 'Saved enquiry' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
+                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Open your quotation form' : prepareMode && !prepareUnlocked ? 'Open your form overview' : prepareMode && adminScreen === 'list' ? 'Prepared and submitted forms' : prepareMode ? 'Prepare a new client form' : clientQuoteLink && step === 'contact' ? 'Confirm your contact details' : clientQuoteLink && step === 'details' ? 'Finish your quotation form' : loadedEnquiry && step === 'details' ? 'Update the saved enquiry' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
+                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the last four digits of your phone number to open this form and finish your quotation request.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to see all prepared and submitted forms. You can also enter the last four digits of a phone number to open one directly.' : prepareMode && adminScreen === 'list' ? 'Review your forms, create a new one, or share a client link so they can finish their answers.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The completed fields will be locked in their form.' : clientQuoteLink && step === 'contact' ? 'Your name, phone number and any answers already prepared are filled in. Continue to request your quotation.' : clientQuoteLink && step === 'details' ? 'Your saved answers are here. Tap through the short sections, add anything missing, and send your requirements.' : loadedEnquiry && step === 'details' ? 'These details were saved earlier. Update them here, or leave them as they are.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
                 {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
             <div className="p-4 sm:p-6 md:p-7">
@@ -316,17 +352,45 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                     <label className="block text-xs font-bold">Four-digit code
                         <input required type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} autoComplete="off" value={preparePin} onChange={event => {setPreparePin(event.target.value.replace(/\D/g, '').slice(0, 4)); setSavedMatches([]);}} placeholder="Preparation code or last 4 phone digits" className={fieldClass}/>
                     </label>
-                    <button type="submit" disabled={submitting} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Checking…' : preparePin === '0905' ? 'Prepare new form' : 'Open saved form'}</button>
+                    <button type="submit" disabled={submitting} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Checking…' : preparePin === '0905' ? 'Open form overview' : 'Open saved form'}</button>
                     {preparePin === '0905' && <button type="button" disabled={submitting} onClick={findSavedInstead} className="w-full min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-bold text-stone-800 disabled:opacity-50">Open a saved form ending 0905</button>}
                     {savedMatches.length > 1 && <div className="space-y-2" role="group" aria-label="Saved client forms"><p className="text-xs text-stone-600">More than one client has these last four digits. Choose the correct form:</p>{savedMatches.map(match => <button key={`${match.kind}-${match.id}`} type="button" disabled={submitting} onClick={() => openSelectedMatch(match)} className="w-full min-h-11 rounded-xl border border-stone-200 px-4 py-3 text-left text-sm hover:border-orange-400 disabled:opacity-50"><strong className="block">{match.name}</strong><span className="text-stone-600">{match.company || 'No company given'} · {match.kind === 'enquiry' ? 'Submitted enquiry' : 'Prepared form'}</span></button>)}</div>}
-                </form> : !prepareMode && step === 'done' ? (
+                </form> : prepareMode && prepareUnlocked && adminScreen === 'list' ? (
+                    <div className="space-y-5">
+                        {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+                        <button type="button" onClick={startNewPreparedForm} className="w-full min-h-12 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white">+ Prepare a new client form</button>
+                        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter forms">
+                            {[['all','All'],['prepared','Prepared'],['enquiry','Submitted']].map(([value,label]) => <button key={value} type="button" onClick={() => setAdminFilter(value)} className={`min-h-11 rounded-full px-4 text-xs font-bold ${adminFilter === value ? 'bg-orange-500 text-stone-950' : 'bg-stone-100 text-stone-700'}`}>{label}</button>)}
+                        </div>
+                        <label className="block text-xs font-bold">Find a client
+                            <input type="search" value={adminSearch} onChange={event => setAdminSearch(event.target.value)} placeholder="Search name, company or phone" className={fieldClass}/>
+                        </label>
+                        <div className="flex items-center justify-between gap-3"><p className="text-xs text-stone-500">{visibleAdminItems.length} form{visibleAdminItems.length === 1 ? '' : 's'}</p><button type="button" onClick={refreshAdminCatalog} disabled={submitting} className="min-h-11 px-2 text-xs font-bold text-orange-700 underline disabled:opacity-50">{submitting ? 'Refreshing…' : 'Refresh list'}</button></div>
+                        <div className="max-h-96 overflow-y-auto space-y-2" aria-label="Client forms">
+                            {visibleAdminItems.map(item => <button key={`${item.kind}-${item.id}`} type="button" onClick={() => selectAdminItem(item)} className={`w-full rounded-xl border p-3 text-left ${selectedAdminItem?.id === item.id && selectedAdminItem?.kind === item.kind ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-orange-300'}`}>
+                                <span className="flex items-start justify-between gap-2"><strong className="text-sm text-stone-900">{item.name}</strong><span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${item.kind === 'enquiry' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{item.kind === 'enquiry' ? 'Submitted' : item.can_share ? 'Prepared' : 'Expired'}</span></span>
+                                <span className="mt-1 block text-xs text-stone-600">{item.company || 'No company'} · {item.mobile || 'No phone saved'}</span>
+                                <span className="mt-1 block text-[11px] text-stone-500">{new Date(item.created_at).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'})}</span>
+                            </button>)}
+                            {!visibleAdminItems.length && <p className="rounded-xl bg-stone-50 p-4 text-sm text-stone-600">No forms match this view.</p>}
+                        </div>
+                        {selectedAdminItem && <div className="space-y-3 rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                            <div><p className="text-xs font-bold text-orange-800">{selectedAdminItem.kind === 'enquiry' ? 'Submitted enquiry' : 'Prepared form'}</p><h4 className="mt-1 text-lg font-black">{selectedAdminItem.name}</h4><p className="text-sm text-stone-700">{selectedAdminItem.company || 'No company'} · {selectedAdminItem.mobile || 'No phone saved'}</p></div>
+                            {selectedAdminItem.kind === 'enquiry' && <pre className="max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 font-sans text-xs text-stone-700">{selectedAdminItem.notes || 'Contact details saved; the client has not added extra answers yet.'}</pre>}
+                            {selectedAdminItem.kind === 'prepared' && <p className="text-xs text-stone-600">{selectedAdminItem.can_share ? 'The client can open this link and complete the remaining answers.' : 'This link can no longer be opened with the phone code.'}</p>}
+                            <button type="button" disabled={selectedAdminItem.kind === 'prepared' && !selectedAdminItem.can_share} onClick={() => shareAdminItem(selectedAdminItem)} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">Copy client link</button>
+                        </div>}
+                        {shareLink && <div className="space-y-3 rounded-xl bg-emerald-50 p-3" role="status"><p className="text-sm font-bold text-emerald-800">Client link ready to share</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass}/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs text-stone-600">The client enters their last four phone digits ({shareCode}) and completes their form.</p></div>}
+                    </div>
+                ) : !prepareMode && step === 'done' ? (
                     <div className="text-center space-y-4 py-4" role="status">
                         <CheckCircle2 className="mx-auto w-10 h-10 text-emerald-600"/>
-                        <p className="text-sm">{preparedBriefId ? 'Your quotation request is saved. We’ll contact you to discuss the right setup.' : 'Your enquiry is saved with contact number'} {!preparedBriefId && <strong>{mobile}</strong>}</p>
-                        {!preparedBriefId && <button type="button" onClick={isModal ? requestClose : reset} className="sf-btn-secondary">{isModal ? 'Done' : 'Submit another enquiry'}</button>}
+                        <p className="text-sm">{clientQuoteLink ? 'Your quotation request is saved. We’ll contact you to discuss the right setup.' : 'Your enquiry is saved with contact number'} {!clientQuoteLink && <strong>{mobile}</strong>}</p>
+                        {!clientQuoteLink && <button type="button" onClick={isModal ? requestClose : reset} className="sf-btn-secondary">{isModal ? 'Done' : 'Submit another enquiry'}</button>}
                     </div>
                 ) : (
                     <form onSubmit={prepareMode ? event => {event.preventDefault(); makeShareLink();} : handleSubmit} className="space-y-5">
+                        {prepareMode && prepareUnlocked && <button type="button" onClick={() => setAdminScreen('list')} className="min-h-11 text-sm font-bold text-orange-700 underline">← Back to all forms</button>}
                         {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex gap-2"><AlertCircle size={16} className="shrink-0"/>{error}</p>}
                         <fieldset disabled={submitting} className="space-y-5">
                             {step === 'contact' && !prepareMode ? (
@@ -454,7 +518,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                 {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-3" role="status"><p className="text-sm font-bold text-emerald-800">Ready to send for a custom quotation</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs text-stone-600">Your client opens the link and enters the last four digits of their phone number ({shareCode}).</p></div>}
                             </> : <button type="submit" className={`${guidedMobile && mobileQuestionStep < 5 ? 'hidden sm:flex' : 'flex'} w-full min-h-12 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm items-center justify-center gap-2 disabled:opacity-50`} disabled={submitting}>
                                 {submitting ? <LoaderCircle size={16} className="animate-spin"/> : <ArrowRight size={16}/>}
-                                {submitting ? 'Saving…' : preparedBriefId && step === 'contact' ? 'Request quotation and continue' : preparedBriefId ? 'Send my requirements' : step === 'contact' ? 'Submit enquiry' : 'Save additional details'}
+                                {submitting ? 'Saving…' : clientQuoteLink && step === 'contact' ? 'Request quotation and continue' : clientQuoteLink ? 'Send my requirements' : step === 'contact' ? 'Submit enquiry' : 'Save additional details'}
                             </button>}
                         </fieldset>
                     </form>

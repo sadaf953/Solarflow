@@ -3,6 +3,7 @@ import {ensureThreeDemoDrivers} from './demo/drivers';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { readPreparedBriefId } from './enquiries/brief';
+import { readSubmittedEnquiryId } from './enquiries/reopen';
 import {ensureThreeDemoVendors,demoVendorTarget} from './demo/vendors';
 import LoginScreen from './components/LoginScreen';
 import BrandMark from './components/BrandMark';
@@ -55,10 +56,10 @@ export default function App(){
  const [user,setUser]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
  const [recoveryMode, setRecoveryMode]=useState(false);
  const [publicView,setPublicView]=useState(()=>typeof window!=='undefined'&&(/^#\/(plans|quote)(\?|$)/.test(window.location.hash))?'plans':null);
- const [clientQuoteLink,setClientQuoteLink]=useState(()=>typeof window!=='undefined'&&Boolean(readPreparedBriefId(window.location.hash)));
+ const [clientQuoteLink,setClientQuoteLink]=useState(()=>typeof window!=='undefined'&&Boolean(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)));
  useEffect(()=>{
   const sync=()=>{
-   setClientQuoteLink(Boolean(readPreparedBriefId(window.location.hash)));
+   setClientQuoteLink(Boolean(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)));
    setPublicView(/^#\/(plans|quote)(\?|$)/.test(window.location.hash)?'plans':null);
   };
   window.addEventListener('hashchange',sync);
@@ -74,7 +75,7 @@ export default function App(){
    try{
     // A shared quotation link always opens its client form, even in a browser
     // that previously entered the demo.
-    if(readPreparedBriefId(window.location.hash))return;
+    if(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash))return;
     const {data}=await supabase.auth.getSession();
     if(!data?.session)return;
     // Fresh visit: show the landing page even though a session is stored.
