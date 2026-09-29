@@ -23,7 +23,7 @@ const OPTIONS = [
             'Separate logins for vendors, stamp staff and technicians.',
             'Installation and operations pages, with dealer-based filtering.',
             'Commission views for installations, vendors and channel partners.',
-            'Quotation and bill makers, delivery challans, DISCOM submission auto print and feasibility document automation.',
+            'Quotation and bill makers, delivery challans, delivery truck tally checklists and feasibility document automation.',
             'Upload MIS files to automatically update project information.',
             'Track requirements with checklists or upload documents to keep them on record.',
             'Manage branches, dealers, channel partner offices (CPOs) and their staff.'
@@ -82,7 +82,7 @@ export default function PricingView() {
                 <div className="max-w-2xl">
                     <p className="sf-kicker">Tools only</p>
                     <h2 className="mt-2 text-xl font-black text-stone-900">Don’t need a CRM? Choose just the tools.</h2>
-                    <p className="mt-2 text-sm leading-relaxed text-stone-600">Quotation maker, BOM, DISCOM submission auto print, feasibility documents, MIS upload auto updater and more. Tell us which tools you’re interested in.</p>
+                    <p className="mt-2 text-sm leading-relaxed text-stone-600">Quotation maker, BOM, delivery truck tally checklist, feasibility documents, MIS upload auto updater and more. Tell us which tools you’re interested in.</p>
                 </div>
                 <button type="button" onClick={() => setEnquiryChoice('Tools only — no CRM')} className="sf-btn-primary min-h-11 w-full sm:w-auto shrink-0">Interested in tools <ArrowRight className="w-4 h-4 inline ml-1"/></button>
             </section>

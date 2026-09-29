@@ -3,11 +3,15 @@ import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy, LockKeyho
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
-import { CORE_DOCUMENT_OPTIONS, DOCUMENT_OPTIONS, INTEREST_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, preparedBriefLink, unlockSavedBrief, verifyPreparationPin } from '../enquiries/brief';
+import { CORE_DOCUMENT_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, preparedBriefLink, unlockSavedBrief, verifyPreparationPin } from '../enquiries/brief';
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
-const OTHER_INTEREST_OPTIONS = INTEREST_OPTIONS.filter(option => !DOCUMENT_OPTIONS.includes(option) && !['Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options', 'Tools only — no CRM', 'Checklists', 'Document uploads', 'Channel partner offices (CPOs)', 'Branches', 'Customer tracking', 'Operations page', 'Dealer-based filtering', 'Warranty tracking', 'Staff management', 'Dealers', 'Finance'].includes(option));
+const OTHER_INTEREST_OPTIONS = [
+    'Inventory', 'Vendor login', 'Stamp staff login', 'Technician login',
+    'Installation view', 'Installation commission view', 'Vendor commission page',
+    'Channel partner commission view', 'Attendance', 'Calendar', 'MIS upload auto updater'
+];
 const DOCUMENT_COPY = {
     'Feasibility document maker':['Bank feasibility document','Prepare the document for bank submission.'],
     'DISCOM submission document maker':['DISCOM submission document','Prepare the document for upload to the PM Surya Ghar portal.'],
@@ -353,6 +357,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                     </fieldset>
                                     <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">
                                         <legend className="px-2 text-sm font-black">5 · Optional document makers</legend>
+                                        <p className="text-xs text-stone-500">The delivery truck tally checklist shows the total quantity of each item to load onto the truck.</p>
                                         {documentChoices(OPTIONAL_DOCUMENT_OPTIONS)}
                                     </fieldset>
                                     <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">

@@ -1,6 +1,6 @@
 export const DOCUMENT_OPTIONS = [
   'Quotation maker', 'Bill / invoice maker', 'BOM maker', 'Delivery challan maker',
-  'Gate pass maker', 'DISCOM submission document maker', 'DISCOM submission auto print',
+  'Gate pass maker', 'DISCOM submission document maker', 'Delivery truck tally checklist',
   'Feasibility document maker'
 ];
 export const CORE_DOCUMENT_OPTIONS = ['Feasibility document maker', 'DISCOM submission document maker', 'Quotation maker', 'BOM maker'];
