@@ -28,8 +28,7 @@ export async function listAdminEnquiries(client, pin) {
   if (error) throw error;
   if (!Array.isArray(data)) throw new Error('Forms could not be loaded.');
   return data.filter(item => item && ['prepared', 'enquiry'].includes(item.kind)
-    && UUID.test(item.id) && (item.kind === 'prepared' ||
-      (typeof item.name === 'string' && PHONE.test(item.mobile))))
+    && UUID.test(item.id) && (item.kind === 'prepared' || typeof item.name === 'string'))
     .map(item => item.kind === 'prepared' ? {
       ...item,
       name:item.name || 'Older prepared form',
@@ -44,7 +43,7 @@ export async function openSubmittedEnquiry(client, id, phoneCode) {
   await ensureSession(client);
   const {data, error} = await client.rpc('open_submitted_enquiry', {p_id:id, p_phone_code:phoneCode});
   if (error) throw error;
-  if (!data || data.id !== id || !PHONE.test(data.mobile) || !data.mobile.endsWith(phoneCode))
+  if (!data || data.id !== id || !PHONE.test(data.mobile))
     throw new Error('That code did not open this enquiry. Check the access code sent with your link.');
   return data;
 }
@@ -89,15 +88,16 @@ export async function findSubmittedEnquiries(client, phoneSuffix) {
   if (error) throw error;
   if (!Array.isArray(data)) throw new Error('Submitted enquiries could not be loaded.');
   return data.filter(item => item && UUID.test(item.id) && typeof item.name === 'string'
-    && typeof item.mobile === 'string' && item.mobile.endsWith(phoneSuffix))
+    && typeof item.mobile === 'string' && item.access_code === phoneSuffix)
     .map(item => ({...item, kind:'enquiry'}));
 }
 
 export async function updateSubmittedEnquiry(client, enquiry, payload, extraLines = []) {
   if (!UUID.test(enquiry?.id) || !/^\d{4}$/.test(enquiry?.suffix)) throw new Error('This saved enquiry cannot be updated.');
   const notes = [payload.notes, ...extraLines].filter(Boolean).join('\n');
-  const {data, error} = await client.rpc('update_submitted_enquiry', {
-    p_id:enquiry.id, p_phone_suffix:enquiry.suffix,
+  const {data, error} = await client.rpc('finalize_client_enquiry', {
+    p_id:enquiry.id, p_code:enquiry.suffix,
+    p_name:payload.name, p_mobile:payload.mobile_number,
     p_company:payload.company_name, p_version:payload.version_type, p_notes:notes
   });
   if (error) throw error;

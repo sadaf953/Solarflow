@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, useId } from 'react';
+import { useState, useRef, useEffect, useId, useCallback } from 'react';
 import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
 import { CORE_DOCUMENT_OPTIONS, DATA_START_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, findOwnedPreparedBriefs, preparedBriefLink, unlockSavedBrief } from '../enquiries/brief';
 import { findSubmittedEnquiries, listAdminEnquiries, openSubmittedEnquiry, parseSubmittedEnquiryNotes, submittedEnquiryLink, updateSubmittedEnquiry } from '../enquiries/reopen';
+import { readClientFormDraft, saveClientFormDraft } from '../enquiries/draft';
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
@@ -24,6 +25,15 @@ const STORAGE_PRICING = [
     {name:'Google Workspace business account', price:'From ₹99/user/month on an annual plan; 20 GB pooled per user', detail:'Monthly billing starts at ₹120/user/month.', href:'https://workspace.google.com/intl/en_in/business/'},
     {name:'Supabase Storage', price:'1 GB free; Pro from $25/month with 100 GB included', detail:'Extra storage on Pro: $0.0213/GB/month.', href:'https://supabase.com/pricing'}
 ];
+const DRAFT_TEXT_FIELDS = ['name','mobile','company','callDate','callTime','hasWebsite','teamSize',
+    'customerCount','liveCustomerCount','otherSoftware','dataStart','fileStorage','storageProvider',
+    'branches','partnerOffices','channelPartners','installationTeams','stampStaffLogin',
+    'technicianLogin','customRequest'];
+const normalizeDraftAnswers = values => ({
+    ...Object.fromEntries(DRAFT_TEXT_FIELDS.map(key => [key, typeof values[key] === 'string' ? values[key] : ''])),
+    interests:Array.isArray(values.interests) ? values.interests : [],
+    software:Array.isArray(values.software) ? values.software : []
+});
 
 
 export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, submittedEnquiryId = null, allowPrepare = false, startInPrepareMode = false}) {
@@ -70,18 +80,27 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [accessCode, setAccessCode] = useState('');
     const [remarks, setRemarks] = useState('');
     const [step, setStep] = useState('contact');
+    const [draftAccess, setDraftAccess] = useState(null);
+    const [draftStatus, setDraftStatus] = useState('saved');
     const [mobileQuestionStep, setMobileQuestionStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const identityRef = useRef(null);
     const savingRef = useRef(false);
+    const lastSavedDraftRef = useRef('');
+    const draftQueueRef = useRef(Promise.resolve());
     const detailsRef = useRef(null);
     const formSectionRef = useRef(null);
     const nameRef = useRef(null);
     const formId = useId();
     const {showConfirm} = useGlobalPopup();
     const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || dataStart || branches || partnerOffices || channelPartners || installationTeams || stampStaffLogin || technicianLogin || fileStorage || storageProvider || interests.join('|') !== selectedInterest);
-    const dirty = prepareMode ? Boolean(name || mobile || optionalDirty) : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
+    const draftAnswers = normalizeDraftAnswers({name, mobile, company, callDate, callTime, interests, hasWebsite, teamSize,
+        customerCount, liveCustomerCount, software, otherSoftware, dataStart, fileStorage,
+        storageProvider, branches, partnerOffices, channelPartners, installationTeams,
+        stampStaffLogin, technicianLogin, customRequest:remarks});
+    const draftSnapshot = JSON.stringify(draftAnswers);
+    const dirty = draftAccess ? draftSnapshot !== lastSavedDraftRef.current : prepareMode ? Boolean(name || mobile || optionalDirty) : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
     const guidedMobile = Boolean(((preparedBriefId && preparedBrief) || (submittedEnquiryId && loadedEnquiry)) && step === 'details');
     const mobileSectionClass = index => guidedMobile && mobileQuestionStep !== index ? 'hidden sm:block' : '';
     const goToMobileQuestion = index => {
@@ -110,9 +129,35 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         return () => window.removeEventListener('beforeunload', warn);
     }, [dirty]);
 
+    const persistDraft = useCallback((snapshot = draftSnapshot) => {
+        if (!draftAccess || snapshot === lastSavedDraftRef.current) return draftQueueRef.current;
+        setDraftStatus('saving');
+        const {kind, id, code} = draftAccess;
+        const next = draftQueueRef.current.catch(() => {}).then(async () => {
+            if (snapshot === lastSavedDraftRef.current) return;
+            await saveClientFormDraft(supabase, kind, id, code, JSON.parse(snapshot));
+            lastSavedDraftRef.current = snapshot;
+            setDraftStatus('saved');
+        }).catch(() => {setDraftStatus('error'); return false;});
+        draftQueueRef.current = next;
+        return next;
+    }, [draftAccess, draftSnapshot]);
+    useEffect(() => {
+        if (!draftAccess || draftSnapshot === lastSavedDraftRef.current || step === 'done') return;
+        setDraftStatus('saving');
+        const timer = window.setTimeout(() => persistDraft(draftSnapshot), 550);
+        return () => window.clearTimeout(timer);
+    }, [draftAccess, draftSnapshot, step, persistDraft]);
+    useEffect(() => {
+        if (!draftAccess) return;
+        const flush = () => {if (document.visibilityState === 'hidden') persistDraft();};
+        document.addEventListener('visibilitychange', flush);
+        return () => document.removeEventListener('visibilitychange', flush);
+    }, [draftAccess, persistDraft]);
+
     const requestClose = async () => {
         if (savingRef.current) return;
-        if (dirty) {
+        if (dirty && !draftAccess) {
             const message = prepareMode ? 'Your prepared answers have not been copied into a link.' : step === 'contact' ? 'Your name and phone number have not been saved.' : 'Your contact details are saved. These optional details have not been saved.';
             if (!await showConfirm(message, {title:'Close this form?', confirmLabel:'Close form', cancelLabel:'Keep editing', type:'warning'})) return;
         }
@@ -139,6 +184,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         savingRef.current = true;
         setSubmitting(true);
         try {
+            if (draftAccess && await persistDraft() === false) throw new Error('Your changes could not be saved. Please check your connection and try again.');
             if (loadedEnquiry) await updateSubmittedEnquiry(supabase, loadedEnquiry, payload, extraNoteLines);
             else await saveEnquiryStep(supabase, payload, identityRef.current, {contactOnly});
             setStep(contactOnly ? 'details' : 'done');
@@ -156,11 +202,13 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setPartnerOffices(initialAnswers.partnerOffices || ''); setChannelPartners(initialAnswers.channelPartners || '');
         setInstallationTeams(initialAnswers.installationTeams || ''); setStampStaffLogin(initialAnswers.stampStaffLogin || ''); setTechnicianLogin(initialAnswers.technicianLogin || '');
         setError(''); identityRef.current = null; setLoadedEnquiry(null); setExtraNoteLines([]); setMobileQuestionStep(0); setStep('contact');
+        setDraftAccess(null); lastSavedDraftRef.current = '';
     };
-    const applyBrief = brief => {
+    const applyBrief = (brief, access = null) => {
+        const savedAnswers = normalizeDraftAnswers({...brief, interests:[...new Set([...(brief.interests || []), ...(selectedInterest ? [selectedInterest] : [])])]});
         setPreparedBrief(brief);
         setName(brief.name || ''); setMobile(brief.mobile || ''); setCompany(brief.company || '');
-        setInterests(current => [...new Set([...(brief.interests || []), ...current])]);
+        setInterests(savedAnswers.interests);
         setHasWebsite(brief.hasWebsite || ''); setTeamSize(brief.teamSize || '');
         setCustomerCount(brief.customerCount || ''); setLiveCustomerCount(brief.liveCustomerCount || '');
         setSoftware(brief.software || []); setOtherSoftware(brief.otherSoftware || ''); setBranches(brief.branches || '');
@@ -168,20 +216,26 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setFileStorage(brief.fileStorage || ''); setStorageProvider(brief.storageProvider || '');
         setPartnerOffices(brief.partnerOffices || ''); setChannelPartners(brief.channelPartners || '');
         setInstallationTeams(brief.installationTeams || ''); setStampStaffLogin(brief.stampStaffLogin || ''); setTechnicianLogin(brief.technicianLogin || '');
+        setCallDate(brief.callDate || ''); setCallTime(brief.callTime || '');
+        lastSavedDraftRef.current = JSON.stringify(savedAnswers);
+        setDraftAccess(access); setDraftStatus('saved');
         setPrepareMode(false); setPrepareUnlocked(false); setPreparePin(''); setSavedMatches([]); setAccessCode(''); setMobileQuestionStep(0);
     };
-    const applyEnquiry = enquiry => {
+    const applyEnquiry = (enquiry, access = null) => {
         const parsed = parseSubmittedEnquiryNotes(enquiry.notes);
-        setPreparedBrief(null); setLoadedEnquiry({id:enquiry.id, suffix:enquiry.mobile.slice(-4), version:enquiry.version, selectedInterest:parsed.selectedInterest || ''});
-        setExtraNoteLines(parsed.extraLines); setName(enquiry.name); setMobile(enquiry.mobile); setCompany(enquiry.company || '');
-        setCallDate(parsed.callDate || ''); setCallTime(parsed.callTime || ''); setInterests(parsed.interests);
-        setHasWebsite(parsed.hasWebsite || ''); setTeamSize(parsed.teamSize || '');
-        setCustomerCount(parsed.customerCount || ''); setLiveCustomerCount(parsed.liveCustomerCount || '');
-        setSoftware(parsed.software); setOtherSoftware(parsed.otherSoftware || ''); setDataStart(parsed.dataStart || '');
-        setFileStorage(parsed.fileStorage || ''); setStorageProvider(parsed.storageProvider || '');
-        setBranches(parsed.branches || ''); setPartnerOffices(parsed.partnerOffices || ''); setChannelPartners(parsed.channelPartners || '');
-        setInstallationTeams(parsed.installationTeams || ''); setStampStaffLogin(parsed.stampStaffLogin || ''); setTechnicianLogin(parsed.technicianLogin || '');
-        setRemarks(parsed.remarks || ''); setPrepareMode(false); setPrepareUnlocked(false); setSavedMatches([]); setError(''); setStep('details');
+        const answers = {...parsed, name:enquiry.name, mobile:enquiry.mobile, company:enquiry.company || '', customRequest:parsed.remarks || '', ...(enquiry.draft || {})};
+        const savedAnswers = normalizeDraftAnswers(answers);
+        setPreparedBrief(null); setLoadedEnquiry({id:enquiry.id, suffix:access?.code || enquiry.mobile.slice(-4), version:enquiry.version, selectedInterest:parsed.selectedInterest || ''});
+        setExtraNoteLines(parsed.extraLines); setName(answers.name || ''); setMobile(answers.mobile || ''); setCompany(answers.company || '');
+        setCallDate(answers.callDate || ''); setCallTime(answers.callTime || ''); setInterests(answers.interests || []);
+        setHasWebsite(answers.hasWebsite || ''); setTeamSize(answers.teamSize || '');
+        setCustomerCount(answers.customerCount || ''); setLiveCustomerCount(answers.liveCustomerCount || '');
+        setSoftware(answers.software || []); setOtherSoftware(answers.otherSoftware || ''); setDataStart(answers.dataStart || '');
+        setFileStorage(answers.fileStorage || ''); setStorageProvider(answers.storageProvider || '');
+        setBranches(answers.branches || ''); setPartnerOffices(answers.partnerOffices || ''); setChannelPartners(answers.channelPartners || '');
+        setInstallationTeams(answers.installationTeams || ''); setStampStaffLogin(answers.stampStaffLogin || ''); setTechnicianLogin(answers.technicianLogin || '');
+        setRemarks(answers.customRequest || ''); setPrepareMode(false); setPrepareUnlocked(false); setSavedMatches([]); setError(''); setStep('details');
+        lastSavedDraftRef.current = JSON.stringify(savedAnswers); setDraftAccess(access); setDraftStatus('saved');
     };
     const findSavedMatches = async () => {
         const [prepared, submitted] = await Promise.all([findOwnedPreparedBriefs(supabase, preparePin), findSubmittedEnquiries(supabase, preparePin)]);
@@ -195,8 +249,15 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         if (savingRef.current) return;
         savingRef.current = true; setSubmitting(true); setError('');
         try {
-            if (submittedEnquiryId) applyEnquiry(await openSubmittedEnquiry(supabase, submittedEnquiryId, accessCode));
-            else applyBrief(await unlockSavedBrief(supabase, preparedBriefId, accessCode));
+            if (submittedEnquiryId) {
+                const enquiry = await openSubmittedEnquiry(supabase, submittedEnquiryId, accessCode);
+                enquiry.draft = await readClientFormDraft(supabase, 'enquiry', submittedEnquiryId, accessCode);
+                applyEnquiry(enquiry, {kind:'enquiry', id:submittedEnquiryId, code:accessCode});
+            } else {
+                const brief = await unlockSavedBrief(supabase, preparedBriefId, accessCode);
+                const draft = await readClientFormDraft(supabase, 'prepared', preparedBriefId, accessCode);
+                applyBrief({...brief, ...draft}, {kind:'prepared', id:preparedBriefId, code:accessCode});
+            }
         }
         catch (err) { setError(err.message || 'Could not open this prepared form.'); }
         finally { savingRef.current = false; setSubmitting(false); }
@@ -218,8 +279,14 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         finally { savingRef.current = false; setSubmitting(false); }
     };
     const openSavedMatch = async match => {
-        if (match.kind === 'enquiry') applyEnquiry(match);
-        else applyBrief(await unlockSavedBrief(supabase, match.id, preparePin));
+        if (match.kind === 'enquiry') {
+            const draft = await readClientFormDraft(supabase, 'enquiry', match.id, preparePin);
+            applyEnquiry({...match, draft}, {kind:'enquiry', id:match.id, code:preparePin});
+        } else {
+            const brief = await unlockSavedBrief(supabase, match.id, preparePin);
+            const draft = await readClientFormDraft(supabase, 'prepared', match.id, preparePin);
+            applyBrief({...brief, ...draft}, {kind:'prepared', id:match.id, code:preparePin});
+        }
     };
     const openSelectedMatch = async match => {
         if (savingRef.current) return;
@@ -273,7 +340,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const shareAdminItem = async item => {
         if (item.kind === 'prepared' && !item.can_share) {setError(item.access_status === 'paused' ? 'This form is paused after too many incorrect codes. Refresh the list and share it after the pause ends.' : 'This prepared link has expired or uses an older access code. Prepare a new form to share it again.'); return;}
         const link = item.kind === 'prepared' ? preparedBriefLink(window.location.origin + window.location.pathname, item.id) : submittedEnquiryLink(window.location.origin + window.location.pathname, item.id);
-        setShareLink(link); setShareCode(item.mobile.slice(-4)); setLinkCopied(false); setInviteCopied(false); setError('');
+        setShareLink(link); setShareCode(item.access_code || item.mobile.slice(-4)); setLinkCopied(false); setInviteCopied(false); setError('');
         try { await navigator.clipboard.writeText(link); setLinkCopied(true); } catch { /* The link remains selectable below. */ }
     };
     const refreshAdminCatalog = async () => {
@@ -331,7 +398,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         <section ref={formSectionRef} className="w-full bg-white rounded-2xl sm:rounded-3xl border border-stone-200 shadow-sm overflow-hidden text-stone-900 scroll-mt-20" aria-labelledby={`${formId}-title`}>
             <div className="bg-stone-900 p-4 sm:p-6 md:p-7 text-white relative">
                 {isModal && step !== 'details' && <button type="button" onClick={requestClose} disabled={submitting} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20" aria-label="Close enquiry"><X size={18}/></button>}
-                {!prepareMode && step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
+                {!prepareMode && step === 'details' && !clientQuoteLink && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
                 <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Your custom quotation form' : prepareMode && prepareUnlocked ? 'Form overview' : prepareMode ? 'Prepare a client form' : clientQuoteLink ? 'Your custom quotation' : loadedEnquiry ? 'Saved enquiry' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
                 <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Open your quotation form' : prepareMode && !prepareUnlocked ? 'Open your form overview' : prepareMode && adminScreen === 'list' ? 'Prepared and submitted forms' : prepareMode ? 'Prepare a new client form' : clientQuoteLink && step === 'contact' ? 'Confirm your contact details' : clientQuoteLink && step === 'details' ? 'Finish your quotation form' : loadedEnquiry && step === 'details' ? 'Update the saved enquiry' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
                 <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the access code sent with your link to open your form.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to see all prepared and submitted forms. You can also enter a client’s four-digit code to open their form directly.' : prepareMode && adminScreen === 'list' ? 'Review your forms, create a new one, or share a client link so they can finish their answers.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The client can review and change any field.' : clientQuoteLink && step === 'contact' ? 'Your name, phone number and any answers already prepared are filled in. Review or change them, then continue to request your quotation.' : clientQuoteLink && step === 'details' ? 'Your saved answers are here. Tap through the short sections, change anything you need, and send your requirements.' : loadedEnquiry && step === 'details' ? 'These details were saved earlier. Update them here, or leave them as they are.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
@@ -379,7 +446,8 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                         {selectedAdminItem && <div className="space-y-3 rounded-2xl border border-orange-200 bg-orange-50 p-4">
                             <div><p className="text-xs font-bold text-orange-800">{selectedAdminItem.kind === 'enquiry' ? 'Submitted enquiry' : 'Prepared form'}</p><h4 className="mt-1 text-lg font-black">{selectedAdminItem.name}</h4><p className="text-sm text-stone-700">{selectedAdminItem.company || 'No company'} · {selectedAdminItem.mobile || 'No phone saved'}</p></div>
                             {selectedAdminItem.kind === 'enquiry' && <pre className="max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-xl bg-white p-3 font-sans text-xs text-stone-700">{selectedAdminItem.notes || 'Contact details saved; the client has not added extra answers yet.'}</pre>}
-                            {selectedAdminItem.kind === 'prepared' && <p className="text-xs text-stone-600">{selectedAdminItem.access_status === 'paused' ? 'This link is paused after too many incorrect codes. It can be opened again after the pause ends.' : selectedAdminItem.can_share ? `Check this is the client’s number ending ${selectedAdminItem.mobile.slice(-4)} before sharing. They can then finish their answers.` : 'This link can no longer be opened with the phone code.'}</p>}
+                            {selectedAdminItem.draft_updated_at && <p className="text-xs text-emerald-800">Client changes saved {new Date(selectedAdminItem.draft_updated_at).toLocaleString('en-IN')}.</p>}
+                            {selectedAdminItem.kind === 'prepared' && <p className="text-xs text-stone-600">{selectedAdminItem.access_status === 'paused' ? 'This link is paused after too many incorrect codes. It can be opened again after the pause ends.' : selectedAdminItem.can_share ? `Share the link and access code ${selectedAdminItem.access_code}. They can then finish their answers.` : 'This link can no longer be opened with the phone code.'}</p>}
                             <button type="button" disabled={selectedAdminItem.kind === 'prepared' && !selectedAdminItem.can_share} onClick={() => shareAdminItem(selectedAdminItem)} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">Copy client link</button>
                         </div>}
                         {shareLink && <div className="space-y-3 rounded-xl bg-emerald-50 p-3" role="status"><p className="text-sm font-bold text-emerald-800">Form saved · client link ready to share</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass}/></label><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={copyShareLink} className="min-h-11 rounded-xl bg-emerald-800 px-4 py-3 text-sm font-bold text-white">{linkCopied ? 'Link copied' : 'Copy link'}</button><button type="button" onClick={copyInviteMessage} className="min-h-11 rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button></div><p className="text-xs font-semibold text-stone-700">Access code: {shareCode}. Check the client’s saved phone number above before sending.</p></div>}
@@ -388,12 +456,14 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                     <div className="text-center space-y-4 py-4" role="status">
                         <CheckCircle2 className="mx-auto w-10 h-10 text-emerald-600"/>
                         <p className="text-sm">{clientQuoteLink ? 'Your quotation request is saved. We’ll contact you to discuss the right setup.' : 'Your enquiry is saved with contact number'} {!clientQuoteLink && <strong>{mobile}</strong>}</p>
+                        {clientQuoteLink && <button type="button" onClick={() => setStep('details')} className="sf-btn-secondary">Edit my answers</button>}
                         {!clientQuoteLink && <button type="button" onClick={isModal ? requestClose : reset} className="sf-btn-secondary">{isModal ? 'Done' : 'Submit another enquiry'}</button>}
                     </div>
                 ) : (
                     <form onSubmit={prepareMode ? event => {event.preventDefault(); makeShareLink();} : handleSubmit} className="space-y-5">
                         {prepareMode && prepareUnlocked && <button type="button" onClick={() => setAdminScreen('list')} className="min-h-11 text-sm font-bold text-orange-700 underline">← Back to all forms</button>}
                         {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex gap-2"><AlertCircle size={16} className="shrink-0"/>{error}</p>}
+                        {draftAccess && <p role="status" className={`text-xs ${draftStatus === 'error' ? 'text-rose-700' : 'text-stone-600'}`}>{draftStatus === 'error' ? 'Could not save changes. Check your connection and keep this page open.' : draftStatus === 'saving' || dirty ? 'Saving changes automatically…' : 'All changes saved automatically. You can reopen this link to edit them.'}</p>}
                         <fieldset disabled={submitting} className="space-y-5">
                             {step === 'contact' && !prepareMode ? (
                                 <div className="space-y-4">
@@ -431,9 +501,17 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                             <button type="submit" className="mt-3 min-h-11 w-full rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Saving…' : 'Save form and get share link'}</button>
                                         </div>
                                     </fieldset>}
-                                    {!prepareMode && <p ref={detailsRef} tabIndex={-1} role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 outline-none">{loadedEnquiry ? 'Saved enquiry' : 'Contact saved'}: {name} · {mobile}</p>}
+                                    {!prepareMode && <div ref={detailsRef} tabIndex={-1} className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 outline-none">{clientQuoteLink ? 'Your contact details (you can edit them below)' : loadedEnquiry ? 'Saved enquiry' : 'Contact saved'}{!clientQuoteLink && `: ${name} · ${mobile}`}</div>}
                                     {guidedMobile && <p className="sm:hidden text-xs font-bold text-orange-700">Section {mobileQuestionStep + 1} of 6</p>}
                                     {!prepareMode && <div className={mobileSectionClass(0)}><div className="grid gap-4 sm:grid-cols-2">
+                                        {clientQuoteLink && <>
+                                            <label className="block text-xs font-bold">Name
+                                                <input required maxLength={200} autoComplete="name" value={name} onChange={e => setName(e.target.value)} className={fieldClass}/>
+                                            </label>
+                                            <label className="block text-xs font-bold">Phone number
+                                                <input required type="tel" maxLength={20} autoComplete="tel" value={mobile} onChange={e => setMobile(e.target.value)} className={fieldClass}/>
+                                            </label>
+                                        </>}
                                         <label className="block text-xs font-bold sm:col-span-2">Company name (optional)
                                             <input maxLength={300} autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} className={fieldClass}/>
                                         </label>
@@ -522,7 +600,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                 <p className="text-xs text-stone-500">Share the link and access code with your client. The form stays available for 30 days, and they can change any answer.</p>
                                 <button type="submit" disabled={submitting} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Saving…' : 'Save form and get share link'}</button>
                                 {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-3" role="status"><p className="text-sm font-bold text-emerald-800">Ready to send for a custom quotation</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs text-stone-600">Client access code: {shareCode}</p></div>}
-                            </> : <button type="submit" className={`${guidedMobile && mobileQuestionStep < 5 ? 'hidden sm:flex' : 'flex'} w-full min-h-12 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm items-center justify-center gap-2 disabled:opacity-50`} disabled={submitting}>
+                            </> : clientQuoteLink && step === 'contact' ? <button type="button" onClick={() => {setError(''); setStep('details');}} className="flex w-full min-h-12 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm items-center justify-center gap-2"><ArrowRight size={16}/>Continue to questions</button> : <button type="submit" className={`${guidedMobile && mobileQuestionStep < 5 ? 'hidden sm:flex' : 'flex'} w-full min-h-12 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm items-center justify-center gap-2 disabled:opacity-50`} disabled={submitting}>
                                 {submitting ? <LoaderCircle size={16} className="animate-spin"/> : <ArrowRight size={16}/>}
                                 {submitting ? 'Saving…' : clientQuoteLink && step === 'contact' ? 'Request quotation and continue' : clientQuoteLink ? 'Send my requirements' : step === 'contact' ? 'Submit enquiry' : 'Save additional details'}
                             </button>}
