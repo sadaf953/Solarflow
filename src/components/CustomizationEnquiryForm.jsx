@@ -3,7 +3,7 @@ import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy, LockKeyho
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
-import { CORE_DOCUMENT_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, findOwnedPreparedBriefs, preparedBriefLink, unlockSavedBrief, verifyPreparationPin } from '../enquiries/brief';
+import { CORE_DOCUMENT_OPTIONS, DATA_START_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, findOwnedPreparedBriefs, preparedBriefLink, unlockSavedBrief, verifyPreparationPin } from '../enquiries/brief';
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
@@ -41,6 +41,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [liveCustomerCount, setLiveCustomerCount] = useState('');
     const [software, setSoftware] = useState([]);
     const [otherSoftware, setOtherSoftware] = useState('');
+    const [dataStart, setDataStart] = useState('');
     const [fileStorage, setFileStorage] = useState(() => initialStoreFiles == null ? '' : initialStoreFiles ? 'Yes' : 'No');
     const [storageProvider, setStorageProvider] = useState('');
     const [branches, setBranches] = useState('');
@@ -66,7 +67,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const nameRef = useRef(null);
     const formId = useId();
     const {showConfirm} = useGlobalPopup();
-    const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || branches || partnerOffices || channelPartners || installationTeams || stampStaffLogin || technicianLogin || fileStorage || storageProvider || interests.join('|') !== selectedInterest);
+    const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || dataStart || branches || partnerOffices || channelPartners || installationTeams || stampStaffLogin || technicianLogin || fileStorage || storageProvider || interests.join('|') !== selectedInterest);
     const dirty = prepareMode ? Boolean(name || mobile || optionalDirty) : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
 
     useEffect(() => {
@@ -113,7 +114,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 company: contactOnly && !preparedBrief ? '' : company, remarks: contactOnly ? '' : remarks,
                 callDate: contactOnly ? '' : callDate, callTime: contactOnly ? '' : callTime,
                 interests: chosenInterests,
-                businessDetails: contactOnly ? {} : {hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware:software.includes('Other third-party software') ? otherSoftware : '', branches, partnerOffices, channelPartners, installationTeams, stampStaffLogin, technicianLogin}});
+                businessDetails: contactOnly ? {} : {hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware:software.includes('Other third-party software') ? otherSoftware : '', dataStart, branches, partnerOffices, channelPartners, installationTeams, stampStaffLogin, technicianLogin}});
         } catch (err) {setError(err.message); return;}
         if (!identityRef.current) identityRef.current = {id:crypto.randomUUID(), editToken:crypto.randomUUID()};
         savingRef.current = true;
@@ -126,11 +127,11 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         } finally {savingRef.current = false; setSubmitting(false);}
     };
     const reset = () => {
-        setName(locked.name || ''); setMobile(locked.mobile || ''); setCompany(locked.company || ''); setCallDate(''); setCallTime(''); setRemarks('');
+        setName(locked.name || ''); setMobile(locked.mobile || ''); setCompany(locked.company || ''); setCallDate(''); setCallTime(''); setRemarks(locked.customRequest || '');
         setInterests([...new Set([...(locked.interests || []), ...(selectedInterest ? [selectedInterest] : [])])]);
         setHasWebsite(locked.hasWebsite || ''); setTeamSize(locked.teamSize || '');
         setCustomerCount(locked.customerCount || ''); setLiveCustomerCount(locked.liveCustomerCount || '');
-        setSoftware(locked.software || []); setOtherSoftware(locked.otherSoftware || ''); setBranches(locked.branches || '');
+        setSoftware(locked.software || []); setOtherSoftware(locked.otherSoftware || ''); setDataStart(locked.dataStart || ''); setBranches(locked.branches || '');
         setFileStorage(locked.fileStorage || (initialStoreFiles == null ? '' : initialStoreFiles ? 'Yes' : 'No')); setStorageProvider(locked.storageProvider || '');
         setPartnerOffices(locked.partnerOffices || ''); setChannelPartners(locked.channelPartners || '');
         setInstallationTeams(locked.installationTeams || ''); setStampStaffLogin(locked.stampStaffLogin || ''); setTechnicianLogin(locked.technicianLogin || '');
@@ -143,6 +144,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setHasWebsite(brief.hasWebsite || ''); setTeamSize(brief.teamSize || '');
         setCustomerCount(brief.customerCount || ''); setLiveCustomerCount(brief.liveCustomerCount || '');
         setSoftware(brief.software || []); setOtherSoftware(brief.otherSoftware || ''); setBranches(brief.branches || '');
+        setDataStart(brief.dataStart || ''); setRemarks(brief.customRequest || '');
         setFileStorage(brief.fileStorage || ''); setStorageProvider(brief.storageProvider || '');
         setPartnerOffices(brief.partnerOffices || ''); setChannelPartners(brief.channelPartners || '');
         setInstallationTeams(brief.installationTeams || ''); setStampStaffLogin(brief.stampStaffLogin || ''); setTechnicianLogin(brief.technicianLogin || '');
@@ -201,7 +203,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         savingRef.current = true; setSubmitting(true); setError('');
         try {
             const saved = await createSavedBrief(supabase, {
-                name, mobile, company, hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, installationTeams, stampStaffLogin, technicianLogin, fileStorage, storageProvider, interests
+                name, mobile, company, hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, dataStart, customRequest:remarks, branches, partnerOffices, channelPartners, installationTeams, stampStaffLogin, technicianLogin, fileStorage, storageProvider, interests
             }, preparePin);
             const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
             setShareLink(link); setShareCode(saved.code);
@@ -349,6 +351,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                         </div>
                                         <p className="text-xs font-bold">What software do you currently use? <span className="font-normal text-stone-500">Tick any that apply.</span></p>
                                         {checkGrid(SOFTWARE_OPTIONS, software, setSoftware, locked.software || [])}
+                                        <div className="pt-2">{choiceField('Would you like to transfer your existing data or start fresh?', 'dataStart', dataStart, setDataStart, DATA_START_OPTIONS)}</div>
                                         {software.includes('Other third-party software') && <label className="block text-xs font-bold">Which other software do you use? (optional) {locked.otherSoftware && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
                                             <input type="text" maxLength={200} value={otherSoftware} disabled={Boolean(locked.otherSoftware)} onChange={event => setOtherSoftware(event.target.value)} placeholder="Enter software name" className={fieldClass}/>
                                         </label>}
@@ -399,9 +402,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                         <p className="text-xs text-stone-500">Pick anything else your team needs. MIS upload automation is an extra feature.</p>
                                         {compactChoices(OTHER_INTEREST_OPTIONS)}
                                     </fieldset>
-                                    {!prepareMode && <label className="block text-xs font-bold">Anything else? (optional)
-                                        <textarea maxLength={5000} rows={3} value={remarks} onChange={e => setRemarks(e.target.value)} className={fieldClass}/>
-                                    </label>}
+                                    <label className="block text-xs font-bold">Custom request (optional) {locked.customRequest && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
+                                        <textarea maxLength={prepareMode ? 2000 : 5000} rows={4} value={remarks} disabled={Boolean(locked.customRequest)} onChange={e => setRemarks(e.target.value)} placeholder="Tell us anything else you need" className={fieldClass}/>
+                                    </label>
                                 </>
                             )}
                             {prepareMode ? <>

@@ -85,6 +85,14 @@ test('optional installation and login answers survive a prepared client link', (
  assert.equal(createPreparedBrief({...draft,installationTeams:'Unknown'}).installationTeams,undefined);
 });
 
+test('data transfer choice and custom request survive a prepared client link', () => {
+ const prepared=createPreparedBrief({...draft,dataStart:'Start fresh',customRequest:'  Build a custom approval step  '});
+ assert.equal(prepared.dataStart,'Start fresh');
+ assert.equal(prepared.customRequest,'Build a custom approval step');
+ assert.equal(createPreparedBrief({...draft,dataStart:'Invalid'}).dataStart,undefined);
+ assert.equal(createPreparedBrief({...draft,customRequest:'x'.repeat(2100)}).customRequest.length,2000);
+});
+
 test('prepared client contact is trimmed, phone-normalized, and invalid phones are omitted', () => {
  const prepared=createPreparedBrief({name:'  A Client  ',mobile:'+91 90000 00001',company:'  Solar Co  '});
  assert.deepEqual(prepared,{name:'A Client',company:'Solar Co',mobile:'9000000001'});

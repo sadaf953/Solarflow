@@ -6,6 +6,7 @@ export function enquiryPayload({name, company, mobile, modelType, storeFiles, st
   ['Total customers', businessDetails.customerCount], ['Live customers', businessDetails.liveCustomerCount],
   ['Current software', businessDetails.software?.join(', ')],
   ['Other software', businessDetails.software?.includes('Other third-party software') ? businessDetails.otherSoftware?.trim().replace(/[\r\n]+/g, ' ').slice(0, 200) : ''],
+  ['Existing data', businessDetails.dataStart],
   ['Branches', businessDetails.branches],
   ['Channel partner offices', businessDetails.partnerOffices], ['Channel partners', businessDetails.channelPartners],
   ['Third-party or multiple installation teams', businessDetails.installationTeams],
@@ -14,7 +15,7 @@ export function enquiryPayload({name, company, mobile, modelType, storeFiles, st
  return {
   name: name.trim() || 'Prospective Client', company_name: company.trim() || null,
   mobile_number: phone, version_type: modelType,
-  notes: [selectedInterest && `Selected option: ${selectedInterest}`, `File storage: ${storeFiles === 'yes' ? 'Yes' : storeFiles === 'no' ? 'No — simple checklists' : 'Discuss on call'}`, storeFiles === 'yes' && storageProvider && `Preferred storage provider: ${storageProvider}`, callDate && `Preferred call date: ${callDate}`, callTime && `Preferred call time (Asia/Kolkata): ${callTime}`, ...detailLines, `Interested in: ${interests.length ? interests.join(', ') : 'Not specified — discuss on call'}`, remarks.trim()].filter(Boolean).join('\n'),
+  notes: [selectedInterest && `Selected option: ${selectedInterest}`, `File storage: ${storeFiles === 'yes' ? 'Yes' : storeFiles === 'no' ? 'No — simple checklists' : 'Discuss on call'}`, storeFiles === 'yes' && storageProvider && `Preferred storage provider: ${storageProvider}`, callDate && `Preferred call date: ${callDate}`, callTime && `Preferred call time (Asia/Kolkata): ${callTime}`, ...detailLines, `Interested in: ${interests.length ? interests.join(', ') : 'Not specified — discuss on call'}`, remarks.trim() && `Custom request: ${remarks.trim()}`].filter(Boolean).join('\n'),
   status: 'new'
  };
 }

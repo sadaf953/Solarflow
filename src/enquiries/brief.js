@@ -9,6 +9,7 @@ export const STORAGE_PROVIDER_OPTIONS = ['Google personal account', 'Google Work
 export const SOFTWARE_OPTIONS = ['Tally', 'Google Sheets', 'Microsoft Excel', 'Zoho', 'Odoo', 'Other third-party software'];
 export const TEAM_SIZE_OPTIONS = ['1–3', '4–9', '10–29', '30–49', '50+', 'Not sure'];
 export const YES_NO_OPTIONS = ['Yes', 'No', 'Not sure'];
+export const DATA_START_OPTIONS = ['Transfer existing data', 'Start fresh', 'Not sure'];
 export const INTEREST_OPTIONS = [
   'Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options', 'Tools only — no CRM',
   'Customer tracking', ...DOCUMENT_OPTIONS, 'Inventory', 'Warranty tracking',
@@ -19,8 +20,9 @@ export const INTEREST_OPTIONS = [
   'Finance', 'Attendance', 'Calendar', 'MIS upload auto updater', 'Checklists', 'Document uploads'
 ];
 
-const SINGLE_FIELDS = ['hasWebsite', 'teamSize', 'customerCount', 'liveCustomerCount', 'branches', 'partnerOffices', 'channelPartners', 'installationTeams', 'stampStaffLogin', 'technicianLogin', 'fileStorage', 'storageProvider'];
+const SINGLE_FIELDS = ['hasWebsite', 'teamSize', 'customerCount', 'liveCustomerCount', 'dataStart', 'branches', 'partnerOffices', 'channelPartners', 'installationTeams', 'stampStaffLogin', 'technicianLogin', 'fileStorage', 'storageProvider'];
 const CHOICES = {hasWebsite:YES_NO_OPTIONS, teamSize:TEAM_SIZE_OPTIONS, branches:YES_NO_OPTIONS,
+  dataStart:DATA_START_OPTIONS,
   partnerOffices:YES_NO_OPTIONS, channelPartners:YES_NO_OPTIONS, installationTeams:YES_NO_OPTIONS,
   stampStaffLogin:YES_NO_OPTIONS, technicianLogin:YES_NO_OPTIONS, fileStorage:['Yes', 'No'], storageProvider:STORAGE_PROVIDER_OPTIONS};
 
@@ -46,6 +48,8 @@ export function createPreparedBrief(draft) {
     const otherSoftware = String(draft.otherSoftware || '').trim().replace(/[\r\n]+/g, ' ').slice(0, 200).trim();
     if (otherSoftware) prepared.otherSoftware = otherSoftware;
   }
+  const customRequest = String(draft.customRequest || '').trim().slice(0, 2000).trim();
+  if (customRequest) prepared.customRequest = customRequest;
   return prepared;
 }
 

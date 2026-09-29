@@ -6,7 +6,7 @@ test('payload uses the existing enquiry schema and normalizes phone',()=>{
  const result=enquiryPayload(draft);
  assert.equal(result.mobile_number,'9000000001');
  assert.equal(result.version_type,'advance');
- assert.equal(result.notes,'File storage: No — simple checklists\nInterested in: Not specified — discuss on call\nDemo only');
+ assert.equal(result.notes,'File storage: No — simple checklists\nInterested in: Not specified — discuss on call\nCustom request: Demo only');
  assert.equal('model_type' in result,false);
  for(const mobile of ['abc9000000001','123','999999999999999']) assert.throws(()=>enquiryPayload({...draft,mobile}));
 });
@@ -33,6 +33,12 @@ test('optional interests and call preferences are saved in existing notes', () =
 test('guided business answers are saved with the same enquiry', () => {
  const payload=enquiryPayload({...draft,businessDetails:{hasWebsite:'Yes',teamSize:'4–9',customerCount:'420',liveCustomerCount:'67',software:['Tally','Google Sheets'],branches:'No',partnerOffices:'Yes',channelPartners:'Not sure',installationTeams:'Yes',stampStaffLogin:'No',technicianLogin:'Yes'}});
  for(const detail of ['Website: Yes','Employees: 4–9','Total customers: 420','Live customers: 67','Current software: Tally, Google Sheets','Branches: No','Channel partner offices: Yes','Channel partners: Not sure','Third-party or multiple installation teams: Yes','Stamp staff login: No','Technician logins: Yes']) assert.ok(payload.notes.includes(detail));
+});
+
+test('existing-data choice and custom request are included in the enquiry', () => {
+ const payload=enquiryPayload({...draft,businessDetails:{dataStart:'Transfer existing data'},remarks:'Import our live customers first'});
+ assert.match(payload.notes,/Existing data: Transfer existing data/);
+ assert.match(payload.notes,/Custom request: Import our live customers first/);
 });
 
 test('named third-party software is included only when selected', () => {

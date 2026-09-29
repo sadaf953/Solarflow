@@ -27,6 +27,12 @@ begin
             'installationTeams','Sometimes'), '0905');
         raise exception 'FAIL: invalid installation answer was accepted';
     exception when invalid_parameter_value then null; end;
+    begin
+        perform public.create_prepared_brief(jsonb_build_object(
+            'name','Test Client','mobile','9000000001','company','Example Solar',
+            'dataStart','Import everything'), '0905');
+        raise exception 'FAIL: invalid transfer choice was accepted';
+    exception when invalid_parameter_value then null; end;
 end $$;
 with created as (
     select public.create_prepared_brief(jsonb_build_object(
@@ -35,6 +41,7 @@ with created as (
         'otherSoftware','Example ERP',
         'fileStorage','Yes','storageProvider','Google Workspace business account',
         'installationTeams','Yes','stampStaffLogin','No','technicianLogin','Not sure',
+        'dataStart','Transfer existing data','customRequest','Please import our current customers',
         'interests',jsonb_build_array('DISCOM submission document maker')), '0905') as result
 )
 select set_config('qa.brief_id',result->>'id',true),
@@ -88,6 +95,12 @@ begin
         or public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
         current_setting('qa.brief_code'))->>'technicianLogin' <> 'Not sure' then
         raise exception 'FAIL: optional installation and login answers did not restore';
+    end if;
+    if public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
+        current_setting('qa.brief_code'))->>'dataStart' <> 'Transfer existing data'
+        or public.unlock_prepared_brief(current_setting('qa.brief_id')::uuid,
+        current_setting('qa.brief_code'))->>'customRequest' <> 'Please import our current customers' then
+        raise exception 'FAIL: data-transfer choice or custom request did not restore';
     end if;
     for attempt in 1..5 loop
         if public.unlock_prepared_brief(current_setting('qa.second_id')::uuid, '0000') is not null then
