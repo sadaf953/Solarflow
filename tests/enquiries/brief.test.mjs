@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createPreparedBrief, createSavedBrief, preparedBriefLink, readPreparedBriefId, unlockSavedBrief, verifyPreparationPin} from '../../src/enquiries/brief.js';
+import {createPreparedBrief, createSavedBrief, findOwnedPreparedBriefs, preparedBriefLink, readPreparedBriefId, unlockSavedBrief, verifyPreparationPin} from '../../src/enquiries/brief.js';
 
 const id='b391c08f-5c13-4b40-b73e-f1c7eec12205';
 const code='0001';
@@ -51,6 +51,16 @@ test('preparation code is checked by the backend, and contact fields are require
  assert.deepEqual(calls.map(call=>call.name),['verify_preparation_pin','verify_preparation_pin']);
  await assert.rejects(createSavedBrief(client,{...draft,company:''},'0905'),/company name/);
  await assert.rejects(createSavedBrief(client,draft,''),/4-digit preparation code/);
+});
+
+test('saved-form lookup uses the browser session and returns only valid matches',async()=>{
+ const calls=[];
+ const client={auth:{getSession:async()=>({data:{session:{}}})},rpc:async(name,args)=>{
+  calls.push({name,args}); return {data:[{id,name:'Private Name',company:'Example Solar'}, {id:'bad',name:'Other',company:'Other'}],error:null};
+ }};
+ assert.deepEqual(await findOwnedPreparedBriefs(client,'0001'),[{id,name:'Private Name',company:'Example Solar'}]);
+ assert.deepEqual(calls,[{name:'find_owned_prepared_briefs',args:{p_phone_suffix:'0001'}}]);
+ await assert.rejects(findOwnedPreparedBriefs(client,'1'),/last four digits/);
 });
 
 test('other software name is kept only with the selected checkbox', () => {

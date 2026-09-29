@@ -1,6 +1,7 @@
 -- The fictional draft and code are rolled back; no real enquiry is created.
 begin;
 select set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
+select set_config('qa.owner_id', current_setting('request.jwt.claim.sub'), true);
 set local role authenticated;
 do $$
 begin
@@ -51,6 +52,12 @@ begin
         or current_setting('qa.brief_id') = current_setting('qa.second_id') then
         raise exception 'FAIL: phone suffix or per-client links are incorrect';
     end if;
+    if jsonb_array_length(public.find_owned_prepared_briefs('0001')) <> 2
+        or public.find_owned_prepared_briefs('0001') @> jsonb_build_array(jsonb_build_object(
+            'id', current_setting('qa.brief_id')::uuid, 'name', 'Test Client')) is false
+        or jsonb_array_length(public.find_owned_prepared_briefs('9999')) <> 0 then
+        raise exception 'FAIL: owner lookup did not return only matching client drafts';
+    end if;
     if public.unlock_prepared_brief(current_setting('qa.second_id')::uuid,
         current_setting('qa.brief_code'))->>'company' <> 'Second Solar' then
         raise exception 'FAIL: second client link loaded the wrong answers';
@@ -95,6 +102,15 @@ begin
         raise exception 'FAIL: signed-in visitor could read private drafts';
     exception when insufficient_privilege then null; end;
 end $$;
+
+select set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
+do $$
+begin
+    if jsonb_array_length(public.find_owned_prepared_briefs('0001')) <> 0 then
+        raise exception 'FAIL: another browser session could find the prepared forms';
+    end if;
+end $$;
+select set_config('request.jwt.claim.sub', current_setting('qa.owner_id'), true);
 
 set local role anon;
 do $$

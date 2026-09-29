@@ -78,6 +78,15 @@ export async function verifyPreparationPin(client, pin) {
   return data === true;
 }
 
+export async function findOwnedPreparedBriefs(client, phoneSuffix) {
+  if (!/^\d{4}$/.test(phoneSuffix)) throw new Error('Enter the last four digits of the client phone number.');
+  await ensureSession(client);
+  const {data, error} = await client.rpc('find_owned_prepared_briefs', {p_phone_suffix:phoneSuffix});
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error('Saved forms could not be loaded. Please try again.');
+  return data.filter(item => item && UUID.test(item.id) && typeof item.name === 'string' && typeof item.company === 'string');
+}
+
 export async function createSavedBrief(client, draft, preparationPin) {
   const prepared = createPreparedBrief(draft);
   if (!prepared.name || !prepared.mobile || !prepared.company) throw new Error('Enter the client name, a valid 10-digit phone number, and company name.');
