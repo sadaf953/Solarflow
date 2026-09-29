@@ -83,7 +83,7 @@ export async function verifyPreparationPin(client, pin) {
 }
 
 export async function findOwnedPreparedBriefs(client, phoneSuffix) {
-  if (!/^\d{4}$/.test(phoneSuffix)) throw new Error('Enter the last four digits of the client phone number.');
+  if (!/^\d{4}$/.test(phoneSuffix)) throw new Error('Enter the four-digit client code.');
   await ensureSession(client);
   const {data, error} = await client.rpc('find_owned_prepared_briefs', {p_phone_suffix:phoneSuffix});
   if (error) throw error;

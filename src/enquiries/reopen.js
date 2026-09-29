@@ -40,12 +40,12 @@ export async function listAdminEnquiries(client, pin) {
 
 export async function openSubmittedEnquiry(client, id, phoneCode) {
   if (!UUID.test(id)) throw new Error('This enquiry link is invalid.');
-  if (!/^\d{4}$/.test(phoneCode)) throw new Error('Enter the last four digits of your phone number.');
+  if (!/^\d{4}$/.test(phoneCode)) throw new Error('Enter your four-digit access code.');
   await ensureSession(client);
   const {data, error} = await client.rpc('open_submitted_enquiry', {p_id:id, p_phone_code:phoneCode});
   if (error) throw error;
   if (!data || data.id !== id || !PHONE.test(data.mobile) || !data.mobile.endsWith(phoneCode))
-    throw new Error('That code did not open this enquiry. Check the last four digits and try again.');
+    throw new Error('That code did not open this enquiry. Check the access code sent with your link.');
   return data;
 }
 
@@ -84,7 +84,7 @@ export function parseSubmittedEnquiryNotes(notes = '') {
 }
 
 export async function findSubmittedEnquiries(client, phoneSuffix) {
-  if (!/^\d{4}$/.test(phoneSuffix)) throw new Error('Enter the last four digits of the client phone number.');
+  if (!/^\d{4}$/.test(phoneSuffix)) throw new Error('Enter the four-digit client code.');
   const {data, error} = await client.rpc('find_submitted_enquiries', {p_phone_suffix:phoneSuffix});
   if (error) throw error;
   if (!Array.isArray(data)) throw new Error('Submitted enquiries could not be loaded.');

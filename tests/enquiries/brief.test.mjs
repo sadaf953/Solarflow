@@ -61,7 +61,7 @@ test('saved-form lookup uses the browser session and returns only valid matches'
  }};
  assert.deepEqual(await findOwnedPreparedBriefs(client,'0001'),[{id,name:'Private Name',company:'Example Solar'}]);
  assert.deepEqual(calls,[{name:'find_owned_prepared_briefs',args:{p_phone_suffix:'0001'}}]);
- await assert.rejects(findOwnedPreparedBriefs(client,'1'),/last four digits/);
+ await assert.rejects(findOwnedPreparedBriefs(client,'1'),/four-digit client code/);
 });
 
 test('other software name is kept only with the selected checkbox', () => {

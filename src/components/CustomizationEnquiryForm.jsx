@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useId } from 'react';
-import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy, LockKeyhole } from 'lucide-react';
+import { CheckCircle2, ArrowRight, X, AlertCircle, LoaderCircle, Copy } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
@@ -30,7 +30,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [preparedBrief, setPreparedBrief] = useState(null);
     const [loadedEnquiry, setLoadedEnquiry] = useState(null);
     const [extraNoteLines, setExtraNoteLines] = useState([]);
-    const locked = preparedBrief || {};
+    const initialAnswers = preparedBrief || {};
     const clientQuoteLink = Boolean(preparedBriefId || submittedEnquiryId);
     const needsUnlock = Boolean((preparedBriefId && !preparedBrief) || (submittedEnquiryId && !loadedEnquiry));
     const [name, setName] = useState('');
@@ -146,14 +146,14 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         } finally {savingRef.current = false; setSubmitting(false);}
     };
     const reset = () => {
-        setName(locked.name || ''); setMobile(locked.mobile || ''); setCompany(locked.company || ''); setCallDate(''); setCallTime(''); setRemarks(locked.customRequest || '');
-        setInterests([...new Set([...(locked.interests || []), ...(selectedInterest ? [selectedInterest] : [])])]);
-        setHasWebsite(locked.hasWebsite || ''); setTeamSize(locked.teamSize || '');
-        setCustomerCount(locked.customerCount || ''); setLiveCustomerCount(locked.liveCustomerCount || '');
-        setSoftware(locked.software || []); setOtherSoftware(locked.otherSoftware || ''); setDataStart(locked.dataStart || ''); setBranches(locked.branches || '');
-        setFileStorage(locked.fileStorage || (initialStoreFiles == null ? '' : initialStoreFiles ? 'Yes' : 'No')); setStorageProvider(locked.storageProvider || '');
-        setPartnerOffices(locked.partnerOffices || ''); setChannelPartners(locked.channelPartners || '');
-        setInstallationTeams(locked.installationTeams || ''); setStampStaffLogin(locked.stampStaffLogin || ''); setTechnicianLogin(locked.technicianLogin || '');
+        setName(initialAnswers.name || ''); setMobile(initialAnswers.mobile || ''); setCompany(initialAnswers.company || ''); setCallDate(''); setCallTime(''); setRemarks(initialAnswers.customRequest || '');
+        setInterests([...new Set([...(initialAnswers.interests || []), ...(selectedInterest ? [selectedInterest] : [])])]);
+        setHasWebsite(initialAnswers.hasWebsite || ''); setTeamSize(initialAnswers.teamSize || '');
+        setCustomerCount(initialAnswers.customerCount || ''); setLiveCustomerCount(initialAnswers.liveCustomerCount || '');
+        setSoftware(initialAnswers.software || []); setOtherSoftware(initialAnswers.otherSoftware || ''); setDataStart(initialAnswers.dataStart || ''); setBranches(initialAnswers.branches || '');
+        setFileStorage(initialAnswers.fileStorage || (initialStoreFiles == null ? '' : initialStoreFiles ? 'Yes' : 'No')); setStorageProvider(initialAnswers.storageProvider || '');
+        setPartnerOffices(initialAnswers.partnerOffices || ''); setChannelPartners(initialAnswers.channelPartners || '');
+        setInstallationTeams(initialAnswers.installationTeams || ''); setStampStaffLogin(initialAnswers.stampStaffLogin || ''); setTechnicianLogin(initialAnswers.technicianLogin || '');
         setError(''); identityRef.current = null; setLoadedEnquiry(null); setExtraNoteLines([]); setMobileQuestionStep(0); setStep('contact');
     };
     const applyBrief = brief => {
@@ -185,7 +185,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const findSavedMatches = async () => {
         const [prepared, submitted] = await Promise.all([findOwnedPreparedBriefs(supabase, preparePin), findSubmittedEnquiries(supabase, preparePin)]);
         const matches = [...prepared.map(item => ({...item, kind:'prepared'})), ...submitted];
-        if (!matches.length) throw new Error('No prepared form or submitted enquiry matches those phone digits.');
+        if (!matches.length) throw new Error('No prepared form or submitted enquiry matches that client code.');
         if (matches.length === 1) await openSavedMatch(matches[0]);
         else setSavedMatches(matches);
     };
@@ -255,7 +255,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         finally { savingRef.current = false; setSubmitting(false); }
     };
     const copyInviteMessage = async () => {
-        const message = `To get your custom SolarFlow quotation, open this link: ${shareLink}\nEnter the last four digits of your phone number to open your form, then review the answers and tell us what else you need.`;
+        const message = `To get your custom SolarFlow quotation, open this link: ${shareLink}\nUse access code ${shareCode} to open your form. Review or change any answers, then tell us what else you need.`;
         try { await navigator.clipboard.writeText(message); setInviteCopied(true); setError(''); }
         catch { setError('Could not copy the message. You can still copy the client link above.'); }
     };
@@ -285,35 +285,32 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         && `${item.name} ${item.company || ''} ${item.mobile}`.toLowerCase().includes(adminSearch.trim().toLowerCase()));
     const fieldClass = 'sf-input mt-1 w-full min-h-11';
     const choiceField = (label, key, value, setValue, options) => <label className="block text-xs font-bold" key={key}>
-        {label} {locked[key] && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
-        <select className={fieldClass} value={value} onChange={event => setValue(event.target.value)} disabled={Boolean(locked[key])}>
+        {label}
+        <select className={fieldClass} value={value} onChange={event => setValue(event.target.value)}>
             <option value="">Choose an answer (optional)</option>
             {options.map(option => <option key={option} value={option}>{option}</option>)}
         </select>
     </label>;
-    const checkGrid = (options, values, setter, lockedValues = []) => <div className="grid gap-2 sm:grid-cols-2">
-        {options.map(option => <label key={option} className={`flex gap-2 items-center border rounded-xl p-3 text-xs ${lockedValues.includes(option) ? 'border-amber-200 bg-amber-50' : 'border-stone-200 cursor-pointer'}`}>
-            <input type="checkbox" checked={values.includes(option)} disabled={lockedValues.includes(option)} onChange={event => toggleList(setter, option, event.target.checked)} className="accent-orange-600 w-4 h-4 shrink-0"/>
-            <span>{option}</span>{lockedValues.includes(option) && <LockKeyhole size={12} className="ml-auto text-amber-700" aria-label="Prepared answer locked"/>}
+    const checkGrid = (options, values, setter) => <div className="grid gap-2 sm:grid-cols-2">
+        {options.map(option => <label key={option} className="flex gap-2 items-center border rounded-xl border-stone-200 p-3 text-xs cursor-pointer hover:border-orange-300">
+            <input type="checkbox" checked={values.includes(option)} onChange={event => toggleList(setter, option, event.target.checked)} className="accent-orange-600 w-4 h-4 shrink-0"/>
+            <span>{option}</span>
         </label>)}
     </div>;
     const documentChoices = (options, showDescription = false) => <div className="grid gap-2 sm:grid-cols-2">
         {options.map(option => {
-            const isLocked = (locked.interests || []).includes(option);
             const [title, description] = DOCUMENT_COPY[option] || [option, ''];
-            return <label key={option} className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${isLocked ? 'border-amber-200 bg-amber-50' : 'border-stone-200 cursor-pointer hover:border-orange-300'}`}>
-                <input type="checkbox" checked={interests.includes(option)} disabled={isLocked} onChange={event => toggleList(setInterests, option, event.target.checked)} className="mt-0.5 accent-orange-600 w-4 h-4 shrink-0"/>
+            return <label key={option} className="flex items-start gap-3 rounded-xl border border-stone-200 p-3 text-sm cursor-pointer hover:border-orange-300">
+                <input type="checkbox" checked={interests.includes(option)} onChange={event => toggleList(setInterests, option, event.target.checked)} className="mt-0.5 accent-orange-600 w-4 h-4 shrink-0"/>
                 <span><span className="font-semibold">{title}</span>{showDescription && description && <span className="block mt-1 text-xs text-stone-500 leading-relaxed">{description}</span>}</span>
-                {isLocked && <LockKeyhole size={12} className="ml-auto text-amber-700" aria-label="Prepared answer locked"/>}
             </label>;
         })}
     </div>;
     const compactChoices = options => <div className="grid gap-x-5 gap-y-1 sm:grid-cols-2 md:grid-cols-3">
         {options.map(option => {
-            const isLocked = (locked.interests || []).includes(option);
-            return <label key={option} className={`flex items-center gap-2 min-h-11 py-2 text-sm font-medium border-b border-stone-100 ${isLocked ? 'text-stone-500' : 'cursor-pointer hover:text-orange-700'}`}>
-                <input type="checkbox" checked={interests.includes(option)} disabled={isLocked} onChange={event => toggleList(setInterests, option, event.target.checked)} className="accent-orange-600 w-4 h-4 shrink-0"/>
-                <span>{option}</span>{isLocked && <LockKeyhole size={11} className="ml-auto text-amber-700" aria-label="Prepared answer locked"/>}
+            return <label key={option} className="flex items-center gap-2 min-h-11 py-2 text-sm font-medium border-b border-stone-100 cursor-pointer hover:text-orange-700">
+                <input type="checkbox" checked={interests.includes(option)} onChange={event => toggleList(setInterests, option, event.target.checked)} className="accent-orange-600 w-4 h-4 shrink-0"/>
+                <span>{option}</span>
             </label>;
         })}
     </div>;
@@ -332,7 +329,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 {!prepareMode && step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
                 <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Your custom quotation form' : prepareMode && prepareUnlocked ? 'Form overview' : prepareMode ? 'Prepare a client form' : clientQuoteLink ? 'Your custom quotation' : loadedEnquiry ? 'Saved enquiry' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
                 <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Open your quotation form' : prepareMode && !prepareUnlocked ? 'Open your form overview' : prepareMode && adminScreen === 'list' ? 'Prepared and submitted forms' : prepareMode ? 'Prepare a new client form' : clientQuoteLink && step === 'contact' ? 'Confirm your contact details' : clientQuoteLink && step === 'details' ? 'Finish your quotation form' : loadedEnquiry && step === 'details' ? 'Update the saved enquiry' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
-                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the last four digits of your phone number to open this form and finish your quotation request.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to see all prepared and submitted forms. You can also enter the last four digits of a phone number to open one directly.' : prepareMode && adminScreen === 'list' ? 'Review your forms, create a new one, or share a client link so they can finish their answers.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The completed fields will be locked in their form.' : clientQuoteLink && step === 'contact' ? 'Your name, phone number and any answers already prepared are filled in. Continue to request your quotation.' : clientQuoteLink && step === 'details' ? 'Your saved answers are here. Tap through the short sections, add anything missing, and send your requirements.' : loadedEnquiry && step === 'details' ? 'These details were saved earlier. Update them here, or leave them as they are.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
+                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the access code sent with your link to open your form.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to see all prepared and submitted forms. You can also enter a client’s four-digit code to open their form directly.' : prepareMode && adminScreen === 'list' ? 'Review your forms, create a new one, or share a client link so they can finish their answers.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The client can review and change any field.' : clientQuoteLink && step === 'contact' ? 'Your name, phone number and any answers already prepared are filled in. Review or change them, then continue to request your quotation.' : clientQuoteLink && step === 'details' ? 'Your saved answers are here. Tap through the short sections, change anything you need, and send your requirements.' : loadedEnquiry && step === 'details' ? 'These details were saved earlier. Update them here, or leave them as they are.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
                 {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
             <div className="p-4 sm:p-6 md:p-7">
@@ -342,19 +339,19 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 </div>}
                 {needsUnlock ? <form onSubmit={handleUnlock} className="space-y-4">
                     {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}
-                    <label className="block text-sm font-bold">Last four digits of your phone number
-                        <input required maxLength={17} autoComplete="one-time-code" inputMode="numeric" value={accessCode} onChange={event => setAccessCode(event.target.value.replace(/\s/g, ''))} placeholder="4-digit code" className="sf-input mt-2 w-full text-lg tracking-widest"/>
+                    <label className="block text-sm font-bold">4-digit access code
+                        <input required maxLength={4} autoComplete="one-time-code" inputMode="numeric" value={accessCode} onChange={event => setAccessCode(event.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Enter code" className="sf-input mt-2 w-full text-lg tracking-widest"/>
                     </label>
                     <button type="submit" disabled={submitting} className="w-full min-h-12 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm disabled:opacity-50">{submitting ? 'Opening…' : 'Open my form'}</button>
                     <a href="#/plans" className="block text-center text-xs text-stone-600 underline">Start a new form instead</a>
                 </form> : prepareMode && !prepareUnlocked ? <form onSubmit={handlePrepareUnlock} className="space-y-4">
                     {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}
                     <label className="block text-xs font-bold">Four-digit code
-                        <input required type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} autoComplete="off" value={preparePin} onChange={event => {setPreparePin(event.target.value.replace(/\D/g, '').slice(0, 4)); setSavedMatches([]);}} placeholder="Preparation code or last 4 phone digits" className={fieldClass}/>
+                        <input required type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} autoComplete="off" value={preparePin} onChange={event => {setPreparePin(event.target.value.replace(/\D/g, '').slice(0, 4)); setSavedMatches([]);}} placeholder="Preparation or client code" className={fieldClass}/>
                     </label>
                     <button type="submit" disabled={submitting} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Checking…' : preparePin === '0905' ? 'Open form overview' : 'Open saved form'}</button>
                     {preparePin === '0905' && <button type="button" disabled={submitting} onClick={findSavedInstead} className="w-full min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-bold text-stone-800 disabled:opacity-50">Open a saved form ending 0905</button>}
-                    {savedMatches.length > 1 && <div className="space-y-2" role="group" aria-label="Saved client forms"><p className="text-xs text-stone-600">More than one client has these last four digits. Choose the correct form:</p>{savedMatches.map(match => <button key={`${match.kind}-${match.id}`} type="button" disabled={submitting} onClick={() => openSelectedMatch(match)} className="w-full min-h-11 rounded-xl border border-stone-200 px-4 py-3 text-left text-sm hover:border-orange-400 disabled:opacity-50"><strong className="block">{match.name}</strong><span className="text-stone-600">{match.company || 'No company given'} · {match.kind === 'enquiry' ? 'Submitted enquiry' : 'Prepared form'}</span></button>)}</div>}
+                    {savedMatches.length > 1 && <div className="space-y-2" role="group" aria-label="Saved client forms"><p className="text-xs text-stone-600">More than one client uses this code. Choose the correct form:</p>{savedMatches.map(match => <button key={`${match.kind}-${match.id}`} type="button" disabled={submitting} onClick={() => openSelectedMatch(match)} className="w-full min-h-11 rounded-xl border border-stone-200 px-4 py-3 text-left text-sm hover:border-orange-400 disabled:opacity-50"><strong className="block">{match.name}</strong><span className="text-stone-600">{match.company || 'No company given'} · {match.kind === 'enquiry' ? 'Submitted enquiry' : 'Prepared form'}</span></button>)}</div>}
                 </form> : prepareMode && prepareUnlocked && adminScreen === 'list' ? (
                     <div className="space-y-5">
                         {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
@@ -380,7 +377,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                             {selectedAdminItem.kind === 'prepared' && <p className="text-xs text-stone-600">{selectedAdminItem.access_status === 'paused' ? 'This link is paused after too many incorrect codes. It can be opened again after the pause ends.' : selectedAdminItem.can_share ? `Check this is the client’s number ending ${selectedAdminItem.mobile.slice(-4)} before sharing. They can then finish their answers.` : 'This link can no longer be opened with the phone code.'}</p>}
                             <button type="button" disabled={selectedAdminItem.kind === 'prepared' && !selectedAdminItem.can_share} onClick={() => shareAdminItem(selectedAdminItem)} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">Copy client link</button>
                         </div>}
-                        {shareLink && <div className="space-y-3 rounded-xl bg-emerald-50 p-3" role="status"><p className="text-sm font-bold text-emerald-800">Client link ready to share</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass}/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs font-semibold text-stone-700">This form is saved for a phone number ending {shareCode}. Check the number before sending the link.</p></div>}
+                        {shareLink && <div className="space-y-3 rounded-xl bg-emerald-50 p-3" role="status"><p className="text-sm font-bold text-emerald-800">Client link ready to share</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass}/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs font-semibold text-stone-700">Access code: {shareCode}. Check the client’s saved phone number above before sending.</p></div>}
                     </div>
                 ) : !prepareMode && step === 'done' ? (
                     <div className="text-center space-y-4 py-4" role="status">
@@ -395,16 +392,16 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                         <fieldset disabled={submitting} className="space-y-5">
                             {step === 'contact' && !prepareMode ? (
                                 <div className="space-y-4">
-                                    {preparedBrief && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Your form is ready. Review the contact details and continue to the quotation questions.</p>}
+                                    {preparedBrief && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">Your form is ready. Review or change any details, then continue to the quotation questions.</p>}
                                     <div className="grid gap-4 sm:grid-cols-2">
-                                    <label className="block text-xs font-bold">Name <span aria-hidden="true">*</span> {locked.name && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
-                                        <input ref={nameRef} required maxLength={200} autoComplete="name" value={name} disabled={Boolean(locked.name)} onChange={e => setName(e.target.value)} placeholder="Your name" className={fieldClass}/>
+                                    <label className="block text-xs font-bold">Name <span aria-hidden="true">*</span>
+                                        <input ref={nameRef} required maxLength={200} autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className={fieldClass}/>
                                     </label>
-                                    <label className="block text-xs font-bold">Phone number <span aria-hidden="true">*</span> {locked.mobile && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
-                                        <input required type="tel" autoComplete="tel" maxLength={20} value={mobile} disabled={Boolean(locked.mobile)} onChange={e => setMobile(e.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
+                                    <label className="block text-xs font-bold">Phone number <span aria-hidden="true">*</span>
+                                        <input required type="tel" autoComplete="tel" maxLength={20} value={mobile} onChange={e => setMobile(e.target.value)} placeholder="10-digit mobile number" className={fieldClass}/>
                                     </label>
-                                    {locked.company && <label className="block text-xs font-bold sm:col-span-2">Company name <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>
-                                        <input value={company} disabled className={fieldClass}/>
+                                    {preparedBrief && <label className="block text-xs font-bold sm:col-span-2">Company name (optional)
+                                        <input maxLength={300} autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} className={fieldClass}/>
                                     </label>}
                                     </div>
                                 </div>
@@ -428,8 +425,8 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                     {!prepareMode && <p ref={detailsRef} tabIndex={-1} role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 outline-none">{loadedEnquiry ? 'Saved enquiry' : 'Contact saved'}: {name} · {mobile}</p>}
                                     {guidedMobile && <p className="sm:hidden text-xs font-bold text-orange-700">Section {mobileQuestionStep + 1} of 6</p>}
                                     {!prepareMode && <div className={mobileSectionClass(0)}><div className="grid gap-4 sm:grid-cols-2">
-                                        <label className="block text-xs font-bold sm:col-span-2">Company name (optional) {locked.company && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
-                                            <input maxLength={300} autoComplete="organization" value={company} disabled={Boolean(locked.company)} onChange={e => setCompany(e.target.value)} className={fieldClass}/>
+                                        <label className="block text-xs font-bold sm:col-span-2">Company name (optional)
+                                            <input maxLength={300} autoComplete="organization" value={company} onChange={e => setCompany(e.target.value)} className={fieldClass}/>
                                         </label>
                                         <label className="block text-xs font-bold">Preferred call date (optional)
                                             <input type="date" value={callDate} onChange={e => setCallDate(e.target.value)} className={fieldClass}/>
@@ -444,17 +441,17 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                             {choiceField('Do you have a website?', 'hasWebsite', hasWebsite, setHasWebsite, YES_NO_OPTIONS)}
                                             {choiceField('How many employees?', 'teamSize', teamSize, setTeamSize, TEAM_SIZE_OPTIONS)}
                                             <label className="block text-xs font-bold">How many customers in total?
-                                                <input type="number" min="0" max="99999999" inputMode="numeric" value={customerCount} disabled={Boolean(locked.customerCount)} onChange={event => setCustomerCount(event.target.value)} placeholder="Approximate number" className={fieldClass}/>
+                                                <input type="number" min="0" max="99999999" inputMode="numeric" value={customerCount} onChange={event => setCustomerCount(event.target.value)} placeholder="Approximate number" className={fieldClass}/>
                                             </label>
                                             <label className="block text-xs font-bold">How many live / active customers?
-                                                <input type="number" min="0" max="99999999" inputMode="numeric" value={liveCustomerCount} disabled={Boolean(locked.liveCustomerCount)} onChange={event => setLiveCustomerCount(event.target.value)} placeholder="Approximate number" className={fieldClass}/>
+                                                <input type="number" min="0" max="99999999" inputMode="numeric" value={liveCustomerCount} onChange={event => setLiveCustomerCount(event.target.value)} placeholder="Approximate number" className={fieldClass}/>
                                             </label>
                                         </div>
                                         <p className="text-xs font-bold">What software do you currently use? <span className="font-normal text-stone-500">Tick any that apply.</span></p>
-                                        {checkGrid(SOFTWARE_OPTIONS, software, setSoftware, locked.software || [])}
+                                        {checkGrid(SOFTWARE_OPTIONS, software, setSoftware)}
                                         <div className="pt-2">{choiceField('Would you like to transfer your existing data or start fresh?', 'dataStart', dataStart, setDataStart, DATA_START_OPTIONS)}</div>
-                                        {software.includes('Other third-party software') && <label className="block text-xs font-bold">Which other software do you use? (optional) {locked.otherSoftware && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
-                                            <input type="text" maxLength={200} value={otherSoftware} disabled={Boolean(locked.otherSoftware)} onChange={event => setOtherSoftware(event.target.value)} placeholder="Enter software name" className={fieldClass}/>
+                                        {software.includes('Other third-party software') && <label className="block text-xs font-bold">Which other software do you use? (optional)
+                                            <input type="text" maxLength={200} value={otherSoftware} onChange={event => setOtherSoftware(event.target.value)} placeholder="Enter software name" className={fieldClass}/>
                                         </label>}
                                     </fieldset>
                                     <fieldset className={`${mobileSectionClass(1)} space-y-4 rounded-2xl border border-stone-200 p-4 md:p-5`}>
@@ -473,7 +470,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                         <p className="text-xs text-stone-500">Do you want to store uploaded files with customer records?</p>
                                         <div className="grid gap-2 sm:grid-cols-2">
                                             {['Yes','No'].map(option => <label key={option} className={`flex gap-3 rounded-xl border p-3 cursor-pointer ${fileStorage === option ? 'border-orange-400 bg-orange-50' : 'border-stone-200'}`}>
-                                                <input type="radio" name={`${formId}-file-storage`} value={option} checked={fileStorage === option} disabled={Boolean(locked.fileStorage)} onChange={() => setFileStorage(option)} className="accent-orange-600 mt-0.5"/>
+                                                <input type="radio" name={`${formId}-file-storage`} value={option} checked={fileStorage === option} onChange={() => setFileStorage(option)} className="accent-orange-600 mt-0.5"/>
                                                 <span className="text-xs"><strong className="block text-sm">{option === 'Yes' ? 'Yes, store files' : 'No, use simple checklists'}</strong>{option === 'No' && <span className="block mt-1 text-stone-600">Included at no extra cost.</span>}</span>
                                             </label>)}
                                         </div>
@@ -481,7 +478,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                             <p className="text-xs font-bold">Which storage account would you prefer? (optional)</p>
                                             <div className="space-y-2">
                                                 {STORAGE_PRICING.map(provider => <label key={provider.name} className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer ${storageProvider === provider.name ? 'border-orange-400 bg-orange-50' : 'border-stone-200'}`}>
-                                                    <input type="radio" name={`${formId}-storage-provider`} checked={storageProvider === provider.name} disabled={Boolean(locked.storageProvider)} onChange={() => setStorageProvider(provider.name)} className="accent-orange-600 mt-0.5"/>
+                                                    <input type="radio" name={`${formId}-storage-provider`} checked={storageProvider === provider.name} onChange={() => setStorageProvider(provider.name)} className="accent-orange-600 mt-0.5"/>
                                                     <span className="text-xs leading-relaxed"><strong className="block text-sm">{provider.name}</strong><span className="block mt-1">{provider.price}</span><span className="block text-stone-500">{provider.detail}</span><a href={provider.href} target="_blank" rel="noopener noreferrer" onClick={event => event.stopPropagation()} className="text-orange-700 underline">Provider pricing</a></span>
                                                 </label>)}
                                             </div>
@@ -503,8 +500,8 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                         <p className="text-xs text-stone-500">Pick anything else your team needs. MIS upload automation is an extra feature.</p>
                                         {compactChoices(OTHER_INTEREST_OPTIONS)}
                                     </fieldset>
-                                    <div className={mobileSectionClass(5)}><label className="block text-xs font-bold">Custom request (optional) {locked.customRequest && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
-                                        <textarea maxLength={prepareMode ? 2000 : 5000} rows={4} value={remarks} disabled={Boolean(locked.customRequest)} onChange={e => setRemarks(e.target.value)} placeholder="Tell us anything else you need" className={fieldClass}/>
+                                    <div className={mobileSectionClass(5)}><label className="block text-xs font-bold">Custom request (optional)
+                                        <textarea maxLength={prepareMode ? 2000 : 5000} rows={4} value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Tell us anything else you need" className={fieldClass}/>
                                     </label></div>
                                     {guidedMobile && <div className="sm:hidden flex gap-3">
                                         {mobileQuestionStep > 0 && <button type="button" onClick={() => goToMobileQuestion(mobileQuestionStep - 1)} className="min-h-12 flex-1 rounded-xl border border-stone-300 px-4 py-3 text-sm font-bold">Back</button>}
@@ -513,9 +510,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                 </>
                             )}
                             {prepareMode ? <>
-                                <p className="text-xs text-stone-500">Share the link with your client. They unlock it with the last four digits of their phone number. The form stays available for 30 days.</p>
+                                <p className="text-xs text-stone-500">Share the link and access code with your client. The form stays available for 30 days, and they can change any answer.</p>
                                 <button type="submit" disabled={submitting} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Preparing…' : 'Create and copy client link'}</button>
-                                {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-3" role="status"><p className="text-sm font-bold text-emerald-800">Ready to send for a custom quotation</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs text-stone-600">Your client opens the link and enters the last four digits of their phone number ({shareCode}).</p></div>}
+                                {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-3" role="status"><p className="text-sm font-bold text-emerald-800">Ready to send for a custom quotation</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs text-stone-600">Client access code: {shareCode}</p></div>}
                             </> : <button type="submit" className={`${guidedMobile && mobileQuestionStep < 5 ? 'hidden sm:flex' : 'flex'} w-full min-h-12 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm items-center justify-center gap-2 disabled:opacity-50`} disabled={submitting}>
                                 {submitting ? <LoaderCircle size={16} className="animate-spin"/> : <ArrowRight size={16}/>}
                                 {submitting ? 'Saving…' : clientQuoteLink && step === 'contact' ? 'Request quotation and continue' : clientQuoteLink ? 'Send my requirements' : step === 'contact' ? 'Submit enquiry' : 'Save additional details'}
