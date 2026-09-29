@@ -4,6 +4,7 @@ import { supabase } from '../supabase';
 import { useGlobalPopup } from './GlobalPopup';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
 import { CORE_DOCUMENT_OPTIONS, DATA_START_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEAM_SIZE_OPTIONS, YES_NO_OPTIONS, createSavedBrief, findOwnedPreparedBriefs, preparedBriefLink, unlockSavedBrief, verifyPreparationPin } from '../enquiries/brief';
+import { findSubmittedEnquiries, parseSubmittedEnquiryNotes, updateSubmittedEnquiry } from '../enquiries/reopen';
 
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
@@ -27,6 +28,8 @@ const STORAGE_PRICING = [
 
 export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, allowPrepare = false}) {
     const [preparedBrief, setPreparedBrief] = useState(null);
+    const [loadedEnquiry, setLoadedEnquiry] = useState(null);
+    const [extraNoteLines, setExtraNoteLines] = useState([]);
     const locked = preparedBrief || {};
     const needsUnlock = Boolean(preparedBriefId && !preparedBrief);
     const [name, setName] = useState('');
@@ -107,20 +110,21 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         const contactOnly = step === 'contact';
         const storeFiles = contactOnly ? 'unspecified' : fileStorage === 'Yes' ? 'yes' : fileStorage === 'No' ? 'no' : 'unspecified';
         const chosenInterests = contactOnly ? selectedInterest ? [selectedInterest] : [] : interests;
-        const modelType = chosenInterests.includes('Option 1: Small team setup') && !chosenInterests.includes('Option 2: Detailed operations') && !chosenInterests.includes('A mix of both options') ? 'basic' : chosenInterests.includes('Option 2: Detailed operations') ? 'advance' : 'both';
+        const modelType = loadedEnquiry?.version || (chosenInterests.includes('Option 1: Small team setup') && !chosenInterests.includes('Option 2: Detailed operations') && !chosenInterests.includes('A mix of both options') ? 'basic' : chosenInterests.includes('Option 2: Detailed operations') ? 'advance' : 'both');
         let payload;
         try {
-            payload = enquiryPayload({name, mobile, modelType, storeFiles, storageProvider:storeFiles === 'yes' ? storageProvider : '', selectedInterest,
+            payload = enquiryPayload({name, mobile, modelType, storeFiles, storageProvider:storeFiles === 'yes' ? storageProvider : '', selectedInterest:loadedEnquiry?.selectedInterest || selectedInterest,
                 company: contactOnly && !preparedBrief ? '' : company, remarks: contactOnly ? '' : remarks,
                 callDate: contactOnly ? '' : callDate, callTime: contactOnly ? '' : callTime,
                 interests: chosenInterests,
                 businessDetails: contactOnly ? {} : {hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware:software.includes('Other third-party software') ? otherSoftware : '', dataStart, branches, partnerOffices, channelPartners, installationTeams, stampStaffLogin, technicianLogin}});
         } catch (err) {setError(err.message); return;}
-        if (!identityRef.current) identityRef.current = {id:crypto.randomUUID(), editToken:crypto.randomUUID()};
+        if (!loadedEnquiry && !identityRef.current) identityRef.current = {id:crypto.randomUUID(), editToken:crypto.randomUUID()};
         savingRef.current = true;
         setSubmitting(true);
         try {
-            await saveEnquiryStep(supabase, payload, identityRef.current, {contactOnly});
+            if (loadedEnquiry) await updateSubmittedEnquiry(supabase, loadedEnquiry, payload, extraNoteLines);
+            else await saveEnquiryStep(supabase, payload, identityRef.current, {contactOnly});
             setStep(contactOnly ? 'details' : 'done');
         } catch (err) {
             setError(err.message?.startsWith('Your contact details are saved.') ? err.message : contactOnly ? 'We could not confirm your enquiry was saved. Please try again; your details are still here.' : 'Your contact details are saved, but we could not save these extra details. Please try again or skip this step.');
@@ -135,7 +139,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setFileStorage(locked.fileStorage || (initialStoreFiles == null ? '' : initialStoreFiles ? 'Yes' : 'No')); setStorageProvider(locked.storageProvider || '');
         setPartnerOffices(locked.partnerOffices || ''); setChannelPartners(locked.channelPartners || '');
         setInstallationTeams(locked.installationTeams || ''); setStampStaffLogin(locked.stampStaffLogin || ''); setTechnicianLogin(locked.technicianLogin || '');
-        setError(''); identityRef.current = null; setStep('contact');
+        setError(''); identityRef.current = null; setLoadedEnquiry(null); setExtraNoteLines([]); setStep('contact');
     };
     const applyBrief = brief => {
         setPreparedBrief(brief);
@@ -149,6 +153,26 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setPartnerOffices(brief.partnerOffices || ''); setChannelPartners(brief.channelPartners || '');
         setInstallationTeams(brief.installationTeams || ''); setStampStaffLogin(brief.stampStaffLogin || ''); setTechnicianLogin(brief.technicianLogin || '');
         setPrepareMode(false); setPrepareUnlocked(false); setPreparePin(''); setSavedMatches([]); setAccessCode('');
+    };
+    const applyEnquiry = enquiry => {
+        const parsed = parseSubmittedEnquiryNotes(enquiry.notes);
+        setPreparedBrief(null); setLoadedEnquiry({id:enquiry.id, suffix:enquiry.mobile.slice(-4), version:enquiry.version, selectedInterest:parsed.selectedInterest || ''});
+        setExtraNoteLines(parsed.extraLines); setName(enquiry.name); setMobile(enquiry.mobile); setCompany(enquiry.company || '');
+        setCallDate(parsed.callDate || ''); setCallTime(parsed.callTime || ''); setInterests(parsed.interests);
+        setHasWebsite(parsed.hasWebsite || ''); setTeamSize(parsed.teamSize || '');
+        setCustomerCount(parsed.customerCount || ''); setLiveCustomerCount(parsed.liveCustomerCount || '');
+        setSoftware(parsed.software); setOtherSoftware(parsed.otherSoftware || ''); setDataStart(parsed.dataStart || '');
+        setFileStorage(parsed.fileStorage || ''); setStorageProvider(parsed.storageProvider || '');
+        setBranches(parsed.branches || ''); setPartnerOffices(parsed.partnerOffices || ''); setChannelPartners(parsed.channelPartners || '');
+        setInstallationTeams(parsed.installationTeams || ''); setStampStaffLogin(parsed.stampStaffLogin || ''); setTechnicianLogin(parsed.technicianLogin || '');
+        setRemarks(parsed.remarks || ''); setPrepareMode(false); setPrepareUnlocked(false); setSavedMatches([]); setError(''); setStep('details');
+    };
+    const findSavedMatches = async () => {
+        const [prepared, submitted] = await Promise.all([findOwnedPreparedBriefs(supabase, preparePin), findSubmittedEnquiries(supabase, preparePin)]);
+        const matches = [...prepared.map(item => ({...item, kind:'prepared'})), ...submitted];
+        if (!matches.length) throw new Error('No prepared form or submitted enquiry matches those phone digits.');
+        if (matches.length === 1) await openSavedMatch(matches[0]);
+        else setSavedMatches(matches);
     };
     const handleUnlock = async event => {
         event.preventDefault();
@@ -168,18 +192,19 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 if (!await verifyPreparationPin(supabase, preparePin)) throw new Error('Incorrect preparation code.');
                 setPrepareUnlocked(true);
             } else {
-                const matches = await findOwnedPreparedBriefs(supabase, preparePin);
-                if (!matches.length) throw new Error('No prepared client form matches those digits in this browser. Submitted enquiries are saved separately and cannot be opened with four digits alone.');
-                if (matches.length === 1) applyBrief(await unlockSavedBrief(supabase, matches[0].id, preparePin));
-                else setSavedMatches(matches);
+                await findSavedMatches();
             }
         } catch (err) { setError(err.message || 'Could not open the saved form. Please try again.'); }
         finally { savingRef.current = false; setSubmitting(false); }
     };
-    const openSavedMatch = async id => {
+    const openSavedMatch = async match => {
+        if (match.kind === 'enquiry') applyEnquiry(match);
+        else applyBrief(await unlockSavedBrief(supabase, match.id, preparePin));
+    };
+    const openSelectedMatch = async match => {
         if (savingRef.current) return;
         savingRef.current = true; setSubmitting(true); setError('');
-        try { applyBrief(await unlockSavedBrief(supabase, id, preparePin)); }
+        try { await openSavedMatch(match); }
         catch (err) { setError(err.message || 'Could not open the saved form.'); }
         finally { savingRef.current = false; setSubmitting(false); }
     };
@@ -187,10 +212,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         if (savingRef.current) return;
         savingRef.current = true; setSubmitting(true); setError('');
         try {
-            const matches = await findOwnedPreparedBriefs(supabase, preparePin);
-            if (!matches.length) throw new Error('No prepared client form matches those digits in this browser. Submitted enquiries are saved separately and cannot be opened with four digits alone.');
-            if (matches.length === 1) applyBrief(await unlockSavedBrief(supabase, matches[0].id, preparePin));
-            else setSavedMatches(matches);
+            await findSavedMatches();
         } catch (err) { setError(err.message || 'Could not find saved forms.'); }
         finally { savingRef.current = false; setSubmitting(false); }
     };
@@ -258,9 +280,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
             <div className="bg-stone-900 p-4 sm:p-6 md:p-7 text-white relative">
                 {isModal && step !== 'details' && <button type="button" onClick={requestClose} disabled={submitting} className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20" aria-label="Close enquiry"><X size={18}/></button>}
                 {!prepareMode && step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
-                <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Prepared client form' : prepareMode ? 'Prepare a client form' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
-                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Enter your access code' : prepareMode && !prepareUnlocked ? 'Open a client form' : prepareMode ? 'Prepare the client form' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
-                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the last four digits of your phone number to open this form. Older prepared links still use their original access code.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to prepare a new client form, or the last four digits of a client’s phone number to reopen a prepared form from this browser. Submitted enquiries are separate.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The completed fields will be locked in their form.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
+                <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Prepared client form' : prepareMode ? 'Prepare a client form' : loadedEnquiry ? 'Saved enquiry' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
+                <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Enter your access code' : prepareMode && !prepareUnlocked ? 'Open a client form' : prepareMode ? 'Prepare the client form' : loadedEnquiry && step === 'details' ? 'Update the saved enquiry' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
+                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the last four digits of your phone number to open this form. Older prepared links still use their original access code.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to prepare a new client form, or the last four digits of a client’s phone number to reopen a prepared form or submitted enquiry.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The completed fields will be locked in their form.' : loadedEnquiry && step === 'details' ? 'These details were saved earlier. Update them here, or leave them as they are.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
                 {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
             <div className="p-4 sm:p-6 md:p-7">
@@ -282,7 +304,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                     </label>
                     <button type="submit" disabled={submitting} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Checking…' : preparePin === '0905' ? 'Prepare new form' : 'Open saved form'}</button>
                     {preparePin === '0905' && <button type="button" disabled={submitting} onClick={findSavedInstead} className="w-full min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-bold text-stone-800 disabled:opacity-50">Open a saved form ending 0905</button>}
-                    {savedMatches.length > 1 && <div className="space-y-2" role="group" aria-label="Saved client forms"><p className="text-xs text-stone-600">More than one client has these last four digits. Choose the correct form:</p>{savedMatches.map(match => <button key={match.id} type="button" disabled={submitting} onClick={() => openSavedMatch(match.id)} className="w-full min-h-11 rounded-xl border border-stone-200 px-4 py-3 text-left text-sm hover:border-orange-400 disabled:opacity-50"><strong className="block">{match.name}</strong><span className="text-stone-600">{match.company}</span></button>)}</div>}
+                    {savedMatches.length > 1 && <div className="space-y-2" role="group" aria-label="Saved client forms"><p className="text-xs text-stone-600">More than one client has these last four digits. Choose the correct form:</p>{savedMatches.map(match => <button key={`${match.kind}-${match.id}`} type="button" disabled={submitting} onClick={() => openSelectedMatch(match)} className="w-full min-h-11 rounded-xl border border-stone-200 px-4 py-3 text-left text-sm hover:border-orange-400 disabled:opacity-50"><strong className="block">{match.name}</strong><span className="text-stone-600">{match.company || 'No company given'} · {match.kind === 'enquiry' ? 'Submitted enquiry' : 'Prepared form'}</span></button>)}</div>}
                 </form> : !prepareMode && step === 'done' ? (
                     <div className="text-center space-y-4 py-4" role="status">
                         <CheckCircle2 className="mx-auto w-10 h-10 text-emerald-600"/>
@@ -325,7 +347,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                             </label>
                                         </div>
                                     </fieldset>}
-                                    {!prepareMode && <p ref={detailsRef} tabIndex={-1} role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 outline-none">Contact saved: {name} · {mobile}</p>}
+                                    {!prepareMode && <p ref={detailsRef} tabIndex={-1} role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 outline-none">{loadedEnquiry ? 'Saved enquiry' : 'Contact saved'}: {name} · {mobile}</p>}
                                     {!prepareMode && <div className="grid gap-4 sm:grid-cols-2">
                                         <label className="block text-xs font-bold sm:col-span-2">Company name (optional) {locked.company && <LockKeyhole size={13} className="inline text-amber-700" aria-label="Prepared answer locked"/>}
                                             <input maxLength={300} autoComplete="organization" value={company} disabled={Boolean(locked.company)} onChange={e => setCompany(e.target.value)} className={fieldClass}/>
