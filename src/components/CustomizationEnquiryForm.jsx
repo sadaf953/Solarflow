@@ -169,7 +169,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 setPrepareUnlocked(true);
             } else {
                 const matches = await findOwnedPreparedBriefs(supabase, preparePin);
-                if (!matches.length) throw new Error('No saved form with those phone digits was found in this browser. Use the client link if it was prepared elsewhere.');
+                if (!matches.length) throw new Error('No prepared client form matches those digits in this browser. Submitted enquiries are saved separately and cannot be opened with four digits alone.');
                 if (matches.length === 1) applyBrief(await unlockSavedBrief(supabase, matches[0].id, preparePin));
                 else setSavedMatches(matches);
             }
@@ -188,7 +188,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         savingRef.current = true; setSubmitting(true); setError('');
         try {
             const matches = await findOwnedPreparedBriefs(supabase, preparePin);
-            if (!matches.length) throw new Error('No saved form with those phone digits was found in this browser. Use the client link if it was prepared elsewhere.');
+            if (!matches.length) throw new Error('No prepared client form matches those digits in this browser. Submitted enquiries are saved separately and cannot be opened with four digits alone.');
             if (matches.length === 1) applyBrief(await unlockSavedBrief(supabase, matches[0].id, preparePin));
             else setSavedMatches(matches);
         } catch (err) { setError(err.message || 'Could not find saved forms.'); }
@@ -260,7 +260,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 {!prepareMode && step === 'details' && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
                 <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Prepared client form' : prepareMode ? 'Prepare a client form' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
                 <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Enter your access code' : prepareMode && !prepareUnlocked ? 'Open a client form' : prepareMode ? 'Prepare the client form' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
-                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the last four digits of your phone number to open this form. Older prepared links still use their original access code.' : prepareMode && !prepareUnlocked ? 'Enter the preparation code to start a new form, or the last four digits of a client’s phone number to reopen a form you prepared in this browser.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The completed fields will be locked in their form.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
+                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the last four digits of your phone number to open this form. Older prepared links still use their original access code.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to prepare a new client form, or the last four digits of a client’s phone number to reopen a prepared form from this browser. Submitted enquiries are separate.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The completed fields will be locked in their form.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
                 {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
             <div className="p-4 sm:p-6 md:p-7">
