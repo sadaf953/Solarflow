@@ -10,8 +10,9 @@ const draft={name:'Private Name',mobile:'9000000001',company:'Example Solar',has
 
 test('client link contains only the backend draft ID; supported answers stay in the private payload', () => {
  const link=preparedBriefLink('https://example.com/',id);
- assert.equal(link,`https://example.com/#/plans?brief=${id}`);
+ assert.equal(link,`https://example.com/#/quote?brief=${id}`);
  assert.equal(readPreparedBriefId(new URL(link).hash),id);
+ assert.equal(readPreparedBriefId(`#/plans?brief=${id}`),id);
  assert.doesNotMatch(link,/Private Name|9000000001|Example Solar|Tally|Website/);
  assert.equal(createPreparedBrief(draft).name,'Private Name');
  assert.equal(createPreparedBrief(draft).mobile,'9000000001');

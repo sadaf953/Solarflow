@@ -48,8 +48,17 @@ export default function PricingView() {
         window.addEventListener('hashchange', update);
         return () => window.removeEventListener('hashchange', update);
     }, []);
-    useEffect(() => { if (preparedBriefId) document.getElementById('setup-enquiry')?.scrollIntoView(); }, [preparedBriefId]);
     const choices = ['Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options'];
+    if (preparedBriefId) return (
+        <main className="mx-auto max-w-2xl py-5 sm:py-10 pb-16 space-y-5">
+            <header className="px-1 sm:px-0">
+                <p className="sf-kicker">Your custom SolarFlow quotation</p>
+                <h1 className="mt-2 text-2xl sm:text-3xl font-black leading-tight text-stone-900">Tell us what your team needs</h1>
+                <p className="mt-2 text-sm leading-relaxed text-stone-600">We’ve started this form with the details shared with us. Enter the code, review the answers, and choose anything else you need. We’ll use your responses to prepare a quotation for you.</p>
+            </header>
+            <CustomizationEnquiryForm key={preparedBriefId} preparedBriefId={preparedBriefId}/>
+        </main>
+    );
     return (
         <div className="max-w-7xl mx-auto py-8 md:py-12 space-y-8">
             <header className="max-w-3xl space-y-3">
@@ -58,7 +67,6 @@ export default function PricingView() {
                 <p className="text-sm leading-relaxed text-stone-600">Simple customer tracking or detailed operations — tell us what your team needs and we’ll help you find the right mix.</p>
                 {!preparedBriefId && <button type="button" onClick={() => document.getElementById('setup-enquiry')?.scrollIntoView({behavior:'smooth', block:'start'})} className="sm:hidden mt-2 w-full min-h-12 rounded-xl bg-orange-500 px-4 py-3 text-sm font-bold text-stone-950">Fill the quick form <ArrowRight className="inline w-4 h-4 ml-1"/></button>}
             </header>
-            {preparedBriefId && <p className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-stone-800">A form has been prepared for you. Enter the separate access code below to open its saved answers.</p>}
             <div className="grid gap-5 lg:grid-cols-3">
                 {OPTIONS.map((option, index) => (
                     <article key={option.title} className={`rounded-3xl p-4 sm:p-6 flex flex-col border ${index === 1 ? 'bg-stone-900 text-white border-stone-900 shadow-lg' : 'bg-white text-stone-900 border-stone-200'}`}>
@@ -87,7 +95,7 @@ export default function PricingView() {
                 <button type="button" onClick={() => setEnquiryChoice('Tools only — no CRM')} className="sf-btn-primary min-h-11 w-full sm:w-auto shrink-0">Interested in tools <ArrowRight className="w-4 h-4 inline ml-1"/></button>
             </section>
             <div id="setup-enquiry" className="scroll-mt-24 max-w-4xl mx-auto">
-                <CustomizationEnquiryForm key={preparedBriefId || 'standard'} preparedBriefId={preparedBriefId} allowPrepare={!preparedBriefId}/>
+                <CustomizationEnquiryForm key="standard" allowPrepare/>
             </div>
             {enquiryChoice !== null && <CustomizationEnquiryForm key={enquiryChoice} isModal selectedInterest={enquiryChoice} onClose={() => setEnquiryChoice(null)}/>}
         </div>

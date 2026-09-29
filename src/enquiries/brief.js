@@ -57,7 +57,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function preparedBriefLink(baseUrl, id) {
   if (!UUID.test(id)) throw new Error('Invalid prepared form reference.');
-  return `${baseUrl.replace(/\/$/, '')}/#/plans?brief=${id}`;
+  return `${baseUrl.replace(/\/$/, '')}/#/quote?brief=${id}`;
 }
 
 export function readPreparedBriefId(hash) {
