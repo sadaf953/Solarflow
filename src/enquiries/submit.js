@@ -7,7 +7,9 @@ export function enquiryPayload({name, company, mobile, modelType, storeFiles, st
   ['Current software', businessDetails.software?.join(', ')],
   ['Other software', businessDetails.software?.includes('Other third-party software') ? businessDetails.otherSoftware?.trim().replace(/[\r\n]+/g, ' ').slice(0, 200) : ''],
   ['Branches', businessDetails.branches],
-  ['Channel partner offices', businessDetails.partnerOffices], ['Channel partners', businessDetails.channelPartners]
+  ['Channel partner offices', businessDetails.partnerOffices], ['Channel partners', businessDetails.channelPartners],
+  ['Third-party or multiple installation teams', businessDetails.installationTeams],
+  ['Stamp staff login', businessDetails.stampStaffLogin], ['Technician logins', businessDetails.technicianLogin]
  ].filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`);
  return {
   name: name.trim() || 'Prospective Client', company_name: company.trim() || null,

@@ -67,6 +67,14 @@ test('storage provider stays only when file storage is selected', () => {
  assert.deepEqual(createPreparedBrief({...choice,storageProvider:'Unknown'}),{fileStorage:'Yes'});
 });
 
+test('optional installation and login answers survive a prepared client link', () => {
+ const prepared=createPreparedBrief({...draft,installationTeams:'Yes',stampStaffLogin:'No',technicianLogin:'Not sure'});
+ assert.equal(prepared.installationTeams,'Yes');
+ assert.equal(prepared.stampStaffLogin,'No');
+ assert.equal(prepared.technicianLogin,'Not sure');
+ assert.equal(createPreparedBrief({...draft,installationTeams:'Unknown'}).installationTeams,undefined);
+});
+
 test('prepared client contact is trimmed, phone-normalized, and invalid phones are omitted', () => {
  const prepared=createPreparedBrief({name:'  A Client  ',mobile:'+91 90000 00001',company:'  Solar Co  '});
  assert.deepEqual(prepared,{name:'A Client',company:'Solar Co',mobile:'9000000001'});

@@ -19,9 +19,10 @@ export const INTEREST_OPTIONS = [
   'Finance', 'Attendance', 'Calendar', 'MIS upload auto updater', 'Checklists', 'Document uploads'
 ];
 
-const SINGLE_FIELDS = ['hasWebsite', 'teamSize', 'customerCount', 'liveCustomerCount', 'branches', 'partnerOffices', 'channelPartners', 'fileStorage', 'storageProvider'];
+const SINGLE_FIELDS = ['hasWebsite', 'teamSize', 'customerCount', 'liveCustomerCount', 'branches', 'partnerOffices', 'channelPartners', 'installationTeams', 'stampStaffLogin', 'technicianLogin', 'fileStorage', 'storageProvider'];
 const CHOICES = {hasWebsite:YES_NO_OPTIONS, teamSize:TEAM_SIZE_OPTIONS, branches:YES_NO_OPTIONS,
-  partnerOffices:YES_NO_OPTIONS, channelPartners:YES_NO_OPTIONS, fileStorage:['Yes', 'No'], storageProvider:STORAGE_PROVIDER_OPTIONS};
+  partnerOffices:YES_NO_OPTIONS, channelPartners:YES_NO_OPTIONS, installationTeams:YES_NO_OPTIONS,
+  stampStaffLogin:YES_NO_OPTIONS, technicianLogin:YES_NO_OPTIONS, fileStorage:['Yes', 'No'], storageProvider:STORAGE_PROVIDER_OPTIONS};
 
 export function createPreparedBrief(draft) {
   const prepared = {};

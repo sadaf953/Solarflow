@@ -8,7 +8,7 @@ import { CORE_DOCUMENT_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, SOFTWARE_OPTIONS, TEA
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
 const OTHER_INTEREST_OPTIONS = [
-    'Inventory', 'Vendor login', 'Stamp staff login', 'Technician login',
+    'Inventory', 'Warranty tracking',
     'Installation view', 'Installation commission view', 'Vendor commission page',
     'Channel partner commission view', 'Attendance', 'Calendar', 'MIS upload auto updater'
 ];
@@ -46,6 +46,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [branches, setBranches] = useState('');
     const [partnerOffices, setPartnerOffices] = useState('');
     const [channelPartners, setChannelPartners] = useState('');
+    const [installationTeams, setInstallationTeams] = useState('');
+    const [stampStaffLogin, setStampStaffLogin] = useState('');
+    const [technicianLogin, setTechnicianLogin] = useState('');
     const [prepareMode, setPrepareMode] = useState(false);
     const [prepareUnlocked, setPrepareUnlocked] = useState(false);
     const [preparePin, setPreparePin] = useState('');
@@ -62,7 +65,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const nameRef = useRef(null);
     const formId = useId();
     const {showConfirm} = useGlobalPopup();
-    const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || branches || partnerOffices || channelPartners || fileStorage || storageProvider || interests.join('|') !== selectedInterest);
+    const optionalDirty = Boolean(company || callDate || callTime || remarks || hasWebsite || teamSize || customerCount || liveCustomerCount || software.length || (software.includes('Other third-party software') && otherSoftware) || branches || partnerOffices || channelPartners || installationTeams || stampStaffLogin || technicianLogin || fileStorage || storageProvider || interests.join('|') !== selectedInterest);
     const dirty = prepareMode ? Boolean(name || mobile || optionalDirty) : step === 'contact' ? Boolean(name || mobile) : step === 'details' && optionalDirty;
 
     useEffect(() => {
@@ -109,7 +112,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 company: contactOnly && !preparedBrief ? '' : company, remarks: contactOnly ? '' : remarks,
                 callDate: contactOnly ? '' : callDate, callTime: contactOnly ? '' : callTime,
                 interests: chosenInterests,
-                businessDetails: contactOnly ? {} : {hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware:software.includes('Other third-party software') ? otherSoftware : '', branches, partnerOffices, channelPartners}});
+                businessDetails: contactOnly ? {} : {hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware:software.includes('Other third-party software') ? otherSoftware : '', branches, partnerOffices, channelPartners, installationTeams, stampStaffLogin, technicianLogin}});
         } catch (err) {setError(err.message); return;}
         if (!identityRef.current) identityRef.current = {id:crypto.randomUUID(), editToken:crypto.randomUUID()};
         savingRef.current = true;
@@ -129,6 +132,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         setSoftware(locked.software || []); setOtherSoftware(locked.otherSoftware || ''); setBranches(locked.branches || '');
         setFileStorage(locked.fileStorage || (initialStoreFiles == null ? '' : initialStoreFiles ? 'Yes' : 'No')); setStorageProvider(locked.storageProvider || '');
         setPartnerOffices(locked.partnerOffices || ''); setChannelPartners(locked.channelPartners || '');
+        setInstallationTeams(locked.installationTeams || ''); setStampStaffLogin(locked.stampStaffLogin || ''); setTechnicianLogin(locked.technicianLogin || '');
         setError(''); identityRef.current = null; setStep('contact');
     };
     const handleUnlock = async event => {
@@ -145,6 +149,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
             setSoftware(brief.software || []); setOtherSoftware(brief.otherSoftware || ''); setBranches(brief.branches || '');
             setFileStorage(brief.fileStorage || ''); setStorageProvider(brief.storageProvider || '');
             setPartnerOffices(brief.partnerOffices || ''); setChannelPartners(brief.channelPartners || '');
+            setInstallationTeams(brief.installationTeams || ''); setStampStaffLogin(brief.stampStaffLogin || ''); setTechnicianLogin(brief.technicianLogin || '');
             setAccessCode('');
         } catch (err) { setError(err.message || 'Could not open this prepared form.'); }
         finally { savingRef.current = false; setSubmitting(false); }
@@ -172,7 +177,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         savingRef.current = true; setSubmitting(true); setError('');
         try {
             const saved = await createSavedBrief(supabase, {
-                name, mobile, company, hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, fileStorage, storageProvider, interests
+                name, mobile, company, hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, branches, partnerOffices, channelPartners, installationTeams, stampStaffLogin, technicianLogin, fileStorage, storageProvider, interests
             }, preparePin);
             const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
             setShareLink(link); setShareCode(saved.code);
@@ -328,6 +333,9 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                             {choiceField('Do you have branches?', 'branches', branches, setBranches, YES_NO_OPTIONS)}
                                             {choiceField('Channel partner offices?', 'partnerOffices', partnerOffices, setPartnerOffices, YES_NO_OPTIONS)}
                                             {choiceField('Channel partners?', 'channelPartners', channelPartners, setChannelPartners, YES_NO_OPTIONS)}
+                                            {choiceField('Do you use third-party or multiple installation teams?', 'installationTeams', installationTeams, setInstallationTeams, YES_NO_OPTIONS)}
+                                            {choiceField('Do you need a stamp staff login?', 'stampStaffLogin', stampStaffLogin, setStampStaffLogin, YES_NO_OPTIONS)}
+                                            {choiceField('Do you need technician logins?', 'technicianLogin', technicianLogin, setTechnicianLogin, YES_NO_OPTIONS)}
                                         </div>
                                     </fieldset>
                                     <fieldset className="space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5">
