@@ -107,7 +107,7 @@ export async function unlockSavedBrief(client, id, code) {
   await ensureSession(client);
   const {data, error} = await client.rpc('unlock_prepared_brief', {p_id:id, p_code:code});
   if (error) throw error;
-  if (!data) throw new Error('That code is incorrect or the prepared form has expired.');
+  if (!data) throw new Error('This link did not open. Ask the sender to check the saved phone number and link. After several incorrect attempts, access pauses for 15 minutes.');
   const prepared = createPreparedBrief(data);
   if (!Object.keys(prepared).length) throw new Error('The prepared form has no usable answers.');
   return prepared;

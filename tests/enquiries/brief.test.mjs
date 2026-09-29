@@ -37,7 +37,7 @@ test('preparing and unlocking use authenticated RPCs and sanitize returned answe
  assert.deepEqual(opened,createPreparedBrief(draft));
  assert.deepEqual(calls.map(call=>call.name),['create_prepared_brief','unlock_prepared_brief']);
  client.rpc=async()=>({data:null,error:null});
- await assert.rejects(unlockSavedBrief(client,id,'WRONG'),/incorrect or.*expired/);
+ await assert.rejects(unlockSavedBrief(client,id,'WRONG'),/saved phone number and link/);
 });
 
 test('empty prepared forms cannot be saved',async()=>{

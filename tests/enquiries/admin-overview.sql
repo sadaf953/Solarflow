@@ -38,6 +38,26 @@ begin
         raise exception 'FAIL: wrong preparation code opened overview';
     exception when insufficient_privilege then null; end;
 end $$;
+reset role;
+update enquiry_private.prepared_briefs
+   set locked_until = now() + interval '15 minutes'
+ where id = current_setting('qa.brief_id')::uuid;
+set local role authenticated;
+do $$
+declare paused jsonb;
+begin
+    select item into paused
+      from jsonb_array_elements(public.admin_enquiry_catalog('0905')) item
+     where item->>'id' = current_setting('qa.brief_id');
+    if paused->>'access_status' <> 'paused' or paused->>'can_share' <> 'false' then
+        raise exception 'FAIL: paused prepared form was shown as shareable';
+    end if;
+end $$;
+reset role;
+update enquiry_private.prepared_briefs
+   set locked_until = null
+ where id = current_setting('qa.brief_id')::uuid;
+set local role authenticated;
 select set_config('request.jwt.claim.sub', gen_random_uuid()::text, true);
 do $$
 begin
