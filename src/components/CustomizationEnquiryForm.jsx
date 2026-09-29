@@ -26,7 +26,7 @@ const STORAGE_PRICING = [
 ];
 
 
-export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, submittedEnquiryId = null, allowPrepare = false}) {
+export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, submittedEnquiryId = null, allowPrepare = false, startInPrepareMode = false}) {
     const [preparedBrief, setPreparedBrief] = useState(null);
     const [loadedEnquiry, setLoadedEnquiry] = useState(null);
     const [extraNoteLines, setExtraNoteLines] = useState([]);
@@ -54,7 +54,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [installationTeams, setInstallationTeams] = useState('');
     const [stampStaffLogin, setStampStaffLogin] = useState('');
     const [technicianLogin, setTechnicianLogin] = useState('');
-    const [prepareMode, setPrepareMode] = useState(false);
+    const [prepareMode, setPrepareMode] = useState(startInPrepareMode);
     const [prepareUnlocked, setPrepareUnlocked] = useState(false);
     const [adminScreen, setAdminScreen] = useState('list');
     const [adminCatalog, setAdminCatalog] = useState([]);
@@ -65,6 +65,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [savedMatches, setSavedMatches] = useState([]);
     const [shareLink, setShareLink] = useState('');
     const [shareCode, setShareCode] = useState('');
+    const [linkCopied, setLinkCopied] = useState(false);
     const [inviteCopied, setInviteCopied] = useState(false);
     const [accessCode, setAccessCode] = useState('');
     const [remarks, setRemarks] = useState('');
@@ -247,10 +248,10 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 name, mobile, company, hasWebsite, teamSize, customerCount, liveCustomerCount, software, otherSoftware, dataStart, customRequest:remarks, branches, partnerOffices, channelPartners, installationTeams, stampStaffLogin, technicianLogin, fileStorage, storageProvider, interests
             }, preparePin);
             const link = preparedBriefLink(window.location.origin + window.location.pathname, saved.id);
-            setShareLink(link); setShareCode(saved.code); setInviteCopied(false);
+            setShareLink(link); setShareCode(saved.code); setLinkCopied(false); setInviteCopied(false);
             setAdminCatalog(current => [{kind:'prepared', id:saved.id, name:name.trim(), mobile:mobile.trim().replace(/[\s()-]/g, '').replace(/^\+91/, ''), company:company.trim(), created_at:new Date().toISOString(), can_share:true, expires_at:new Date(Date.now()+30*86400000).toISOString()}, ...current]);
             setSelectedAdminItem(null); setAdminScreen('list');
-            try { await navigator.clipboard?.writeText(link); } catch { /* The link remains selectable below. */ }
+            try { await navigator.clipboard.writeText(link); setLinkCopied(true); } catch { /* The link remains selectable below. */ }
         } catch (err) { setError(err.message || 'Could not prepare the client form.'); }
         finally { savingRef.current = false; setSubmitting(false); }
     };
@@ -259,17 +260,21 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         try { await navigator.clipboard.writeText(message); setInviteCopied(true); setError(''); }
         catch { setError('Could not copy the message. You can still copy the client link above.'); }
     };
+    const copyShareLink = async () => {
+        try { await navigator.clipboard.writeText(shareLink); setLinkCopied(true); setError(''); }
+        catch { setError('Could not copy the link. You can select and copy it from the field below.'); }
+    };
     const startNewPreparedForm = () => {
-        reset(); setPreparedBrief(null); setShareLink(''); setShareCode(''); setSelectedAdminItem(null); setAdminScreen('new');
+        reset(); setPreparedBrief(null); setShareLink(''); setShareCode(''); setLinkCopied(false); setSelectedAdminItem(null); setAdminScreen('new');
     };
     const selectAdminItem = item => {
-        setSelectedAdminItem(item); setShareLink(''); setShareCode(''); setInviteCopied(false); setError('');
+        setSelectedAdminItem(item); setShareLink(''); setShareCode(''); setLinkCopied(false); setInviteCopied(false); setError('');
     };
     const shareAdminItem = async item => {
         if (item.kind === 'prepared' && !item.can_share) {setError(item.access_status === 'paused' ? 'This form is paused after too many incorrect codes. Refresh the list and share it after the pause ends.' : 'This prepared link has expired or uses an older access code. Prepare a new form to share it again.'); return;}
         const link = item.kind === 'prepared' ? preparedBriefLink(window.location.origin + window.location.pathname, item.id) : submittedEnquiryLink(window.location.origin + window.location.pathname, item.id);
-        setShareLink(link); setShareCode(item.mobile.slice(-4)); setInviteCopied(false); setError('');
-        try { await navigator.clipboard?.writeText(link); } catch { /* The link remains selectable below. */ }
+        setShareLink(link); setShareCode(item.mobile.slice(-4)); setLinkCopied(false); setInviteCopied(false); setError('');
+        try { await navigator.clipboard.writeText(link); setLinkCopied(true); } catch { /* The link remains selectable below. */ }
     };
     const refreshAdminCatalog = async () => {
         if (savingRef.current) return;
@@ -377,7 +382,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                             {selectedAdminItem.kind === 'prepared' && <p className="text-xs text-stone-600">{selectedAdminItem.access_status === 'paused' ? 'This link is paused after too many incorrect codes. It can be opened again after the pause ends.' : selectedAdminItem.can_share ? `Check this is the client’s number ending ${selectedAdminItem.mobile.slice(-4)} before sharing. They can then finish their answers.` : 'This link can no longer be opened with the phone code.'}</p>}
                             <button type="button" disabled={selectedAdminItem.kind === 'prepared' && !selectedAdminItem.can_share} onClick={() => shareAdminItem(selectedAdminItem)} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">Copy client link</button>
                         </div>}
-                        {shareLink && <div className="space-y-3 rounded-xl bg-emerald-50 p-3" role="status"><p className="text-sm font-bold text-emerald-800">Client link ready to share</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass}/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs font-semibold text-stone-700">Access code: {shareCode}. Check the client’s saved phone number above before sending.</p></div>}
+                        {shareLink && <div className="space-y-3 rounded-xl bg-emerald-50 p-3" role="status"><p className="text-sm font-bold text-emerald-800">Form saved · client link ready to share</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass}/></label><div className="grid gap-2 sm:grid-cols-2"><button type="button" onClick={copyShareLink} className="min-h-11 rounded-xl bg-emerald-800 px-4 py-3 text-sm font-bold text-white">{linkCopied ? 'Link copied' : 'Copy link'}</button><button type="button" onClick={copyInviteMessage} className="min-h-11 rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button></div><p className="text-xs font-semibold text-stone-700">Access code: {shareCode}. Check the client’s saved phone number above before sending.</p></div>}
                     </div>
                 ) : !prepareMode && step === 'done' ? (
                     <div className="text-center space-y-4 py-4" role="status">
@@ -420,6 +425,10 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                             <label className="block text-xs font-bold sm:col-span-2">Company name <span aria-hidden="true">*</span>
                                                 <input required maxLength={300} autoComplete="off" value={company} onChange={event => setCompany(event.target.value)} placeholder="Company name" className={fieldClass}/>
                                             </label>
+                                        </div>
+                                        <div className="mt-4 rounded-xl bg-orange-50 p-3">
+                                            <p className="text-xs text-stone-700">You can save and share with just these contact details, or fill more answers below first.</p>
+                                            <button type="submit" className="mt-3 min-h-11 w-full rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Saving…' : 'Save form and get share link'}</button>
                                         </div>
                                     </fieldset>}
                                     {!prepareMode && <p ref={detailsRef} tabIndex={-1} role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800 outline-none">{loadedEnquiry ? 'Saved enquiry' : 'Contact saved'}: {name} · {mobile}</p>}
@@ -511,7 +520,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                             )}
                             {prepareMode ? <>
                                 <p className="text-xs text-stone-500">Share the link and access code with your client. The form stays available for 30 days, and they can change any answer.</p>
-                                <button type="submit" disabled={submitting} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Preparing…' : 'Create and copy client link'}</button>
+                                <button type="submit" disabled={submitting} className="w-full min-h-11 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Copy size={16}/>{submitting ? 'Saving…' : 'Save form and get share link'}</button>
                                 {shareLink && <div className="rounded-xl bg-emerald-50 p-3 space-y-3" role="status"><p className="text-sm font-bold text-emerald-800">Ready to send for a custom quotation</p><label className="block text-xs font-bold">Client link<input readOnly value={shareLink} onFocus={event => event.target.select()} className={fieldClass} aria-label="Prepared client form link"/></label><button type="button" onClick={copyInviteMessage} className="min-h-11 w-full rounded-xl border border-emerald-700 px-4 py-3 text-sm font-bold text-emerald-900">{inviteCopied ? 'Invitation copied' : 'Copy invitation message'}</button><p className="text-xs text-stone-600">Client access code: {shareCode}</p></div>}
                             </> : <button type="submit" className={`${guidedMobile && mobileQuestionStep < 5 ? 'hidden sm:flex' : 'flex'} w-full min-h-12 py-3 rounded-xl bg-stone-900 text-white font-bold text-sm items-center justify-center gap-2 disabled:opacity-50`} disabled={submitting}>
                                 {submitting ? <LoaderCircle size={16} className="animate-spin"/> : <ArrowRight size={16}/>}

@@ -75,7 +75,8 @@ export default function App(){
    try{
     // A shared quotation link always opens its client form, even in a browser
     // that previously entered the demo.
-    if(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash))return;
+    if(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)
+      || (/^#\/plans\?/.test(window.location.hash) && new URLSearchParams(window.location.hash.split('?')[1]).get('admin')==='1'))return;
     const {data}=await supabase.auth.getSession();
     if(!data?.session)return;
     // Fresh visit: show the landing page even though a session is stored.
