@@ -123,6 +123,66 @@ const batchMaterialMatrix = manifest => {
     };
 };
 
+function MaterialDeliverySheet({ batch, matrix, loading, error }) {
+    return <div id="printable-material-summary" className="mx-auto max-w-[210mm] bg-white text-stone-950 print-document">
+        {loading && <p role="status" className="m-4 border border-amber-300 bg-amber-50 p-3 text-sm font-bold no-print">Loading each customer's saved BOM quantities…</p>}
+        {error && <p role="alert" className="m-4 border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800 no-print">{error}</p>}
+        {!loading && !error && <section className="material-summary-page p-6 sm:p-8">
+            <header className="border-b-2 border-stone-900 pb-3 mb-4">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-xl font-black uppercase tracking-wide">SolarFlow Demo Energy</h1>
+                        <p className="text-sm font-bold">Gate pass · Delivery order · Material summary</p>
+                    </div>
+                    <strong className="text-sm text-right">{batch.batch_no}</strong>
+                </div>
+            </header>
+            <div className="material-summary-details grid grid-cols-2 gap-x-5 gap-y-2 text-sm border border-stone-400 p-3 mb-4">
+                <div><strong>Vehicle:</strong> {batch.vehicle_number || '–'}</div>
+                <div><strong>Dispatch:</strong> {batch.dispatch_date || '–'}</div>
+                <div><strong>Driver:</strong> {batch.driver_name || '–'}</div>
+                <div><strong>Driver phone:</strong> {batch.driver_phone || '–'}</div>
+                <div><strong>Stops:</strong> {matrix.customers.length}</div>
+                <div><strong>Vendor:</strong> {batch.vendor || '–'}</div>
+            </div>
+            <h2 className="text-sm font-black uppercase tracking-wide mb-2">Delivery order / drop-off locations</h2>
+            <ol className="material-summary-stops grid gap-2 mb-4">
+                {matrix.customers.map((customer, index) => <li key={customer.id} className="grid grid-cols-[2rem_1fr] gap-2 border border-stone-300 p-2 text-sm">
+                    <strong className="text-base">{index + 1}.</strong>
+                    <div><strong>{customer.customer_name || 'Unnamed customer'}</strong> · {customer.phone_number || 'No phone'}
+                        <div className="text-stone-600">{[customer.villages, customer.sub_divisions].filter(Boolean).join(', ') || 'Address not recorded'}{customer.system_capacity_kwp ? ` · ${customer.system_capacity_kwp} kWp` : ''}</div>
+                    </div>
+                </li>)}
+            </ol>
+            {batch.notes && <p className="text-sm border-l-2 border-stone-500 pl-2 mb-4"><strong>Gate / route instructions:</strong> {batch.notes}</p>}
+            <h2 className="text-sm font-black uppercase tracking-wide mb-1">Materials to load and deliver</h2>
+            <p className="text-xs text-stone-600 mb-2">Stop numbers match the delivery order above. Blank stops do not receive that material.</p>
+            {matrix.rows.length ? <table className="material-summary-table w-full table-fixed border-collapse text-[13px] leading-snug">
+                <colgroup><col style={{width:'40%'}}/><col style={{width:'12%'}}/><col style={{width:'13%'}}/><col style={{width:'35%'}}/></colgroup>
+                <thead><tr className="bg-stone-100">
+                    <th className="border border-stone-400 p-1.5 text-left">Material</th>
+                    <th className="border border-stone-400 p-1.5 text-right">Total</th>
+                    <th className="border border-stone-400 p-1.5 text-left">Unit</th>
+                    <th className="border border-stone-400 p-1.5 text-left">Quantity by stop</th>
+                </tr></thead>
+                <tbody>{matrix.rows.map((row, index) => <tr key={`${row.product_name}-${row.uom}`} className={index%2?'bg-stone-50':'bg-white'}>
+                    <td className="border border-stone-300 px-1.5 py-1 font-semibold">{row.product_name}</td>
+                    <td className="border border-stone-300 px-1.5 py-1 text-right font-black">{formatMaterialQuantity(row.total)}</td>
+                    <td className="border border-stone-300 px-1.5 py-1">{row.uom}</td>
+                    <td className="border border-stone-300 px-1.5 py-1 font-semibold">
+                        {row.customerQuantities.map((quantity, stop) => quantity ? `${stop + 1}: ${formatMaterialQuantity(quantity)}` : null).filter(Boolean).join('  ·  ') || '–'}
+                    </td>
+                </tr>)}</tbody>
+            </table> : <p className="border border-stone-300 p-3 text-sm font-semibold">No saved BOM quantities are available for this batch.</p>}
+            <div className="material-summary-signatures mt-6 grid grid-cols-3 gap-5 text-center text-xs font-bold">
+                <div className="border-t border-stone-500 pt-1 mt-8">Warehouse / Gate</div>
+                <div className="border-t border-stone-500 pt-1 mt-8">Driver / Transporter</div>
+                <div className="border-t border-stone-500 pt-1 mt-8">Received at final stop</div>
+            </div>
+        </section>}
+    </div>;
+}
+
 export default function DeliveryBatchesView({ 
     currentUser, 
     customers: propCustomers = [], 
@@ -569,70 +629,59 @@ export default function DeliveryBatchesView({
 
     const handlePrintMaterialSheet = () => {
         if (!materialSheetBatch || printMaterialsLoading || printMaterialsError) return;
-        const cleanBatch = String(materialSheetBatch?.batch_no || materialSheetBatch?.id || 'Batch').replace(/[^a-zA-Z0-9_-]/g, '_');
-        const cleanVehicle = String(materialSheetBatch?.vehicle_number || 'Vehicle').replace(/[^a-zA-Z0-9_-]/g, '_');
-        const docTitle = `Material_Summary_${cleanBatch}_${cleanVehicle}`;
         const source = document.getElementById('printable-material-summary');
         if (!source) return;
-
-        const frame = document.createElement('iframe');
-        frame.setAttribute('title', 'Material summary print document');
-        frame.style.position = 'fixed';
-        frame.style.right = '0';
-        frame.style.bottom = '0';
-        frame.style.width = '0';
-        frame.style.height = '0';
-        frame.style.border = '0';
-        document.body.appendChild(frame);
-
-        const printDocument = frame.contentDocument;
-        const printWindow = frame.contentWindow;
-        if (!printDocument || !printWindow) {
-            frame.remove();
-            showAlert('The print preview could not be opened.', { type: 'error' });
-            return;
-        }
-
-        const styles = [...document.head.querySelectorAll('style, link[rel="stylesheet"]')]
-            .map(node => node.outerHTML)
-            .join('');
-        printDocument.open();
-        printDocument.write(`<!doctype html><html><head><meta charset="utf-8"><title>${docTitle}</title>${styles}<style>
-            @page { size: A4 landscape; margin: 5mm; }
-            html, body { width: 100%; height: auto; margin: 0; padding: 0; overflow: visible; background: #fff; color: #000; }
-            body *, body * * { visibility: visible !important; }
-            #printable-material-summary { position: static !important; width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
-            .material-summary-page { box-sizing: border-box !important; width: 100% !important; margin: 0 !important; padding: 3mm !important; break-inside: auto; page-break-inside: auto; }
-            .material-summary-page:not(:last-child) { break-after: page; page-break-after: always; }
-            .material-summary-table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '10px' : '12px'} !important; line-height: 1.3 !important; color: #000 !important; }
-            .material-summary-table thead { display: table-header-group; }
-            .material-summary-table tr { break-inside: avoid; page-break-inside: avoid; }
-            .material-summary-table th, .material-summary-table td { padding: 3px 5px !important; border: 1px solid #555 !important; color: #000 !important; background: #fff !important; overflow-wrap: anywhere; }
-            .material-summary-table td:not(:first-child) { font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '11px' : '13px'} !important; }
-            .material-summary-table th span { overflow-wrap: anywhere; }
-            .material-summary-signatures { break-inside: avoid; page-break-inside: avoid; }
-            .no-print { display: none !important; }
-        </style></head><body>${source.outerHTML}</body></html>`);
-        printDocument.close();
-
+        const cleanBatch = String(materialSheetBatch.batch_no || materialSheetBatch.id || 'Batch').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const previousTitle = document.title;
+        const printCopy = source.cloneNode(true);
+        printCopy.id = 'material-summary-print-copy';
+        printCopy.style.display = 'none';
+        document.body.appendChild(printCopy);
+        const printStyle = document.createElement('style');
+        printStyle.textContent = `
+            @media print {
+                @page { size: A4 portrait; margin: 10mm; }
+                body > *:not(#material-summary-print-copy) { display: none !important; }
+                #material-summary-print-copy.print-document {
+                    display: block !important; visibility: visible !important;
+                    position: static !important; inset: auto !important;
+                    width: 100% !important; max-width: none !important;
+                    height: auto !important; max-height: none !important;
+                    margin: 0 !important; padding: 0 !important;
+                    overflow: visible !important; background: #fff !important;
+                }
+                #material-summary-print-copy * { visibility: visible !important; }
+                #material-summary-print-copy .material-summary-page { padding: 0 !important; margin: 0 !important; }
+                #material-summary-print-copy .material-summary-table { table-layout: fixed !important; font-size: 12px !important; line-height: 1.35 !important; }
+                #material-summary-print-copy .material-summary-table th,
+                #material-summary-print-copy .material-summary-table td { padding: 4px 6px !important; border: 1px solid #777 !important; overflow-wrap: anywhere; }
+                #material-summary-print-copy .material-summary-table th { background: #eee !important; color: #111 !important; }
+                #material-summary-print-copy .material-summary-table thead { display: table-header-group; }
+                #material-summary-print-copy .material-summary-table tr,
+                #material-summary-print-copy .material-summary-stops li,
+                #material-summary-print-copy .material-summary-signatures { break-inside: avoid; page-break-inside: avoid; }
+            }
+        `;
+        document.head.appendChild(printStyle);
         let cleanedUp = false;
         const cleanup = () => {
             if (cleanedUp) return;
             cleanedUp = true;
-            frame.remove();
+            window.removeEventListener('afterprint', cleanup);
+            printCopy.remove();
+            printStyle.remove();
+            document.title = previousTitle;
         };
-        printWindow.addEventListener('afterprint', cleanup, { once: true });
-        setTimeout(() => {
-            try {
-                printWindow.focus();
-                printWindow.print();
-            } catch (err) {
-                console.error('Print execution error:', err);
-                cleanup();
-                showAlert('The print preview could not be opened.', { type: 'error' });
-            }
-        }, 300);
-        setTimeout(cleanup, 60000);
+        window.addEventListener('afterprint', cleanup, { once: true });
+        document.title = `Delivery_Material_Sheet_${cleanBatch}`;
+        try {
+            window.print();
+        } catch (error) {
+            console.error('Print execution error:', error);
+            cleanup();
+            showAlert('The print dialog could not be opened.', { type: 'error' });
+        }
+        setTimeout(cleanup, 120000);
     };
 
     const handleOpenMaterialSheet = async batch => {
@@ -1643,128 +1692,32 @@ export default function DeliveryBatchesView({
                 </div>
             )}
 
-            {/* Separate landscape material quantity matrix */}
+            {/* Portrait gate pass and compact material delivery sheet */}
             {materialSheetBatch && (() => {
                 const manifest = batchMaterialManifest(materialSheetBatch, customers, printBomItems);
                 const matrix = batchMaterialMatrix(manifest);
-                const materialPageSize = Math.ceil(matrix.rows.length / 2);
-                const materialPages = matrix.rows.length
-                    ? [matrix.rows.slice(0, materialPageSize), matrix.rows.slice(materialPageSize)].filter(page => page.length)
-                    : [];
-                const materialWidth = Math.max(34, 70 - 6 * matrix.customers.length);
-                const customerWidth = matrix.customers.length ? (100 - materialWidth - 9 - 7) / matrix.customers.length : 0;
-                return (
-                    <div className="fixed inset-0 z-50 bg-stone-900/70 backdrop-blur-sm flex items-center justify-center p-2 overflow-y-auto material-summary-overlay">
-                        <div className="bg-white rounded-2xl shadow-2xl max-w-[calc(100vw-1rem)] w-full max-h-[calc(100vh-1rem)] flex flex-col overflow-hidden print-container material-summary-print">
-                            <div className="px-4 py-3 bg-stone-900 text-white flex flex-wrap items-center justify-between gap-2 no-print">
-                                <div className="flex items-center gap-2">
-                                    <FileText size={18} className="text-amber-400" />
-                                    <h3 className="text-sm font-black uppercase tracking-wider">
-                                        Material Summary Preview - {materialSheetBatch.batch_no}
-                                    </h3>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={handlePrintMaterialSheet}
-                                        disabled={printMaterialsLoading || Boolean(printMaterialsError) || matrix.rows.length === 0}
-                                        className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <Printer size={14} /> {printMaterialsLoading ? 'Loading Materials…' : 'Print Summary'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        aria-label="Close material summary"
-                                        onClick={() => { setMaterialSheetBatch(null); setPrintBomItems({}); setPrintMaterialsError(''); }}
-                                        className="text-stone-400 hover:text-white p-1 rounded-lg transition"
-                                    >
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 overflow-auto p-1 sm:p-2 bg-stone-100 text-stone-900 print-document" id="printable-material-summary">
-                                {printMaterialsLoading && (
-                                    <p role="status" className="mb-4 border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-900 no-print">
-                                        Loading each customer's saved BOM quantities…
-                                    </p>
-                                )}
-                                {printMaterialsError && (
-                                    <p role="alert" className="mb-4 border border-red-300 bg-red-50 p-3 text-xs font-bold text-red-800 no-print">
-                                        {printMaterialsError}
-                                    </p>
-                                )}
-
-                                {materialPages.length ? materialPages.map((pageRows, pageIndex) => (
-                                    <section key={pageIndex} className={`bg-white p-4 material-summary-page ${pageIndex ? 'mt-2' : ''}`}>
-                                        <div className="border-b-2 border-stone-900 pb-1 mb-1 flex items-end justify-between gap-2">
-                                            <div>
-                                                <h1 className="text-base font-black uppercase tracking-wide text-stone-950">SolarFlow Demo Energy</h1>
-                                                <p className="text-[10px] font-semibold text-stone-600">Batch Material Quantity Summary</p>
-                                            </div>
-                                            <div className="text-right text-[9px] leading-4">
-                                                <div><strong>Batch:</strong> {materialSheetBatch.batch_no} · <strong>Vehicle:</strong> {materialSheetBatch.vehicle_number || '–'}</div>
-                                                <div><strong>Dispatch:</strong> {materialSheetBatch.dispatch_date || '–'} · <strong>Page:</strong> {pageIndex + 1} of {materialPages.length}</div>
-                                            </div>
-                                        </div>
-                                    <table className="w-full table-fixed border-collapse border border-stone-400 text-[14px] leading-snug material-summary-table">
-                                        <colgroup>
-                                            <col style={{ width: `${materialWidth}%` }} />
-                                            <col style={{ width: '9%' }} />
-                                            <col style={{ width: '7%' }} />
-                                            {matrix.customers.map(customer => <col key={customer.id} style={{ width: `${customerWidth}%` }} />)}
-                                        </colgroup>
-                                        <thead>
-                                            <tr className="bg-stone-900 text-white">
-                                                <th className="border border-stone-500 p-1.5 text-left">Material</th>
-                                                <th className="border border-stone-500 p-1.5 text-right">Total<br/>Quantity</th>
-                                                <th className="border border-stone-500 p-1.5 text-left">Unit</th>
-                                                {matrix.customers.map((customer, index) => (
-                                                    <th key={customer.id} className="border border-stone-500 p-1.5 text-center break-words">
-                                                        <span className="block text-[12px]">Customer {index + 1}</span>
-                                                        <span className="block normal-case font-semibold text-[13px] text-stone-200 leading-tight">{customer.customer_name || 'Unnamed'}</span>
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {pageRows.map((row, rowIndex) => (
-                                                <tr key={`${row.product_name}-${row.uom}`} className={rowIndex % 2 ? 'bg-stone-50' : 'bg-white'}>
-                                                    <td className="border border-stone-300 px-1.5 py-1 font-semibold break-words">{row.product_name}</td>
-                                                    <td className="border border-stone-300 px-1.5 py-1 text-right font-black text-[15px]">{formatMaterialQuantity(row.total)}</td>
-                                                    <td className="border border-stone-300 px-1.5 py-1 break-words">{row.uom}</td>
-                                                    {row.customerQuantities.map((quantity, customerIndex) => (
-                                                        <td key={`${row.product_name}-${customerIndex}`} className="border border-stone-300 px-1.5 py-1 text-center font-bold text-[15px]">
-                                                            {quantity ? formatMaterialQuantity(quantity) : '–'}
-                                                        </td>
-                                                    ))}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {pageIndex === materialPages.length - 1 && (
-                                        <div className="mt-3 grid grid-cols-3 gap-6 text-center text-[9px] material-summary-signatures">
-                                            <div><div className="h-5 border-b border-stone-500 mb-0.5"></div><strong>Prepared By</strong></div>
-                                            <div><div className="h-5 border-b border-stone-500 mb-0.5"></div><strong>Warehouse Checked By</strong></div>
-                                            <div><div className="h-5 border-b border-stone-500 mb-0.5"></div><strong>Driver / Transporter</strong></div>
-                                        </div>
-                                    )}
-                                    </section>
-                                )) : !printMaterialsLoading && !printMaterialsError ? (
-                                    <p className="border border-stone-300 p-4 text-sm font-semibold">No saved BOM quantities are available for this batch.</p>
-                                ) : null}
+                return <div className="fixed inset-0 z-50 bg-stone-900/70 backdrop-blur-sm flex items-center justify-center p-2 overflow-y-auto material-summary-overlay">
+                    <div className="bg-stone-100 rounded-2xl shadow-2xl w-full max-w-[850px] max-h-[calc(100vh-1rem)] flex flex-col overflow-hidden material-summary-print">
+                        <div className="px-4 py-3 bg-stone-900 text-white flex flex-wrap items-center justify-between gap-2 no-print">
+                            <div className="flex items-center gap-2"><FileText size={18} className="text-amber-400"/><h3 className="text-sm font-black uppercase tracking-wider">Delivery sheet preview - {materialSheetBatch.batch_no}</h3></div>
+                            <div className="flex items-center gap-3">
+                                <button type="button" onClick={handlePrintMaterialSheet} disabled={printMaterialsLoading || Boolean(printMaterialsError) || matrix.rows.length === 0} className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"><Printer size={14}/>{printMaterialsLoading ? 'Loading Materials…' : 'Print delivery sheet'}</button>
+                                <button type="button" aria-label="Close material summary" onClick={() => { setMaterialSheetBatch(null); setPrintBomItems({}); setPrintMaterialsError(''); }} className="text-stone-400 hover:text-white p-1 rounded-lg transition"><X size={18}/></button>
                             </div>
                         </div>
+                        <div className="flex-1 overflow-auto p-2 sm:p-4 bg-stone-100">
+                            <MaterialDeliverySheet batch={materialSheetBatch} matrix={matrix} loading={printMaterialsLoading} error={printMaterialsError}/>
+                        </div>
                     </div>
-                );
+                </div>;
             })()}
 
             {/* Print Specific CSS */}
             <style>{`
                 @media print {
                     @page {
-                        size: ${materialSheetBatch ? 'A4 landscape' : 'A4 portrait'};
-                        margin: ${materialSheetBatch ? '5mm' : '10mm'};
+                        size: A4 portrait;
+                        margin: 10mm;
                     }
                     body * {
                         visibility: hidden !important;
