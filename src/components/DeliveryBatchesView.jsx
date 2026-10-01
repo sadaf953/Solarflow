@@ -124,20 +124,21 @@ const batchMaterialMatrix = manifest => {
 };
 
 function MaterialDeliverySheet({ batch, matrix, loading, error }) {
-    return <div id="printable-material-summary" className="mx-auto max-w-[210mm] bg-white text-stone-950 print-document">
+    const customerWidth = matrix.customers.length ? `${48 / matrix.customers.length}%` : '16%';
+    return <div id="printable-material-summary" className="mx-auto max-w-[297mm] bg-white text-stone-950 print-document" style={{ fontFamily: "'Roboto', Arial, sans-serif" }}>
         {loading && <p role="status" className="m-4 border border-amber-300 bg-amber-50 p-3 text-sm font-bold no-print">Loading each customer's saved BOM quantities…</p>}
         {error && <p role="alert" className="m-4 border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-800 no-print">{error}</p>}
-        {!loading && !error && <section className="material-summary-page p-6 sm:p-8">
-            <header className="border-b-2 border-stone-900 pb-3 mb-4">
+        {!loading && !error && <section className="material-summary-page p-5 sm:p-7">
+            <header className="border-b-2 border-stone-900 pb-2 mb-3">
                 <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-black uppercase tracking-wide">SolarFlow Demo Energy</h1>
-                        <p className="text-sm font-bold">Gate pass · Delivery order · Material summary</p>
+                        <h1 className="text-lg font-black uppercase tracking-wide">SolarFlow Demo Energy</h1>
+                        <p className="text-xs font-bold">Gate pass · Loading list · Delivery order</p>
                     </div>
                     <strong className="text-sm text-right">{batch.batch_no}</strong>
                 </div>
             </header>
-            <div className="material-summary-details grid grid-cols-2 gap-x-5 gap-y-2 text-sm border border-stone-400 p-3 mb-4">
+            <div className="material-summary-details grid grid-cols-3 gap-x-4 gap-y-1 text-xs border border-stone-400 p-2 mb-3">
                 <div><strong>Vehicle:</strong> {batch.vehicle_number || '–'}</div>
                 <div><strong>Dispatch:</strong> {batch.dispatch_date || '–'}</div>
                 <div><strong>Driver:</strong> {batch.driver_name || '–'}</div>
@@ -145,33 +146,28 @@ function MaterialDeliverySheet({ batch, matrix, loading, error }) {
                 <div><strong>Stops:</strong> {matrix.customers.length}</div>
                 <div><strong>Vendor:</strong> {batch.vendor || '–'}</div>
             </div>
-            <h2 className="text-sm font-black uppercase tracking-wide mb-2">Delivery order / drop-off locations</h2>
-            <ol className="material-summary-stops grid gap-2 mb-4">
-                {matrix.customers.map((customer, index) => <li key={customer.id} className="grid grid-cols-[2rem_1fr] gap-2 border border-stone-300 p-2 text-sm">
-                    <strong className="text-base">{index + 1}.</strong>
-                    <div><strong>{customer.customer_name || 'Unnamed customer'}</strong> · {customer.phone_number || 'No phone'}
-                        <div className="text-stone-600">{[customer.villages, customer.sub_divisions].filter(Boolean).join(', ') || 'Address not recorded'}{customer.system_capacity_kwp ? ` · ${customer.system_capacity_kwp} kWp` : ''}</div>
-                    </div>
+            <h2 className="text-xs font-black uppercase tracking-wide mb-1">Delivery order</h2>
+            <ol className="material-summary-stops grid grid-cols-3 gap-1.5 mb-3">
+                {matrix.customers.map((customer, index) => <li key={customer.id} className="border border-stone-300 px-2 py-1 text-xs leading-tight">
+                    <strong>{index + 1}. {customer.customer_name || 'Unnamed customer'}</strong> · {customer.phone_number || 'No phone'}
+                    <div className="text-stone-600">{[customer.villages, customer.sub_divisions].filter(Boolean).join(', ') || 'Address not recorded'}{customer.system_capacity_kwp ? ` · ${customer.system_capacity_kwp} kWp` : ''}</div>
                 </li>)}
             </ol>
-            {batch.notes && <p className="text-sm border-l-2 border-stone-500 pl-2 mb-4"><strong>Gate / route instructions:</strong> {batch.notes}</p>}
-            <h2 className="text-sm font-black uppercase tracking-wide mb-1">Materials to load and deliver</h2>
-            <p className="text-xs text-stone-600 mb-2">Stop numbers match the delivery order above. Blank stops do not receive that material.</p>
+            {batch.notes && <p className="text-xs border-l-2 border-stone-500 pl-2 mb-2"><strong>Gate / route instructions:</strong> {batch.notes}</p>}
+            <h2 className="text-xs font-black uppercase tracking-wide mb-1">Combined materials to load</h2>
             {matrix.rows.length ? <table className="material-summary-table w-full table-fixed border-collapse text-[13px] leading-snug">
-                <colgroup><col style={{width:'40%'}}/><col style={{width:'12%'}}/><col style={{width:'13%'}}/><col style={{width:'35%'}}/></colgroup>
+                <colgroup><col style={{width:'30%'}}/><col style={{width:'13%'}}/><col style={{width:'9%'}}/>{matrix.customers.map(customer => <col key={customer.id} style={{width:customerWidth}}/>)}</colgroup>
                 <thead><tr className="bg-stone-100">
-                    <th className="border border-stone-400 p-1.5 text-left">Material</th>
-                    <th className="border border-stone-400 p-1.5 text-right">Total</th>
+                    <th className="border border-stone-400 p-1.5 text-left">Material / item</th>
+                    <th className="border border-stone-400 p-1.5 text-right">Total to load</th>
                     <th className="border border-stone-400 p-1.5 text-left">Unit</th>
-                    <th className="border border-stone-400 p-1.5 text-left">Quantity by stop</th>
+                    {matrix.customers.map((customer, index) => <th key={customer.id} className="material-customer-heading border border-stone-400 p-1.5 text-center"><span className="block text-[11px] font-medium">Customer {index + 1}</span><strong className="block leading-tight break-words">{customer.customer_name || 'Unnamed customer'}</strong></th>)}
                 </tr></thead>
                 <tbody>{matrix.rows.map((row, index) => <tr key={`${row.product_name}-${row.uom}`} className={index%2?'bg-stone-50':'bg-white'}>
                     <td className="border border-stone-300 px-1.5 py-1 font-semibold">{row.product_name}</td>
                     <td className="border border-stone-300 px-1.5 py-1 text-right font-black">{formatMaterialQuantity(row.total)}</td>
                     <td className="border border-stone-300 px-1.5 py-1">{row.uom}</td>
-                    <td className="border border-stone-300 px-1.5 py-1 font-semibold">
-                        {row.customerQuantities.map((quantity, stop) => quantity ? `${stop + 1}: ${formatMaterialQuantity(quantity)}` : null).filter(Boolean).join('  ·  ') || '–'}
-                    </td>
+                    {row.customerQuantities.map((quantity, stop) => <td key={matrix.customers[stop]?.id || stop} className="border border-stone-300 px-1.5 py-1 text-center font-semibold">{quantity ? formatMaterialQuantity(quantity) : '–'}</td>)}
                 </tr>)}</tbody>
             </table> : <p className="border border-stone-300 p-3 text-sm font-semibold">No saved BOM quantities are available for this batch.</p>}
             <div className="material-summary-signatures mt-6 grid grid-cols-3 gap-5 text-center text-xs font-bold">
@@ -635,13 +631,14 @@ export default function DeliveryBatchesView({
         const previousTitle = document.title;
         const printCopy = source.cloneNode(true);
         printCopy.id = 'material-summary-print-copy';
-        printCopy.style.display = 'none';
         document.body.appendChild(printCopy);
         const printStyle = document.createElement('style');
         printStyle.textContent = `
+            @page { size: A4 landscape; margin: 9mm; }
+            @media screen { #material-summary-print-copy { display: none !important; } }
             @media print {
-                @page { size: A4 portrait; margin: 10mm; }
                 body > *:not(#material-summary-print-copy) { display: none !important; }
+                html, body { width: auto !important; height: auto !important; margin: 0 !important; padding: 0 !important; overflow: visible !important; }
                 #material-summary-print-copy.print-document {
                     display: block !important; visibility: visible !important;
                     position: static !important; inset: auto !important;
@@ -649,20 +646,24 @@ export default function DeliveryBatchesView({
                     height: auto !important; max-height: none !important;
                     margin: 0 !important; padding: 0 !important;
                     overflow: visible !important; background: #fff !important;
+                    font-family: 'Roboto', Arial, sans-serif !important;
                 }
                 #material-summary-print-copy * { visibility: visible !important; }
                 #material-summary-print-copy .material-summary-page { padding: 0 !important; margin: 0 !important; }
-                #material-summary-print-copy .material-summary-table { table-layout: fixed !important; font-size: 12px !important; line-height: 1.35 !important; }
+                #material-summary-print-copy .material-summary-table { table-layout: fixed !important; width: 100% !important; font-size: 12px !important; line-height: 1.2 !important; }
                 #material-summary-print-copy .material-summary-table th,
-                #material-summary-print-copy .material-summary-table td { padding: 4px 6px !important; border: 1px solid #777 !important; overflow-wrap: anywhere; }
+                #material-summary-print-copy .material-summary-table td { padding: 3px 5px !important; border: 1px solid #777 !important; overflow-wrap: anywhere; }
                 #material-summary-print-copy .material-summary-table th { background: #eee !important; color: #111 !important; }
                 #material-summary-print-copy .material-summary-table thead { display: table-header-group; }
+                #material-summary-print-copy .material-customer-heading span,
+                #material-summary-print-copy .material-customer-heading strong { display: block; white-space: normal; }
+                #material-summary-print-copy .material-customer-heading strong { line-height: 1.15; margin-top: 2px; }
                 #material-summary-print-copy .material-summary-table tr,
                 #material-summary-print-copy .material-summary-stops li,
                 #material-summary-print-copy .material-summary-signatures { break-inside: avoid; page-break-inside: avoid; }
             }
         `;
-        document.head.appendChild(printStyle);
+        document.body.appendChild(printStyle);
         let cleanedUp = false;
         const cleanup = () => {
             if (cleanedUp) return;
@@ -1692,12 +1693,12 @@ export default function DeliveryBatchesView({
                 </div>
             )}
 
-            {/* Portrait gate pass and compact material delivery sheet */}
+            {/* Landscape gate pass and combined material loading sheet */}
             {materialSheetBatch && (() => {
                 const manifest = batchMaterialManifest(materialSheetBatch, customers, printBomItems);
                 const matrix = batchMaterialMatrix(manifest);
                 return <div className="fixed inset-0 z-50 bg-stone-900/70 backdrop-blur-sm flex items-center justify-center p-2 overflow-y-auto material-summary-overlay">
-                    <div className="bg-stone-100 rounded-2xl shadow-2xl w-full max-w-[850px] max-h-[calc(100vh-1rem)] flex flex-col overflow-hidden material-summary-print">
+                    <div className="bg-stone-100 rounded-2xl shadow-2xl w-full max-w-[1200px] max-h-[calc(100vh-1rem)] flex flex-col overflow-hidden material-summary-print">
                         <div className="px-4 py-3 bg-stone-900 text-white flex flex-wrap items-center justify-between gap-2 no-print">
                             <div className="flex items-center gap-2"><FileText size={18} className="text-amber-400"/><h3 className="text-sm font-black uppercase tracking-wider">Delivery sheet preview - {materialSheetBatch.batch_no}</h3></div>
                             <div className="flex items-center gap-3">
@@ -1749,91 +1750,12 @@ export default function DeliveryBatchesView({
                         overflow: visible !important;
                         padding: 0 !important;
                     }
-                    .material-summary-overlay {
-                        position: static !important;
-                        inset: auto !important;
-                        display: block !important;
-                        width: 100% !important;
-                        height: auto !important;
-                        min-height: 0 !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        overflow: visible !important;
-                        background: transparent !important;
-                        backdrop-filter: none !important;
-                    }
-                    .material-summary-print.print-container {
-                        position: static !important;
-                        display: block !important;
-                        width: 100% !important;
-                        max-width: none !important;
-                        height: auto !important;
-                        max-height: none !important;
-                        overflow: visible !important;
-                        border-radius: 0 !important;
-                        box-shadow: none !important;
-                    }
-                    .material-summary-print .print-document {
-                        position: static !important;
-                        inset: auto !important;
-                        display: block !important;
-                        width: 100% !important;
-                        height: auto !important;
-                        max-height: none !important;
-                        overflow: visible !important;
-                        padding: 0 !important;
-                        margin: 0 !important;
-                        background: #ffffff !important;
-                    }
                     tr {
                         break-inside: avoid;
                         page-break-inside: avoid;
                     }
                     thead {
                         display: table-header-group;
-                    }
-                    .material-summary-table {
-                        width: 100% !important;
-                        table-layout: fixed !important;
-                        font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '10px' : '12px'} !important;
-                        line-height: 1.3 !important;
-                        color: #000000 !important;
-                    }
-                    .material-summary-table th,
-                    .material-summary-table td {
-                        padding: 3px 5px !important;
-                        overflow-wrap: anywhere;
-                    }
-                    .material-summary-table td:not(:first-child) {
-                        font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '11px' : '13px'} !important;
-                    }
-                    .material-summary-table thead tr,
-                    .material-summary-table thead th,
-                    .material-summary-table thead span {
-                        background: #ffffff !important;
-                        color: #000000 !important;
-                        border-color: #000000 !important;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
-                    .material-summary-table td {
-                        border-color: #555555 !important;
-                    }
-                    .material-summary-page {
-                        box-sizing: border-box !important;
-                        padding: 3mm !important;
-                        margin: 0 !important;
-                        width: 100% !important;
-                        break-inside: auto;
-                        page-break-inside: auto;
-                    }
-                    .material-summary-page:not(:last-child) {
-                        break-after: page;
-                        page-break-after: always;
-                    }
-                    .material-summary-signatures {
-                        break-inside: avoid;
-                        page-break-inside: avoid;
                     }
                     .no-print {
                         display: none !important;
