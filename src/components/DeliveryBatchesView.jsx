@@ -594,11 +594,11 @@ export default function DeliveryBatchesView({
             .join('');
         printDocument.open();
         printDocument.write(`<!doctype html><html><head><meta charset="utf-8"><title>${docTitle}</title>${styles}<style>
-            @page { size: A4 landscape; margin: 4mm; }
+            @page { size: A4 landscape; margin: 5mm; }
             html, body { width: 100%; height: auto; margin: 0; padding: 0; overflow: visible; background: #fff; color: #000; }
             body *, body * * { visibility: visible !important; }
             #printable-material-summary { position: static !important; width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
-            .material-summary-page { width: 100% !important; margin: 0 !important; padding: 0 !important; break-inside: auto; page-break-inside: auto; }
+            .material-summary-page { box-sizing: border-box !important; width: 100% !important; margin: 0 !important; padding: 3mm !important; break-inside: auto; page-break-inside: auto; }
             .material-summary-page:not(:last-child) { break-after: page; page-break-after: always; }
             .material-summary-table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '7px' : '10px'} !important; color: #000 !important; }
             .material-summary-table thead { display: table-header-group; }
@@ -1650,8 +1650,8 @@ export default function DeliveryBatchesView({
                     : [];
                 return (
                     <div className="fixed inset-0 z-50 bg-stone-900/70 backdrop-blur-sm flex items-center justify-center p-2 overflow-y-auto material-summary-overlay">
-                        <div className="bg-white rounded-2xl shadow-2xl max-w-[96vw] w-full max-h-[92vh] flex flex-col overflow-hidden print-container material-summary-print">
-                            <div className="px-6 py-4 bg-stone-900 text-white flex items-center justify-between no-print">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-[calc(100vw-1rem)] w-full max-h-[calc(100vh-1rem)] flex flex-col overflow-hidden print-container material-summary-print">
+                            <div className="px-4 py-3 bg-stone-900 text-white flex flex-wrap items-center justify-between gap-2 no-print">
                                 <div className="flex items-center gap-2">
                                     <FileText size={18} className="text-amber-400" />
                                     <h3 className="text-sm font-black uppercase tracking-wider">
@@ -1678,7 +1678,7 @@ export default function DeliveryBatchesView({
                                 </div>
                             </div>
 
-                            <div className="flex-1 overflow-auto p-1 bg-stone-100 text-stone-900 print-document" id="printable-material-summary">
+                            <div className="flex-1 overflow-auto p-1 sm:p-2 bg-stone-100 text-stone-900 print-document" id="printable-material-summary">
                                 {printMaterialsLoading && (
                                     <p role="status" className="mb-4 border border-amber-300 bg-amber-50 p-3 text-xs font-bold text-amber-900 no-print">
                                         Loading each customer's saved BOM quantities…
@@ -1691,7 +1691,7 @@ export default function DeliveryBatchesView({
                                 )}
 
                                 {materialPages.length ? materialPages.map((pageRows, pageIndex) => (
-                                    <section key={pageIndex} className={`bg-white p-2 material-summary-page ${pageIndex ? 'mt-1' : ''}`}>
+                                    <section key={pageIndex} className={`bg-white p-4 material-summary-page ${pageIndex ? 'mt-2' : ''}`}>
                                         <div className="border-b-2 border-stone-900 pb-1 mb-1 flex items-end justify-between gap-2">
                                             <div>
                                                 <h1 className="text-base font-black uppercase tracking-wide text-stone-950">SolarFlow Demo Energy</h1>
@@ -1753,7 +1753,7 @@ export default function DeliveryBatchesView({
                 @media print {
                     @page {
                         size: ${materialSheetBatch ? 'A4 landscape' : 'A4 portrait'};
-                        margin: ${materialSheetBatch ? '4mm' : '10mm'};
+                        margin: ${materialSheetBatch ? '5mm' : '10mm'};
                     }
                     body * {
                         visibility: hidden !important;
@@ -1847,7 +1847,8 @@ export default function DeliveryBatchesView({
                         border-color: #555555 !important;
                     }
                     .material-summary-page {
-                        padding: 0 !important;
+                        box-sizing: border-box !important;
+                        padding: 3mm !important;
                         margin: 0 !important;
                         width: 100% !important;
                         break-inside: auto;
