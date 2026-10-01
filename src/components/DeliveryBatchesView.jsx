@@ -132,8 +132,9 @@ export default function DeliveryBatchesView({
     const { showAlert, showConfirm } = useGlobalPopup();
     const [batches, setBatches] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [loadError, setLoadError] = useState(false);
+    const [loadError, setLoadError] = useState('');
     const loadRequest = useRef(0);
+    const batchLoadPending = useRef(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [monthFilter, setMonthFilter] = useState('');
     const [appliedMonthFilter, setAppliedMonthFilter] = useState('');
@@ -256,16 +257,19 @@ export default function DeliveryBatchesView({
     }, [projectStageFilter]);
 
     const fetchBatches = async () => {
+        if (batchLoadPending.current) return;
+        batchLoadPending.current = true;
         const requestId = ++loadRequest.current;
         setLoading(true);
-        setLoadError(false);
+        setLoadError('');
         try {
             const data = await loadDeliveryBatches(supabase);
             if (requestId === loadRequest.current) setBatches(data);
         } catch (error) {
             console.error('Failed to load delivery batches:', error);
-            if (requestId === loadRequest.current) setLoadError(true);
+            if (requestId === loadRequest.current) setLoadError(error.message || 'The request failed.');
         } finally {
+            batchLoadPending.current = false;
             if (requestId === loadRequest.current) setLoading(false);
         }
     };
@@ -839,7 +843,7 @@ export default function DeliveryBatchesView({
             ) : loadError ? (
                 <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-stone-800 space-y-3">
                     <h3 className="font-bold">Delivery batches couldn’t be loaded</h3>
-                    <p className="text-sm">We couldn’t confirm the latest trips. Your saved records haven’t been changed. Try again before editing or dispatching a batch.</p>
+                    <p className="text-sm">{loadError} Your saved records haven’t been changed. Try again before editing or dispatching a batch.</p>
                     <button type="button" onClick={handleRefresh} className="rounded-xl bg-stone-900 text-white px-4 py-3 text-sm font-bold">Retry loading batches</button>
                 </div>
             ) : filteredBatches.length === 0 ? (
