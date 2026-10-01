@@ -604,13 +604,12 @@ export default function DeliveryBatchesView({
             #printable-material-summary { position: static !important; width: 100% !important; height: auto !important; max-height: none !important; overflow: visible !important; margin: 0 !important; padding: 0 !important; background: #fff !important; }
             .material-summary-page { box-sizing: border-box !important; width: 100% !important; margin: 0 !important; padding: 3mm !important; break-inside: auto; page-break-inside: auto; }
             .material-summary-page:not(:last-child) { break-after: page; page-break-after: always; }
-            .material-summary-table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '7px' : '10px'} !important; color: #000 !important; }
+            .material-summary-table { width: 100% !important; table-layout: fixed !important; border-collapse: collapse !important; font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '10px' : '12px'} !important; line-height: 1.3 !important; color: #000 !important; }
             .material-summary-table thead { display: table-header-group; }
             .material-summary-table tr { break-inside: avoid; page-break-inside: avoid; }
-            .material-summary-table th, .material-summary-table td { padding: 1px 3px !important; border: 1px solid #555 !important; color: #000 !important; background: #fff !important; }
-            .material-summary-table th:first-child, .material-summary-table td:first-child { width: 20% !important; }
-            .material-summary-table th:nth-child(2), .material-summary-table td:nth-child(2) { width: 9% !important; }
-            .material-summary-table th:nth-child(3), .material-summary-table td:nth-child(3) { width: 7% !important; }
+            .material-summary-table th, .material-summary-table td { padding: 3px 5px !important; border: 1px solid #555 !important; color: #000 !important; background: #fff !important; overflow-wrap: anywhere; }
+            .material-summary-table td:not(:first-child) { font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '11px' : '13px'} !important; }
+            .material-summary-table th span { overflow-wrap: anywhere; }
             .material-summary-signatures { break-inside: avoid; page-break-inside: avoid; }
             .no-print { display: none !important; }
         </style></head><body>${source.outerHTML}</body></html>`);
@@ -1652,6 +1651,8 @@ export default function DeliveryBatchesView({
                 const materialPages = matrix.rows.length
                     ? [matrix.rows.slice(0, materialPageSize), matrix.rows.slice(materialPageSize)].filter(page => page.length)
                     : [];
+                const materialWidth = Math.max(34, 70 - 6 * matrix.customers.length);
+                const customerWidth = matrix.customers.length ? (100 - materialWidth - 9 - 7) / matrix.customers.length : 0;
                 return (
                     <div className="fixed inset-0 z-50 bg-stone-900/70 backdrop-blur-sm flex items-center justify-center p-2 overflow-y-auto material-summary-overlay">
                         <div className="bg-white rounded-2xl shadow-2xl max-w-[calc(100vw-1rem)] w-full max-h-[calc(100vh-1rem)] flex flex-col overflow-hidden print-container material-summary-print">
@@ -1706,16 +1707,22 @@ export default function DeliveryBatchesView({
                                                 <div><strong>Dispatch:</strong> {materialSheetBatch.dispatch_date || '–'} · <strong>Page:</strong> {pageIndex + 1} of {materialPages.length}</div>
                                             </div>
                                         </div>
-                                    <table className="w-full border-collapse border border-stone-400 text-[10px] material-summary-table">
+                                    <table className="w-full table-fixed border-collapse border border-stone-400 text-[14px] leading-snug material-summary-table">
+                                        <colgroup>
+                                            <col style={{ width: `${materialWidth}%` }} />
+                                            <col style={{ width: '9%' }} />
+                                            <col style={{ width: '7%' }} />
+                                            {matrix.customers.map(customer => <col key={customer.id} style={{ width: `${customerWidth}%` }} />)}
+                                        </colgroup>
                                         <thead>
                                             <tr className="bg-stone-900 text-white">
-                                                <th className="border border-stone-500 p-1 text-left min-w-40">Material</th>
-                                                <th className="border border-stone-500 p-1 text-right w-20">Total Quantity</th>
-                                                <th className="border border-stone-500 p-1 text-left w-16">Unit</th>
+                                                <th className="border border-stone-500 p-1.5 text-left">Material</th>
+                                                <th className="border border-stone-500 p-1.5 text-right">Total<br/>Quantity</th>
+                                                <th className="border border-stone-500 p-1.5 text-left">Unit</th>
                                                 {matrix.customers.map((customer, index) => (
-                                                    <th key={customer.id} className="border border-stone-500 p-1 text-center min-w-24">
-                                                        <span className="block">Customer {index + 1}</span>
-                                                        <span className="block normal-case font-semibold text-[9px] text-stone-200">{customer.customer_name || 'Unnamed'}</span>
+                                                    <th key={customer.id} className="border border-stone-500 p-1.5 text-center break-words">
+                                                        <span className="block text-[12px]">Customer {index + 1}</span>
+                                                        <span className="block normal-case font-semibold text-[13px] text-stone-200 leading-tight">{customer.customer_name || 'Unnamed'}</span>
                                                     </th>
                                                 ))}
                                             </tr>
@@ -1723,11 +1730,11 @@ export default function DeliveryBatchesView({
                                         <tbody>
                                             {pageRows.map((row, rowIndex) => (
                                                 <tr key={`${row.product_name}-${row.uom}`} className={rowIndex % 2 ? 'bg-stone-50' : 'bg-white'}>
-                                                    <td className="border border-stone-300 px-1 py-0.5 font-semibold">{row.product_name}</td>
-                                                    <td className="border border-stone-300 px-1 py-0.5 text-right font-black">{formatMaterialQuantity(row.total)}</td>
-                                                    <td className="border border-stone-300 px-1 py-0.5">{row.uom}</td>
+                                                    <td className="border border-stone-300 px-1.5 py-1 font-semibold break-words">{row.product_name}</td>
+                                                    <td className="border border-stone-300 px-1.5 py-1 text-right font-black text-[15px]">{formatMaterialQuantity(row.total)}</td>
+                                                    <td className="border border-stone-300 px-1.5 py-1 break-words">{row.uom}</td>
                                                     {row.customerQuantities.map((quantity, customerIndex) => (
-                                                        <td key={`${row.product_name}-${customerIndex}`} className="border border-stone-300 px-1 py-0.5 text-center font-bold">
+                                                        <td key={`${row.product_name}-${customerIndex}`} className="border border-stone-300 px-1.5 py-1 text-center font-bold text-[15px]">
                                                             {quantity ? formatMaterialQuantity(quantity) : '–'}
                                                         </td>
                                                     ))}
@@ -1835,8 +1842,17 @@ export default function DeliveryBatchesView({
                     .material-summary-table {
                         width: 100% !important;
                         table-layout: fixed !important;
-                        font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '7px' : '10px'} !important;
+                        font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '10px' : '12px'} !important;
+                        line-height: 1.3 !important;
                         color: #000000 !important;
+                    }
+                    .material-summary-table th,
+                    .material-summary-table td {
+                        padding: 3px 5px !important;
+                        overflow-wrap: anywhere;
+                    }
+                    .material-summary-table td:not(:first-child) {
+                        font-size: ${(materialSheetBatch?.project_ids || []).length > 6 ? '11px' : '13px'} !important;
                     }
                     .material-summary-table thead tr,
                     .material-summary-table thead th,
@@ -1861,18 +1877,6 @@ export default function DeliveryBatchesView({
                     .material-summary-page:not(:last-child) {
                         break-after: page;
                         page-break-after: always;
-                    }
-                    .material-summary-table th:first-child,
-                    .material-summary-table td:first-child {
-                        width: 20% !important;
-                    }
-                    .material-summary-table th:nth-child(2),
-                    .material-summary-table td:nth-child(2) {
-                        width: 9% !important;
-                    }
-                    .material-summary-table th:nth-child(3),
-                    .material-summary-table td:nth-child(3) {
-                        width: 7% !important;
                     }
                     .material-summary-signatures {
                         break-inside: avoid;
