@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ClipboardList, Save, Printer, ShoppingBag, User, Clock, AlertCircle, X, Layers, Zap, Copy, Check, ClipboardPaste, Plus, Trash2 } from 'lucide-react';
+import { ClipboardList, Save, Printer, ShoppingBag, User, Clock, AlertCircle, X, Layers, Zap, Copy, Check, ClipboardPaste, Plus, Trash2, ScanLine } from 'lucide-react';
 import { supabase } from '../../supabase';
 import { SectionHeader, EditableDetailItem } from './shared';
 import BomPrintModal from '../BomPrintModal';
@@ -7,30 +7,12 @@ import { ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE, COMMON_BOM_ITEMS } from '../../co
 import bomReference from '../../inventory/reference.json' with { type: 'json' };
 import { loadBomForCustomer, getBomTemplateForType } from '../../utils/bom';
 import { useGlobalPopup } from '../GlobalPopup';
+import SerialScanner from '../SerialScanner';
+import { MAX_MODULE_SERIALS, persistScannedSerial, readModuleSerials } from '../../serials/record';
 
-const parsePanelSerials = (raw) => {
-    if (!raw) return [''];
-    if (Array.isArray(raw)) {
-        const serials = raw.map(value => String(value || '').trim()).filter(Boolean);
-        return serials.length > 0 ? serials : [''];
-    }
-
-    const rawText = String(raw);
-    try {
-        const parsed = JSON.parse(rawText);
-        if (Array.isArray(parsed)) {
-            const serials = parsed.map(value => String(value || '').trim()).filter(Boolean);
-            return serials.length > 0 ? serials : [''];
-        }
-    } catch { /* not valid JSON, fall through to default */ }
-
-    if (rawText.includes('\n')) {
-        return rawText.split('\n').map(s => s.trim()).filter(Boolean);
-    }
-    if (rawText.includes(',')) {
-        return rawText.split(',').map(s => s.trim()).filter(Boolean);
-    }
-    return [rawText.trim()];
+const parsePanelSerials = raw => {
+    const serials = readModuleSerials(raw);
+    return serials.length ? serials : [''];
 };
 
 export default function MaterialIntegrationTab({
@@ -73,6 +55,8 @@ export default function MaterialIntegrationTab({
     const [bulkText, setBulkText] = useState('');
     const [copiedIdx, setCopiedIdx] = useState(null);
     const [copiedAll, setCopiedAll] = useState(false);
+    const [scannerTarget, setScannerTarget] = useState(null);
+    const scanSavePendingRef = useRef(false);
 
     const inverterMakeOptions = (meta?.['inverter_make'] && meta['inverter_make'].length > 0)
         ? meta['inverter_make']
@@ -94,8 +78,8 @@ export default function MaterialIntegrationTab({
 
     const addPanelSerial = (count = 1) => {
         onDirty?.();
-        if (panelSerials.length >= 100) return;
-        const toAdd = Math.min(count, 100 - panelSerials.length);
+        if (panelSerials.length >= MAX_MODULE_SERIALS) return;
+        const toAdd = Math.min(count, MAX_MODULE_SERIALS - panelSerials.length);
         const newItems = Array(toAdd).fill('');
         setPanelSerials(prev => [...prev, ...newItems]);
     };
@@ -141,6 +125,30 @@ export default function MaterialIntegrationTab({
         navigator.clipboard.writeText(text);
         setCopiedAll(true);
         setTimeout(() => setCopiedAll(false), 2000);
+    };
+
+    const handleScannedSerial = async (target, scannedValue) => {
+        if (!isEditable || !customer?.id) throw new Error('This customer card is read-only.');
+        if (scanSavePendingRef.current) throw new Error('Please wait for the previous serial to finish saving.');
+        scanSavePendingRef.current = true;
+        try {
+            const currentValue = target === 'module'
+                ? panelSerials.filter(Boolean).join('\n')
+                : (editData?.inverter_serial_no ?? customer?.inverter_serial_no ?? '');
+            const result = await persistScannedSerial(target, currentValue, scannedValue,
+                (field, value) => onUpdate(customer.id, { [field]: value }));
+            if (result.status === 'saved') {
+                if (target === 'module') setPanelSerials(parsePanelSerials(result.value));
+                if (logActivity && user?.id) {
+                    void Promise.resolve(logActivity(user.id, 'update',
+                        `${customer.customer_name}: Scanned ${target} serial ${result.serial}`, '', customer.id))
+                        .catch(error => console.warn('Serial saved, but activity logging failed:', error));
+                }
+            }
+            return result;
+        } finally {
+            scanSavePendingRef.current = false;
+        }
     };
 
     const filledCount = panelSerials.filter(Boolean).length;
@@ -518,6 +526,7 @@ export default function MaterialIntegrationTab({
                     <p className="text-[11px] text-stone-500 font-medium">Reference quantities from your BOM exports. Confirm measurements for this project; compound specifications stay unchanged.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {isEditable && <button type="button" onClick={() => setScannerTarget('module')} className="bg-amber-500 hover:bg-amber-400 text-stone-950 px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"><ScanLine size={17}/> Scan serials</button>}
                     <span className="bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider">
                         {activeType} BOM
                     </span>
@@ -695,7 +704,7 @@ export default function MaterialIntegrationTab({
                                 <button
                                     type="button"
                                     onClick={() => addPanelSerial(1)}
-                                    disabled={panelSerials.length >= 100}
+                                    disabled={panelSerials.length >= MAX_MODULE_SERIALS}
                                     className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition disabled:opacity-50 cursor-pointer shadow-xs"
                                 >
                                     <Plus size={13} /> Add 1
@@ -703,7 +712,7 @@ export default function MaterialIntegrationTab({
                                 <button
                                     type="button"
                                     onClick={() => addPanelSerial(5)}
-                                    disabled={panelSerials.length >= 96}
+                                    disabled={panelSerials.length >= MAX_MODULE_SERIALS - 4}
                                     className="text-[11px] font-bold px-2 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/60 transition disabled:opacity-50 cursor-pointer"
                                     title="Add 5 serial rows"
                                 >
@@ -712,7 +721,7 @@ export default function MaterialIntegrationTab({
                                 <button
                                     type="button"
                                     onClick={() => addPanelSerial(10)}
-                                    disabled={panelSerials.length >= 91}
+                                    disabled={panelSerials.length >= MAX_MODULE_SERIALS - 9}
                                     className="text-[11px] font-bold px-2 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/60 transition disabled:opacity-50 cursor-pointer"
                                     title="Add 10 serial rows"
                                 >
@@ -1142,6 +1151,15 @@ export default function MaterialIntegrationTab({
             </section>
 
             {/* Dedicated Print & PDF Modal */}
+            {scannerTarget && <SerialScanner
+                customerName={customer?.customer_name || 'Customer'}
+                initialTarget={scannerTarget}
+                moduleCount={filledCount}
+                expectedModules={Number(editData?.no_of_modules ?? customer?.no_of_modules) || 0}
+                inverterSerial={editData?.inverter_serial_no ?? customer?.inverter_serial_no ?? ''}
+                onScan={handleScannedSerial}
+                onClose={() => setScannerTarget(null)}
+            />}
             {showPrintModal && (
                 <BomPrintModal
                     customer={{ ...customer, ...editData }}
@@ -1165,4 +1183,3 @@ export default function MaterialIntegrationTab({
         </div>
     );
 }
-

@@ -1527,8 +1527,8 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
     };
 
     return (
-        <div data-demo-editor="customer" className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-5xl h-[94vh] overflow-hidden flex flex-col border border-stone-100">
+        <div data-demo-editor="customer" className="fixed inset-0 bg-stone-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-4">
+            <div className="bg-white rounded-none sm:rounded-[28px] shadow-2xl w-full max-w-5xl h-[100dvh] sm:h-[94vh] overflow-hidden flex flex-col border border-stone-100">
 
                 {/* Realtime Remote Conflict Alert Banner - see SHOW_REMOTE_UPDATE_ALERT */}
                 {SHOW_REMOTE_UPDATE_ALERT && remoteUpdateAlert && (
@@ -1575,7 +1575,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                 )}
 
                 {/* Header */}
-                <div className="bg-stone-900 px-6 py-5 flex justify-between items-center flex-shrink-0">
+                <div className="bg-stone-900 px-4 sm:px-6 py-3 sm:py-5 flex justify-between items-center flex-shrink-0">
                     <div>
                         <div className="flex items-center gap-3 flex-wrap">
                             <h2 className="text-xl font-bold text-white">{customer.customer_name}</h2>
@@ -1701,7 +1701,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
 
                 {/* Tabs */}
                 <div className="relative bg-stone-900 border-t border-white/5 flex-shrink-0">
-                    <div className="flex gap-6 overflow-x-auto scrollbar-none whitespace-nowrap px-6 scroll-smooth">
+                    <div className="flex gap-6 overflow-x-auto scrollbar-none whitespace-nowrap px-4 sm:px-6 scroll-smooth">
                         {[
                             ...PRIMARY_STAGES.filter(s => {
                                 if (s.id === STAGE_IDS.LOAN && editData.payment_type?.trim().toLowerCase() === 'cash') return false;
@@ -1731,7 +1731,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 min-h-0 overflow-y-auto p-6 bg-[#FCFBFA]">
+                <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-6 bg-[#FCFBFA]">
 
                     {/* Frozen banner for completed cards */}
                     {isCompleted && isFrozen && (
