@@ -114,3 +114,22 @@
 .demo-tour-chapters select{width:100%;max-width:290px;min-height:44px;border:1px solid #d6d3d1;border-radius:8px;background:white;padding:8px;font-size:12px;color:#1c1917}
 .demo-tour-chapters small{font-size:11px;font-weight:400;color:#78716c}
 .demo-tour-chapters select:focus-visible{outline:3px solid #ff8a00;outline-offset:2px}
+.demo-login-hero-card p.demo-access-error{margin-top:10px;color:#fda4af;font-weight:700;font-size:13px}
+.demo-login-hero-card p.demo-access-help{margin-top:12px;font-size:13px}
+.demo-access-help button{background:none;border:none;padding:0;color:#ff8a00;font-weight:700;text-decoration:underline;cursor:pointer;font-size:inherit}
+.demo-access-help button:hover{color:#ffb35c}
+.demo-access-contact{margin-top:12px;padding:14px;border-radius:14px;background:rgba(244,63,94,.08);border:1px solid rgba(253,164,175,.35)}
+.demo-login-hero-card .demo-access-contact p.demo-access-error{margin:0 0 10px}
+.demo-access-contact-links{display:flex;flex-wrap:wrap;gap:8px}
+.demo-access-contact-links a{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:12px;background:#292524;border:1px solid #57534e;color:#fff;font-size:13px;font-weight:700;text-decoration:none;transition:background .15s}
+.demo-access-contact-links a:hover{background:#3a3532}
+.demo-access-contact-links a.is-whatsapp{background:#25d366;border-color:#25d366;color:#0b2e17}
+.demo-access-contact-links a.is-whatsapp:hover{background:#1ebe5a}
+.demo-access-contact-links button{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:12px;background:#292524;border:1px solid #57534e;color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s}
+.demo-access-contact-links button:hover{background:#3a3532}
+.demo-access-email-form{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.demo-access-email-form input,.demo-access-email-form textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid #57534e;background:#292524;color:#fff;font-size:14px;outline:none;resize:vertical}
+.demo-access-email-form input:focus,.demo-access-email-form textarea:focus{border-color:#ff8a00}
+.demo-access-email-form > button{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:12px;background:#ff8a00;color:#1c1917;font-weight:800;font-size:13px;border:none;cursor:pointer}
+.demo-access-email-form > button:disabled{opacity:.5;cursor:not-allowed}
+.demo-login-hero-card p.demo-access-sent{display:flex;align-items:center;gap:8px;margin-top:12px;color:#86efac;font-weight:700;font-size:13px}

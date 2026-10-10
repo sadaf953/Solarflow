@@ -3,7 +3,7 @@ import {ensureThreeDemoDrivers} from '../demo/drivers';
 import { useState } from 'react';
 import { 
     ArrowRight, ShieldCheck, BriefcaseBusiness, Building2, ChartNoAxesCombined, 
-    Handshake, Users, Truck, Stamp, LoaderCircle, Mail, Lock, KeyRound, Send, AlertTriangle, Check, User 
+    Handshake, Users, Truck, Stamp, LoaderCircle, Mail, Lock, KeyRound, Send, AlertTriangle, Check, User, MessageCircle, Phone 
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { APP_ROLES } from '../constants';
@@ -13,6 +13,11 @@ import CustomizationEnquiryForm, { DEFAULT_BASIC_VERSION_URL } from './Customiza
 import BrandMark from './BrandMark';
 import '../demo/demo.css';
 const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handshake,Users,Truck,Stamp];
+const DEMO_ACCESS_PASSWORD='admin@2026';
+const DEMO_CONTACT_EMAIL='enquiry@deeprootsystems.in';
+const DEMO_CONTACT_PHONE='917981980910';
+const DEMO_CONTACT_PHONE_LABEL='+91 79819 80910';
+const DEMO_CONTACT_FORM_URL=`https://formsubmit.co/ajax/${DEMO_CONTACT_EMAIL}`;
 const descriptions=['Explore the complete solar business.','Manage leads and daily operations.','Follow your partner’s project pipeline.','Review progress and team activity.','Build quotations and follow up leads.','Track your customers from start to finish.','Manage delivery, installation and photos.','Review documents and completed work.'];
 export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
  const [busy,setBusy]=useState('');const [error,setError]=useState(initialError);
@@ -31,6 +36,13 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
  const [forgotMode, setForgotMode] = useState(false);
  const [credBusy, setCredBusy] = useState(false);
  const [credNotice, setCredNotice] = useState({ type: '', text: '' });
+ const [pendingRole, setPendingRole] = useState(null);
+ const [accessPassword, setAccessPassword] = useState('');
+ const [accessError, setAccessError] = useState('');
+ const [showEmailForm, setShowEmailForm] = useState(false);
+ const [requestContact, setRequestContact] = useState('');
+ const [requestMessage, setRequestMessage] = useState('');
+ const [requestState, setRequestState] = useState('idle'); // 'idle' | 'sending' | 'sent' | 'failed'
 
  async function handleCredentialsSubmit(e) {
   e.preventDefault();
@@ -123,11 +135,59 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
   }
  }
 
- async function choose(role, customName){
+ function handleAccessSubmit() {
+  if (accessPassword.trim() !== DEMO_ACCESS_PASSWORD) {
+   setAccessError('Your password is wrong. Kindly contact us to get the correct password.');
+   return;
+  }
+  const role = pendingRole;
+  setPendingRole(null);
+  setAccessPassword('');
+  setAccessError('');
+  choose(role, undefined, true);
+ }
+
+ async function sendPasswordRequest() {
+  if (!requestContact.trim() || requestState === 'sending') return;
+  setRequestState('sending');
+  try {
+   const res = await fetch(DEMO_CONTACT_FORM_URL, {
+    method:'POST',
+    headers:{'Content-Type':'application/json',Accept:'application/json'},
+    body:JSON.stringify({
+     name: visitorName.trim(),
+     contact: requestContact.trim(),
+     message: requestMessage.trim() || 'Please share the SolarFlow demo password.',
+     _subject: `SolarFlow demo password request from ${visitorName.trim()}`,
+     _template: 'table',
+     _captcha: 'false'
+    })
+   });
+   const body = await res.json().catch(() => ({}));
+   if (!res.ok || String(body.success) === 'false') throw new Error(body.message || 'Send failed');
+   setRequestState('sent');
+  } catch {
+   setRequestState('failed');
+  }
+ }
+
+ function openContact() {
+  setShowEnquiry(true);
+  setTimeout(() => document.getElementById('demo-enquiry')?.scrollIntoView({behavior:'smooth',block:'start'}), 0);
+ }
+
+ async function choose(role, customName, unlocked = false){
   setBusy(role.user_type);setError('');
   try {
    const nameToUse = (customName !== undefined ? customName : visitorName || '').trim();
    if (!nameToUse) throw new Error('Enter your name to continue.');
+   if (!unlocked) {
+    setPendingRole(role);
+    setAccessPassword('');
+    setAccessError('');
+    document.querySelector('.demo-login-hero-card')?.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+   }
    const {data:session,error:sessionError}=await supabase.auth.getSession();if(sessionError)throw sessionError;
    if(!session.session){const result=await supabase.auth.signInAnonymously();if(result.error)throw result.error;}
    const {data,error:roleError}=await supabase.rpc('start_demo_session',{
@@ -348,7 +408,8 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
      <form 
       onSubmit={(e) => {
        e.preventDefault();
-       choose(adminRole);
+       if (pendingRole) handleAccessSubmit();
+       else choose(adminRole);
       }}
       className="demo-login-hero-card"
       aria-label="Enter SolarFlow"
@@ -358,8 +419,89 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
         <ShieldCheck size={14} />
         <span>DEMO ACCESS · NO SIGNUP REQUIRED</span>
        </div>
+       {pendingRole ? <>
+       <h2>Enter the demo password</h2>
+       <p>Welcome, {visitorName.trim()}. Enter the password you were given to open SolarFlow.</p>
+
+       <div className="demo-name-entry-row">
+        <div className="demo-name-input-wrap">
+         <Lock className="demo-name-input-icon" size={18}/>
+         <input
+          type="password"
+          value={accessPassword}
+          onChange={(e) => { setAccessPassword(e.target.value); setAccessError(''); }}
+          placeholder="Enter password"
+          className="demo-name-input"
+          autoComplete="current-password"
+          aria-label="Demo password"
+          aria-invalid={!!accessError}
+          aria-describedby="demo-access-help"
+          required
+          autoFocus
+         />
+        </div>
+        <button
+         type="submit"
+         disabled={!!busy || !accessPassword.trim()}
+         className="demo-login-hero-btn"
+        >
+         <ArrowRight size={19}/>
+         <span>Continue</span>
+        </button>
+       </div>
+       {accessError ? (
+        <div role="alert" className="demo-access-contact">
+         <p className="demo-access-error">{accessError}</p>
+         <div className="demo-access-contact-links">
+          <a href={`https://wa.me/${DEMO_CONTACT_PHONE}?text=${encodeURIComponent(`Hi, I'm ${visitorName.trim()}. Please share the password for the SolarFlow demo.`)}`} target="_blank" rel="noopener noreferrer" className="is-whatsapp">
+           <MessageCircle size={16}/><span>Message us on WhatsApp</span>
+          </a>
+          <a href={`tel:+${DEMO_CONTACT_PHONE}`}><Phone size={16}/><span>{DEMO_CONTACT_PHONE_LABEL}</span></a>
+          <button type="button" aria-expanded={showEmailForm} onClick={() => setShowEmailForm(v => !v)}><Mail size={16}/><span>Email us</span></button>
+         </div>
+         {showEmailForm && (
+          requestState === 'sent' ? (
+           <p className="demo-access-sent"><Check size={16}/> Your request has been sent to {DEMO_CONTACT_EMAIL}. We’ll get back to you shortly.</p>
+          ) : (
+           <div className="demo-access-email-form">
+            <input
+             type="text"
+             value={requestContact}
+             onChange={(e) => setRequestContact(e.target.value)}
+             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); sendPasswordRequest(); } }}
+             placeholder="Your email or phone number *"
+             aria-label="Your email or phone number"
+             autoComplete="email"
+            />
+            <textarea
+             value={requestMessage}
+             onChange={(e) => setRequestMessage(e.target.value)}
+             placeholder="Message (optional)"
+             aria-label="Message"
+             rows={2}
+            />
+            <button type="button" onClick={sendPasswordRequest} disabled={!requestContact.trim() || requestState === 'sending'}>
+             {requestState === 'sending' ? <LoaderCircle size={15} className="animate-spin"/> : <Send size={15}/>}
+             <span>{requestState === 'sending' ? 'Sending...' : 'Send request'}</span>
+            </button>
+            {requestState === 'failed' && (
+             <p className="demo-access-error">The email couldn’t be sent. Please message us on WhatsApp or write to {DEMO_CONTACT_EMAIL}.</p>
+            )}
+           </div>
+          )
+         )}
+        </div>
+       ) : (
+        <p id="demo-access-help" className="demo-access-help">
+         Please <button type="button" onClick={openContact}>contact us</button> if the password wasn’t shared with you.
+        </p>
+       )}
+       <p className="demo-access-help">
+        <button type="button" onClick={() => { setPendingRole(null); setAccessError(''); }}>Change name</button>
+       </p>
+       </> : <>
        <h2>Enter your name to explore the demo</h2>
-       <p>This demo uses name-only access so you can explore quickly. The production CRM is secured with authenticated user accounts, passwords and role-based permissions. Your demo activity will be recorded under the name you enter.</p>
+       <p>This demo uses your name and a shared demo password so you can explore quickly. The production CRM is secured with authenticated user accounts, passwords and role-based permissions. Your demo activity will be recorded under the name you enter.</p>
        
        <div className="demo-name-entry-row">
         <div className="demo-name-input-wrap">
@@ -384,6 +526,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
          <span>{busy === adminRole.user_type ? 'Entering SolarFlow...' : 'Enter SolarFlow'}</span>
         </button>
        </div>
+       </>}
       </div>
      </form>
 
