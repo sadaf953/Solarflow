@@ -14,7 +14,6 @@ import BrandMark from './BrandMark';
 import '../demo/demo.css';
 const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handshake,Users,Truck,Stamp];
 const DEMO_ACCESS_PASSWORD='admin@2026';
-const DEMO_ACCESS_KEY='solarflow_demo_access';
 const DEMO_CONTACT_EMAIL='enquiry@deeprootsystems.in';
 const DEMO_CONTACT_PHONE='917981980910';
 const DEMO_CONTACT_PHONE_LABEL='+91 79819 80910';
@@ -37,9 +36,6 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
  const [forgotMode, setForgotMode] = useState(false);
  const [credBusy, setCredBusy] = useState(false);
  const [credNotice, setCredNotice] = useState({ type: '', text: '' });
- const [accessGranted, setAccessGranted] = useState(() => {
-  try { return sessionStorage.getItem(DEMO_ACCESS_KEY) === 'granted'; } catch { return false; }
- });
  const [pendingRole, setPendingRole] = useState(null);
  const [accessPassword, setAccessPassword] = useState('');
  const [accessError, setAccessError] = useState('');
@@ -144,8 +140,6 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
    setAccessError('Your password is wrong. Kindly contact us to get the correct password.');
    return;
   }
-  try { sessionStorage.setItem(DEMO_ACCESS_KEY, 'granted'); } catch { /* storage may be unavailable */ }
-  setAccessGranted(true);
   const role = pendingRole;
   setPendingRole(null);
   setAccessPassword('');
@@ -187,7 +181,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
   try {
    const nameToUse = (customName !== undefined ? customName : visitorName || '').trim();
    if (!nameToUse) throw new Error('Enter your name to continue.');
-   if (!accessGranted && !unlocked) {
+   if (!unlocked) {
     setPendingRole(role);
     setAccessPassword('');
     setAccessError('');

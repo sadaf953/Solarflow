@@ -28,7 +28,6 @@ const Loader=()=> <div className="p-12 text-center text-stone-500" role="status"
 // the right place: a new tab or a later visit starts at the landing page,
 // while a refresh in the middle of a session still restores the workspace.
 const ENTERED_KEY = 'solarflow_entered_demo';
-function hasEnteredThisTab(){ try{ return !!sessionStorage.getItem(ENTERED_KEY); }catch{ return false; } }
 function markEnteredThisTab(){ try{ sessionStorage.setItem(ENTERED_KEY,'1'); }catch{ /* private mode */ } }
 function clearEnteredThisTab(){ try{ sessionStorage.removeItem(ENTERED_KEY); }catch{ /* ignore */ } }
 
@@ -77,26 +76,8 @@ export default function App(){
     // that previously entered the demo.
     if(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)
       || (/^#\/plans\?/.test(window.location.hash) && new URLSearchParams(window.location.hash.split('?')[1]).get('admin')==='1'))return;
-    const {data}=await supabase.auth.getSession();
-    if(!data?.session)return;
-    // Fresh visit: show the landing page even though a session is stored.
-    // Returning early also skips the profile round-trip, so the landing
-    // page paints sooner.
-    if(!hasEnteredThisTab())return;
-    let userId = data.session.user?.id;
-    if(!userId){
-     const {data:identity,error:authError}=await supabase.auth.getUser();
-     if(authError || !identity.user)return;
-     userId = identity.user.id;
-    }
-    const {data:profile,error:profileError}=await supabase.from('profiles').select('*').eq('id',userId).maybeSingle();
-    if(!profileError && profile?.status==='active' && active){
-     if(profile.user_type==='vendor')profile.name=demoVendorTarget(profile.name)||profile.name;
-     if(active)setUser({...profile,userType:profile.user_type,isDemo:true});
-     if(['admin','sales'].includes(profile.user_type)){
-      scheduleBackgroundDemoCleanup(supabase);
-     }
-    }
+    // Every page load starts at the landing page, even with a stored session,
+    // so the demo password is asked again on each visit or reload.
    }catch(e){if(active)setError(e.message);}finally{if(active)setLoading(false);}
   }restore();
   const {data:{subscription}}=supabase.auth.onAuthStateChange((event)=>{
