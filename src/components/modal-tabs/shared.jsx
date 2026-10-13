@@ -2,7 +2,7 @@ import { getChecklistMode, setChecklistMode } from '../../utils/checklistMode';
 export { getChecklistMode, setChecklistMode } from '../../utils/checklistMode';
 import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, Plus, Edit3, X, Paperclip, Eye, Upload, FileText, Image as ImageIcon, Download, MessageSquare, Check, Sparkles, Phone, CheckSquare, FolderOpen } from 'lucide-react';
-import { formatINR, toIndianCommas, parseIndianNumber, formatInputValue, getTelephoneHref } from '../../utils';
+import { formatINR, toIndianCommas, parseIndianNumber, formatInputValue, getTelephoneHref, isInactiveStaff, staffOptionLabel } from '../../utils';
 import { supabase } from '../../supabase';
 import { useGlobalPopup } from '../GlobalPopup';
 
@@ -126,7 +126,7 @@ export function MetaSelect({ label, field, value, onChange, options = [], isEdit
                 {value && !options.includes(value) && (
                     <option value={value}>{value}</option>
                 )}
-                {options.map(o => <option key={o} value={o}>{o}</option>)}
+                {options.map(o => <option key={o} value={o} disabled={isInactiveStaff(o) && o !== value}>{staffOptionLabel(o)}</option>)}
             </select>
         </div>
     );
@@ -322,7 +322,7 @@ export function EditableDetailItem({ label, field, value, onChange, type = 'text
                     {value && !options.includes(value) && (
                         <option value={value}>{value}</option>
                     )}
-                    {options.map(o => <option key={o}>{o}</option>)}
+                    {options.map(o => <option key={o} value={o} disabled={isInactiveStaff(o) && o !== value}>{staffOptionLabel(o)}</option>)}
                 </select>
             ) : isMoney || field === 'invoice_value' ? (
                 <input type="text" inputMode="decimal" value={value ? formatInputValue(value) : ''}

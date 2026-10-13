@@ -133,3 +133,12 @@
 .demo-access-email-form > button{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:12px;background:#ff8a00;color:#1c1917;font-weight:800;font-size:13px;border:none;cursor:pointer}
 .demo-access-email-form > button:disabled{opacity:.5;cursor:not-allowed}
 .demo-login-hero-card p.demo-access-sent{display:flex;align-items:center;gap:8px;margin-top:12px;color:#86efac;font-weight:700;font-size:13px}
+
+/* Personal invite link: name is locked */
+.demo-name-input-wrap.is-locked .demo-name-input{background:#f5f5f4;color:#44403c;cursor:not-allowed;font-weight:600}
+.demo-name-input-wrap.is-locked .demo-name-input:focus{box-shadow:none}
+
+/* Get quotation on WhatsApp – demo header */
+.demo-quote-whatsapp{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border-radius:10px;background:#25D366;color:#073B1C;font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap}
+.demo-quote-whatsapp:hover{filter:brightness(.95)}
+@media (max-width:640px){.demo-quote-whatsapp span{display:none}.demo-quote-whatsapp{padding:0 10px}}

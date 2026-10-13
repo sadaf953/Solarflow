@@ -12,12 +12,12 @@ export const YES_NO_OPTIONS = ['Yes', 'No', 'Not sure'];
 export const DATA_START_OPTIONS = ['Transfer existing data', 'Start fresh', 'Not sure'];
 export const INTEREST_OPTIONS = [
   'Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options', 'Tools only — no CRM',
-  'Customer tracking', ...DOCUMENT_OPTIONS, 'Inventory', 'Warranty tracking',
-  'Vendor login', 'Stamp staff login', 'Technician login', 'Dealers',
+  'Customer tracking', ...DOCUMENT_OPTIONS, 'Inventory',
+  'Vendor login', 'Technician login', 'Dealers',
   'Channel partner offices (CPOs)', 'Branches', 'Staff management',
   'Installation view', 'Installation commission view', 'Vendor commission page',
   'Channel partner commission view', 'Operations page', 'Dealer-based filtering',
-  'Finance', 'Attendance', 'Calendar', 'MIS upload auto updater', 'Checklists', 'Document uploads'
+  'Finance', 'Attendance', 'Calendar', 'Checklists', 'Document uploads'
 ];
 
 const SINGLE_FIELDS = ['hasWebsite', 'teamSize', 'customerCount', 'liveCustomerCount', 'dataStart', 'branches', 'partnerOffices', 'channelPartners', 'installationTeams', 'stampStaffLogin', 'technicianLogin', 'fileStorage', 'storageProvider'];

@@ -3,7 +3,7 @@ import { supabase } from '../../supabase';
 import { ClipboardList, Save, FileText, Printer, RotateCcw, AlertTriangle, CheckCircle2, SendHorizonal, Loader2, Upload } from 'lucide-react';
 import { Page1 } from '../agreement/Page1';
 import { CheckboxRemarkItem, ChecklistModeToggle } from './shared';
-import { formatDateToDDMMYYYY } from '../../utils';
+import { formatDateToDDMMYYYY, isInactiveStaff, staffOptionLabel } from '../../utils';
 
 export default function DiscomSubmissionTab({
     customer,
@@ -341,7 +341,7 @@ export default function DiscomSubmissionTab({
                         >
                             <option value="">Select Staff...</option>
                             {staffList.map(name => (
-                                <option key={name} value={name}>{name}</option>
+                                <option key={name} value={name} disabled={isInactiveStaff(name)}>{staffOptionLabel(name)}</option>
                             ))}
                         </select>
                     </div>

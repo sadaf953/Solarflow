@@ -6,7 +6,7 @@ import {supabase} from '../supabase';
 import {dailyStock,stockDay} from './model';
 import './inventory.css';
 import {inventoryLoadMessage} from './errors';
-const tabs=[['stock','Stock',Package],['movements','Movements',History],['daily','Daily Report',CalendarDays],['archived','Archived',Archive]];
+const tabs=[['stock','Stock',Package],['movements','Movements',History],['daily','Daily Report',CalendarDays],['archived','Discontinued',Archive]];
 const fmt=n=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:3});
 const blankItem={product_name:'',sku:'',uom:'Nos',category:'General',reorder_level:'0'};
 const normalizeKey=(name,unit)=>`${name.trim().toLowerCase().replace(/\s+/g,' ').replace('16sq mm la cabel','16sq mm la cable').replace('condute pipe','conduite pipe')}|${/^(no\.?|nos\.?)$/i.test(unit.trim())?'Nos':unit.trim()}`;
@@ -15,6 +15,7 @@ export default function InventoryView({currentUser}){
  const [tab,setTab]=useState('stock'),[visibleCount,setVisibleCount]=useState(50),[loadFailed,setLoadFailed]=useState(false),[stockFilter,setStockFilter]=useState('all');
  const [historyLoading,setHistoryLoading]=useState(false),[historyLoaded,setHistoryLoaded]=useState(false),[todayMovementCount,setTodayMovementCount]=useState(null);
  const [itemDraft,setItemDraft]=useState(null),[categoryFilter,setCategoryFilter]=useState('all');
+ const [retireDraft,setRetireDraft]=useState(null),[notice,setNotice]=useState('');
  useDemoTourNavigation(entry=>{if(entry.view==='inventory' && tabs.some(([id])=>id===entry.tab)){setTab(entry.tab);setVisibleCount(50);setSearch('');}});
  const [reportDay,setReportDay]=useState(()=>stockDay(Date.now()));const request=useRef(null),inventoryPanelRef=useRef(null),historyRequest=useRef(null);
 
@@ -134,14 +135,22 @@ export default function InventoryView({currentUser}){
    setItemDraft(null);setTab('stock');setCategoryFilter('all');await refresh();
   }catch(e){setError(e.code==='23505'?'An item with this material name/unit or SKU already exists.':['PGRST204','42703'].includes(e.code)?'Inventory setup is required before adding items. Run the supplied SQL.':e.message);}finally{setSaving(false);}
  }
- async function setArchived(item,archived){
-  if(saving)return;setSaving(true);setError('');
+ async function setArchived(item,archived,details={}){
+  if(saving)return;setSaving(true);setError('');setNotice('');
+  const base={archived_at:archived?new Date().toISOString():null};
+  const full={...base,replaced_by_id:archived?(details.replacedBy||null):null,discontinued_reason:archived?(details.reason?.trim()||null):null};
   try{
-   const {data,error:failure}=await supabase.from('inventory_items').update({archived_at:archived?new Date().toISOString():null}).eq('id',item.id).select('id');
+   let {data,error:failure}=await supabase.from('inventory_items').update(full).eq('id',item.id).select('id');
+   if(failure&&['PGRST204','42703'].includes(failure.code)){
+    // Replacement columns not added yet: still move the item, then explain.
+    ({data,error:failure}=await supabase.from('inventory_items').update(base).eq('id',item.id).select('id'));
+    if(!failure&&archived&&(details.replacedBy||details.reason))setNotice('Item moved to Discontinued. To save the replacement and reason, run supabase-setup/24_inventory_discontinued_items.sql once.');
+   }
    if(failure)throw failure;
    if(!data?.length)throw new Error('The item could not be updated. Refresh and try again.');
+   setRetireDraft(null);
    await refresh();
-  }catch(e){setError(['PGRST204','42703'].includes(e.code)?'Inventory setup is required before archiving items. Run the supplied SQL.':e.message);}finally{setSaving(false);}
+  }catch(e){setError(['PGRST204','42703'].includes(e.code)?'Inventory setup is required before discontinuing items. Run the supplied SQL.':e.message);}finally{setSaving(false);}
  }
   async function record(e){
    e.preventDefault();
@@ -239,8 +248,8 @@ export default function InventoryView({currentUser}){
      </button>
    )}
  </div>
- <p className="inventory-help">{tab==='stock'?'Add materials, arrange them by section, and receive or issue stock. Delivered batches deduct their BOM quantities automatically.':tab==='archived'?'Archived items stay in the database with their stock history. Restore them any time.':tab==='daily'?'Opening + incoming − outgoing = closing. Use the date picker to review any day.':'Every receipt and issue is recorded with its reference and team member.'}</p>
- {loading||((tab==='movements'||tab==='daily')&&historyLoading)?<div className="inventory-loading" role="status"><RefreshCw size={18}/><span>{loading?'Loading stock…':'Loading movement history…'}</span></div>:loadFailed?<div className="inventory-empty"><h3>Inventory couldn’t be loaded</h3><p>Your stock records have not been changed. Choose Refresh to try again.</p></div>:<div className="inventory-table"><table><thead><tr>{(tab==='stock'?['Material','Stock health','Available','Actions']:tab==='archived'?['Material','Section','Stock kept','Actions']:tab==='daily'?['Material','Unit','Opening','Incoming','Outgoing','Closing']:['Material','Movement','Quantity','Reference','By','Recorded']).map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>
+ <p className="inventory-help">{tab==='stock'?'Add materials, arrange them by section, and receive or issue stock. Delivered batches deduct their BOM quantities automatically.':tab==='archived'?'Materials you no longer use, and what replaced them. They are hidden from the Stock list, but their history is kept. Restore them any time.':tab==='daily'?'Opening + incoming − outgoing = closing. Use the date picker to review any day.':'Every receipt and issue is recorded with its reference and team member.'}</p>
+ {loading||((tab==='movements'||tab==='daily')&&historyLoading)?<div className="inventory-loading" role="status"><RefreshCw size={18}/><span>{loading?'Loading stock…':'Loading movement history…'}</span></div>:loadFailed?<div className="inventory-empty"><h3>Inventory couldn’t be loaded</h3><p>Your stock records have not been changed. Choose Refresh to try again.</p></div>:<div className="inventory-table"><table><thead><tr>{(tab==='stock'?['Material','Stock health','Available','Actions']:tab==='archived'?['Material','Replaced by','Stock kept','Actions']:tab==='daily'?['Material','Unit','Opening','Incoming','Outgoing','Closing']:['Material','Movement','Quantity','Reference','By','Recorded']).map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>
  {visible.map((row,index)=>{
   if(tab==='stock'){
    const state=stockState(row),reorder=Number(row.reorder_level)||0,stock=Number(row.stock_on_hand)||0;
@@ -249,10 +258,10 @@ export default function InventoryView({currentUser}){
     <td><strong>{row.product_name}</strong><small>{row.sku} · {row.uom} · {row.category||'General'}</small></td>
     <td><span className={`inventory-badge ${state}`}>{state==='out'?'Out of stock':state==='low'?'Low stock':'In stock'}</span></td>
     <td><div className="inventory-level"><div><strong>{fmt(stock)} {row.uom}</strong><small>Reorder at {fmt(reorder)}</small></div><span><i className={state} style={{width:`${fill}%`}}/></span></div></td>
-    <td><div className="inventory-row-actions"><button className="inventory-primary" onClick={()=>openStock(row)}>Receive</button><button onClick={()=>openStock(row,'issue')} disabled={stock<=0}>Issue</button><button onClick={()=>{setItemDraft({...row});setError('');}}>Edit</button><button onClick={()=>setArchived(row,true)} disabled={saving} title="Move to Archived; stock history is kept"><Archive size={13}/> Archive</button></div></td>
+    <td><div className="inventory-row-actions"><button className="inventory-primary" onClick={()=>openStock(row)}>Receive</button><button onClick={()=>openStock(row,'issue')} disabled={stock<=0}>Issue</button><button onClick={()=>{setItemDraft({...row});setError('');}}>Edit</button><button onClick={()=>{setRetireDraft({item:row,replacedBy:'',reason:''});setError('');}} disabled={saving} title="No longer used? Move it to Discontinued; stock history is kept"><Archive size={13}/> Discontinue</button></div></td>
    </tr>;
   }
-  if(tab==='archived')return <tr key={row.id}><td><strong>{row.product_name}</strong><small>{row.sku} · {row.uom}</small></td><td>{row.category||'General'}</td><td>{fmt(row.stock_on_hand)} {row.uom}</td><td><button onClick={()=>setArchived(row,false)} disabled={saving}><RotateCcw size={13}/> Restore</button></td></tr>;
+  if(tab==='archived'){const replacement=row.replaced_by_id&&itemMap.get(row.replaced_by_id);return <tr key={row.id}><td><strong>{row.product_name}</strong><small>{row.sku} · {row.uom} · {row.category||'General'}</small>{row.discontinued_reason&&<small>{row.discontinued_reason}</small>}</td><td>{replacement?<><strong>{replacement.product_name}</strong><small>{replacement.sku}</small></>:<small>—</small>}</td><td>{fmt(row.stock_on_hand)} {row.uom}</td><td><button onClick={()=>setArchived(row,false)} disabled={saving}><RotateCcw size={13}/> Restore</button></td></tr>;}
   if(tab==='daily')return <tr key={row.id}><td>{row.product_name}</td><td>{row.uom}</td><td>{fmt(row.opening)}</td><td className="inventory-in">+{fmt(row.incoming)}</td><td className="inventory-out">−{fmt(row.outgoing)}</td><td><strong>{fmt(row.closing)}</strong></td></tr>;
   const parsed=formatMovementRow(row);
   return <tr key={row.id||index}><td>{itemMap.get(row.item_id)?.product_name||'Material'}</td><td><span className={`inventory-badge ${row.kind==='issue'?'low':'good'}`}>{row.kind}</span></td><td>{row.kind==='issue'?'−':'+'}{fmt(row.quantity)} {itemMap.get(row.item_id)?.uom}</td><td>{parsed.displayNote}</td><td><span className="inventory-badge inventory-author">{parsed.author}</span></td><td>{new Date(row.created_at).toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}</td></tr>;
@@ -263,6 +272,8 @@ export default function InventoryView({currentUser}){
    {tab==='movements'&&visible.length<rows.length&&<button type="button" onClick={()=>setVisibleCount(count=>count+50)}>Load 50 more movements</button>}
  </div>}
  </section>
+  {notice&&<p role="status" className="inventory-help">{notice}</p>}
+  {retireDraft&&<div className="inventory-backdrop"><section role="dialog" aria-modal="true" aria-label="Discontinue material" className="inventory-dialog"><form onSubmit={e=>{e.preventDefault();setArchived(retireDraft.item,true,retireDraft);}}><h3>Discontinue {retireDraft.item.product_name}?</h3><p>It moves to the Discontinued tab and stops appearing in Stock. Its stock history is kept, and you can restore it any time.</p><label>Replaced by (optional)<select value={retireDraft.replacedBy} onChange={e=>setRetireDraft({...retireDraft,replacedBy:e.target.value})} disabled={saving}><option value="">Not replaced</option>{activeItems.filter(i=>i.id!==retireDraft.item.id).sort((a,b)=>a.product_name.localeCompare(b.product_name)).map(i=><option key={i.id} value={i.id}>{i.product_name} · {i.sku}</option>)}</select></label><label>Reason (optional)<input maxLength={160} value={retireDraft.reason} onChange={e=>setRetireDraft({...retireDraft,reason:e.target.value})} placeholder="e.g. Switched to 550W modules" disabled={saving}/></label>{Number(retireDraft.item.stock_on_hand)>0&&<p className="inventory-error">{fmt(retireDraft.item.stock_on_hand)} {retireDraft.item.uom} still in stock. It stays recorded under Discontinued.</p>}{error&&<p role="alert" className="inventory-error">{error}</p>}<div className="inventory-heading"><button type="button" disabled={saving} onClick={()=>{setRetireDraft(null);setError('');}}>Cancel</button><button className="inventory-primary" type="submit" disabled={saving}>{saving?'Saving…':'Move to Discontinued'}</button></div></form></section></div>}
   {itemDraft&&<div className="inventory-backdrop"><section role="dialog" aria-modal="true" aria-label={itemDraft.id?'Edit inventory item':'Add inventory item'} className="inventory-dialog"><form onSubmit={saveItem}><h3>{itemDraft.id?'Edit inventory item':'Add inventory item'}</h3><p>{itemDraft.id?'Change its section or reorder level. Material identity stays linked to existing BOM and movement history.':'The item will be saved to the shared stock catalogue. Start with zero stock, then use Receive to add a quantity.'}</p><label>Material name<input autoFocus required maxLength={160} value={itemDraft.product_name} onChange={e=>setItemDraft({...itemDraft,product_name:e.target.value})} disabled={saving||!!itemDraft.id}/></label><label>SKU<input required maxLength={80} value={itemDraft.sku} onChange={e=>setItemDraft({...itemDraft,sku:e.target.value})} disabled={saving||!!itemDraft.id}/></label><label>Unit<input required maxLength={40} value={itemDraft.uom} onChange={e=>setItemDraft({...itemDraft,uom:e.target.value})} disabled={saving||!!itemDraft.id}/></label><label>Section<input required maxLength={80} list="inventory-sections" value={itemDraft.category||'General'} onChange={e=>setItemDraft({...itemDraft,category:e.target.value})} disabled={saving}/><datalist id="inventory-sections">{categories.map(category=><option key={category} value={category}/>)}</datalist></label><label>Reorder level<input required type="number" min="0" step="0.001" value={itemDraft.reorder_level} onChange={e=>setItemDraft({...itemDraft,reorder_level:e.target.value})} disabled={saving}/></label>{error&&<p role="alert" className="inventory-error">{error}</p>}<div className="inventory-heading"><button type="button" disabled={saving} onClick={()=>{setItemDraft(null);setError('');}}>Cancel</button><button className="inventory-primary" type="submit" disabled={saving}>{saving?'Saving…':itemDraft.id?'Save changes':'Add item'}</button></div></form></section></div>}
   {selected&&<div className="inventory-backdrop"><section role="dialog" aria-modal="true" aria-label="Record stock movement" className="inventory-dialog"><form onSubmit={record}><h3>{kind==='receipt'?'Add quantity':'Issue stock'} · {selected.product_name}</h3><p>Available: {fmt(selected.stock_on_hand)} {selected.uom}</p><label>Quantity ({selected.uom})<input autoFocus type="number" min="0.001" step="0.001" value={qty} onChange={e=>setQty(e.target.value)} required disabled={saving}/></label><label>Reference / note <small style={{color:'#78716c',fontWeight:'normal'}}>(optional)</small><input value={note} onChange={e=>setNote(e.target.value)} placeholder="Delivery note, return or project reference (optional)" maxLength={500} disabled={saving}/></label>{error&&<p role="alert" className="inventory-error">{error}</p>}<div className="inventory-heading"><button type="button" disabled={saving} onClick={()=>setSelected(null)}>Cancel</button><button className="inventory-primary" type="submit" disabled={saving}>{saving?'Saving…':'Save quantity'}</button></div></form></section></div>}
  </section>;

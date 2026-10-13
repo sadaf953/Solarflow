@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { History, Paperclip, IndianRupee, CheckCircle2, Lock, Edit3, X, ClipboardList, Upload, Eye, Loader2 } from 'lucide-react';
 import { LOAN_TAGS, LOAN_TAG_COLORS, isFinalTagValue } from '../../constants';
 import { CheckboxRemarkItem, EditableDetailItem, ChecklistModeToggle } from './shared';
-import { toIndianCommas, formatInputValue, parseIndianNumber } from '../../utils';
+import { toIndianCommas, formatInputValue, parseIndianNumber, isInactiveStaff, staffOptionLabel } from '../../utils';
 import { createFeasibilityPdf, getMissingFeasibilityFields, mapFeasibilityReport } from '../../feasibilityReport';
 import { useGlobalPopup } from '../GlobalPopup';
 
@@ -320,7 +320,7 @@ export default function LoanTab({
                                         {editData.loan_by && !(meta['registration_by'] || []).includes(editData.loan_by) && (
                                             <option value={editData.loan_by}>{editData.loan_by}</option>
                                         )}
-                                        {(meta['registration_by'] || []).map(name => <option key={name} value={name}>{name}</option>)}
+                                        {(meta['registration_by'] || []).map(name => <option key={name} value={name} disabled={isInactiveStaff(name) && name !== editData.loan_by}>{staffOptionLabel(name)}</option>)}
                                     </select>
                                 ) : (
                                     <p className="text-xs font-bold text-stone-800 break-words">{editData.loan_by || '–'}</p>

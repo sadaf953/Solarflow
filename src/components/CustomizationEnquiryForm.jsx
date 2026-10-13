@@ -10,9 +10,9 @@ import { readClientFormDraft, saveClientFormDraft } from '../enquiries/draft';
 export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
 
 const OTHER_INTEREST_OPTIONS = [
-    'Inventory', 'Warranty tracking',
+    'Inventory',
     'Installation view', 'Installation commission view', 'Vendor commission page',
-    'Channel partner commission view', 'Attendance', 'Calendar', 'MIS upload auto updater'
+    'Channel partner commission view', 'Attendance', 'Calendar'
 ];
 const DOCUMENT_COPY = {
     'Feasibility document maker':['Bank feasibility document','Prepare the document for bank submission.'],
@@ -548,7 +548,6 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                             {choiceField('Channel partner offices?', 'partnerOffices', partnerOffices, setPartnerOffices, YES_NO_OPTIONS)}
                                             {choiceField('Channel partners?', 'channelPartners', channelPartners, setChannelPartners, YES_NO_OPTIONS)}
                                             {choiceField('Do you use third-party or multiple installation teams?', 'installationTeams', installationTeams, setInstallationTeams, YES_NO_OPTIONS)}
-                                            {choiceField('Do you need a stamp staff login?', 'stampStaffLogin', stampStaffLogin, setStampStaffLogin, YES_NO_OPTIONS)}
                                             {choiceField('Do you need technician logins?', 'technicianLogin', technicianLogin, setTechnicianLogin, YES_NO_OPTIONS)}
                                         </div>
                                     </fieldset>
@@ -584,7 +583,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                                     </fieldset>
                                     <fieldset className={`${mobileSectionClass(5)} space-y-3 rounded-2xl border border-stone-200 p-4 md:p-5`}>
                                         <legend className="px-2 text-sm font-black">6 · Other features</legend>
-                                        <p className="text-xs text-stone-500">Pick anything else your team needs. MIS upload automation is an extra feature.</p>
+                                        <p className="text-xs text-stone-500">Pick anything else your team needs.</p>
                                         {compactChoices(OTHER_INTEREST_OPTIONS)}
                                     </fieldset>
                                     <div className={mobileSectionClass(5)}><label className="block text-xs font-bold">Custom request (optional)

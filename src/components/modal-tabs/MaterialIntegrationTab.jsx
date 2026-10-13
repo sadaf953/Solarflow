@@ -1,3 +1,4 @@
+import { isInactiveStaff, staffOptionLabel } from '../../utils';
 import React, { useState, useEffect, useRef } from 'react';
 import { ClipboardList, Save, Printer, ShoppingBag, User, Clock, AlertCircle, X, Layers, Zap, Copy, Check, ClipboardPaste, Plus, Trash2, ScanLine } from 'lucide-react';
 import { supabase } from '../../supabase';
@@ -908,7 +909,7 @@ export default function MaterialIntegrationTab({
                                     <option value={paperPreparedBy}>{paperPreparedBy} (not in list)</option>
                                 )}
                                 {integrationByOptions.map((opt) => (
-                                    <option key={opt} value={opt}>{opt}</option>
+                                    <option key={opt} value={opt} disabled={isInactiveStaff(opt)}>{staffOptionLabel(opt)}</option>
                                 ))}
                             </select>
                             {integrationByOptions.length === 0 && (
@@ -943,7 +944,7 @@ export default function MaterialIntegrationTab({
                                     <option value={materialLoadedBy}>{materialLoadedBy} (not in list)</option>
                                 )}
                                 {integrationByOptions.map((opt) => (
-                                    <option key={opt} value={opt}>{opt}</option>
+                                    <option key={opt} value={opt} disabled={isInactiveStaff(opt)}>{staffOptionLabel(opt)}</option>
                                 ))}
                             </select>
                             {integrationByOptions.length === 0 && (
@@ -1065,8 +1066,8 @@ export default function MaterialIntegrationTab({
                                                 </option>
 
                                                 {integrationByOptions.map((opt) => (
-                                                    <option key={opt} value={opt}>
-                                                        {opt}
+                                                    <option key={opt} value={opt} disabled={isInactiveStaff(opt)}>
+                                                        {staffOptionLabel(opt)}
                                                     </option>
                                                 ))}
                                             </select>

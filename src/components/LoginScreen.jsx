@@ -1,6 +1,6 @@
 import {ensureGroupedDemoBatches} from '../demo/deliveryBatches';
 import {ensureThreeDemoDrivers} from '../demo/drivers';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
     ArrowRight, ShieldCheck, BriefcaseBusiness, Building2, ChartNoAxesCombined, 
     Handshake, Users, Truck, Stamp, LoaderCircle, Mail, Lock, KeyRound, Send, AlertTriangle, Check, User, MessageCircle, Phone 
@@ -11,6 +11,8 @@ import { ensureThreeDemoVendors, demoVendorTarget } from '../demo/vendors';
 import { getChecklistMode, setChecklistMode } from '../utils/checklistMode';
 import CustomizationEnquiryForm, { DEFAULT_BASIC_VERSION_URL } from './CustomizationEnquiryForm';
 import BrandMark from './BrandMark';
+import QuoteOnWhatsApp from '../demo/QuoteOnWhatsApp';
+import { rememberVisitor } from '../demo/whatsapp';
 import '../demo/demo.css';
 const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handshake,Users,Truck,Stamp];
 const DEMO_ACCESS_PASSWORD='admin@2026';
@@ -18,10 +20,30 @@ const DEMO_CONTACT_EMAIL='enquiry@deeprootsystems.in';
 const DEMO_CONTACT_PHONE='917981980910';
 const DEMO_CONTACT_PHONE_LABEL='+91 79819 80910';
 const DEMO_CONTACT_FORM_URL=`https://formsubmit.co/ajax/${DEMO_CONTACT_EMAIL}`;
+// Personal invite links: ?name=Sunny%20Chauhan&company=Raj%20Electricals&k=<invite key>
+// The name is filled in and locked; a valid k skips the password step.
+// The invite key is NOT the demo password, so the password never appears in
+// a link. Change DEMO_INVITE_KEY to switch off every link already sent.
+const DEMO_INVITE_KEY='sfdemo26';
+function readInvite(){
+ try{
+  const qs=new URLSearchParams(window.location.search||(window.location.hash.split('?')[1]||''));
+  const name=(qs.get('name')||'').trim().slice(0,60);
+  if(!name)return null;
+  const company=(qs.get('company')||'').trim().slice(0,80);
+  let unlocked=false;
+  const k=qs.get('k');
+  if(k)unlocked=k===DEMO_INVITE_KEY;
+  return {name,company,unlocked};
+ }catch{return null;}
+}
 const descriptions=['Explore the complete solar business.','Manage leads and daily operations.','Follow your partner’s project pipeline.','Review progress and team activity.','Build quotations and follow up leads.','Track your customers from start to finish.','Manage delivery, installation and photos.','Review documents and completed work.'];
 export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
  const [busy,setBusy]=useState('');const [error,setError]=useState(initialError);
+ const [invite] = useState(readInvite);
+ useEffect(() => { if (invite) rememberVisitor({ name: invite.name, company: invite.company }); }, [invite]);
  const [visitorName, setVisitorName] = useState(() => {
+  if (invite) return invite.name;
   try { return localStorage.getItem('solarflow_visitor_name') || ''; } catch { return ''; }
  });
  const [hasBranches, setHasBranches] = useState(false);
@@ -181,6 +203,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
   try {
    const nameToUse = (customName !== undefined ? customName : visitorName || '').trim();
    if (!nameToUse) throw new Error('Enter your name to continue.');
+   if (!unlocked && invite?.unlocked && nameToUse === invite.name) unlocked = true;
    if (!unlocked) {
     setPendingRole(role);
     setAccessPassword('');
@@ -190,9 +213,10 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
    }
    const {data:session,error:sessionError}=await supabase.auth.getSession();if(sessionError)throw sessionError;
    if(!session.session){const result=await supabase.auth.signInAnonymously();if(result.error)throw result.error;}
+   const recordedName = invite && invite.company && nameToUse === invite.name ? `${nameToUse} (${invite.company})` : nameToUse;
    const {data,error:roleError}=await supabase.rpc('start_demo_session',{
      p_role: role.user_type,
-     p_name: nameToUse || null
+     p_name: recordedName || null
    });
    if(roleError)throw roleError;
    if(!data?.id)throw new Error('The demo profile could not be created.');
@@ -240,7 +264,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
    } else if (preset === 'enterprise') {
     setHasBranches(true);
     setHasVendors(true);
-    setHasStamp(true);
+    setHasStamp(false);
     handleStoreFilesChange(true);
    }
   }
@@ -351,7 +375,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
         {!forgotMode && (
          <div className="pt-3 border-t border-stone-150">
           <div className="flex items-center justify-between mb-2">
-           <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Quick Fill All 8 Roles:</span>
+           <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Quick Fill Roles:</span>
            <span className="text-[10px] text-stone-400 font-mono">PW: SolarFlow@2026</span>
           </div>
           <div className="grid grid-cols-4 gap-1.5">
@@ -363,7 +387,6 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
             { label: 'Dealer', email: 'dealer@solarflow.demo' },
             { label: 'Partner', email: 'partner@solarflow.demo' },
             { label: 'Vendor', email: 'vendor@solarflow.demo' },
-            { label: 'Stamp', email: 'stamp@solarflow.demo' },
            ].map(r => (
             <button
              key={r.email}
@@ -496,25 +519,33 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
          Please <button type="button" onClick={openContact}>contact us</button> if the password wasn’t shared with you.
         </p>
        )}
-       <p className="demo-access-help">
+       {!invite && <p className="demo-access-help">
         <button type="button" onClick={() => { setPendingRole(null); setAccessError(''); }}>Change name</button>
-       </p>
+       </p>}
+       </> : <>
+       {invite ? <>
+       <h2>Welcome, {invite.name}</h2>
+       <p>{invite.company ? <>Your personal SolarFlow demo for <strong>{invite.company}</strong> is ready.</> : <>Your personal SolarFlow demo is ready.</>} {invite.unlocked ? 'No password needed. Just tap Enter SolarFlow.' : 'Tap Enter SolarFlow, then enter the demo password you were given.'}</p>
        </> : <>
        <h2>Enter your name to explore the demo</h2>
        <p>This demo uses your name and a shared demo password so you can explore quickly. The production CRM is secured with authenticated user accounts, passwords and role-based permissions. Your demo activity will be recorded under the name you enter.</p>
+       </>}
        
        <div className="demo-name-entry-row">
-        <div className="demo-name-input-wrap">
-         <User className="demo-name-input-icon" size={18}/>
+        <div className={`demo-name-input-wrap${invite ? ' is-locked' : ''}`}>
+         {invite ? <Lock className="demo-name-input-icon" size={18}/> : <User className="demo-name-input-icon" size={18}/>}
          <input
           type="text"
           value={visitorName}
-          onChange={(e) => setVisitorName(e.target.value)}
+          onChange={(e) => { if (!invite) setVisitorName(e.target.value); }}
+          readOnly={!!invite}
+          aria-readonly={!!invite}
+          title={invite ? 'This demo link is personalised for you' : undefined}
           placeholder="Enter your name"
           className="demo-name-input"
           autoComplete="name"
           required
-          autoFocus
+          autoFocus={!invite}
          />
         </div>
         <button 
@@ -530,6 +561,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
       </div>
      </form>
 
+    <p className="demo-quote-line text-center text-sm text-stone-600">Already know what you need? <QuoteOnWhatsApp variant="link" label="Ask for a quotation on WhatsApp" name={visitorName.trim() || undefined} company={invite?.company || undefined} context="demo landing page"/></p>
     <div className="demo-start-options">
      <button type="button" aria-expanded={showSetup} aria-controls="demo-company-setup" onClick={() => setShowSetup(!showSetup)}>{showSetup ? 'Hide demo options' : 'Customize demo or explore team roles'} <ArrowRight size={16}/></button>
      <button type="button" onClick={() => { setAuthMode('credentials'); setCredNotice({type:'',text:''}); }}>Already have demo credentials? Sign in</button>
@@ -563,9 +595,9 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
         <button 
          type="button" 
          onClick={() => applyPreset('enterprise')}
-         className={`demo-preset-btn${hasBranches && hasVendors && hasStamp && storeFiles ? ' is-active' : ''}`}
+         className={`demo-preset-btn${hasBranches && hasVendors && storeFiles ? ' is-active' : ''}`}
         >
-         Full Enterprise (All 8)
+         Full Enterprise (All 7)
         </button>
        </div>
       </div>
@@ -625,37 +657,10 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
         </div>
        </div>
 
-       {/* Q3: Dedicated Stamp Guy */}
-       <div className={`demo-question-box${hasStamp ? ' is-enabled' : ''}`}>
-        <div className="demo-question-info">
-         <span className="demo-question-num">3</span>
-         <div>
-          <strong>Do you have a dedicated agreement / stamp maker?</strong>
-          <small>{hasStamp ? 'Document coordinator portal enabled for verification & document workflow.' : 'Office handles stamping: Document coordinator portal hidden.'}</small>
-         </div>
-        </div>
-        <div className="demo-toggle-group" role="radiogroup" aria-label="Dedicated agreement / stamp maker?">
-         <button 
-          type="button" 
-          onClick={() => setHasStamp(false)}
-          className={`demo-toggle-btn${!hasStamp ? ' is-selected' : ''}`}
-         >
-          No
-         </button>
-         <button 
-          type="button" 
-          onClick={() => setHasStamp(true)}
-          className={`demo-toggle-btn${hasStamp ? ' is-selected' : ''}`}
-         >
-          Yes
-         </button>
-        </div>
-       </div>
-
        {/* Q4: Storing Files & Documents */}
        <div className={`demo-question-box${storeFiles ? ' is-enabled' : ''}`}>
         <div className="demo-question-info">
-         <span className="demo-question-num">4</span>
+         <span className="demo-question-num">3</span>
          <div>
           <strong>Do you want to store customer files &amp; documents?</strong>
           <small>{storeFiles ? 'Cloud file storage enabled: checklists link directly to uploaded files, photos, and documents.' : 'Direct checklist mode: items check and uncheck with 1 click without uploading files.'}</small>
@@ -726,7 +731,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
 
    <div className="demo-next-links">
     <div><strong>Looking for a simpler CRM?</strong><p>Explore the basic version for leads, quotations and customer tracking.</p><p><strong>Demo credentials</strong><br/>Email: <code>admin@crm.com</code><br/>Password: <code>admin</code></p><a href={DEFAULT_BASIC_VERSION_URL} target="_blank" rel="noopener noreferrer">Explore Basic Version <ArrowRight size={15}/></a></div>
-    <div><strong>Plans for every team size</strong><p>Compare the Foundation, Growth and Enterprise setup options before entering the demo.</p><button type="button" onClick={onOpenPlans}>View Plans &amp; Pricing <ArrowRight size={15}/></button></div>
+    <div><strong>Plans for every team size</strong><p>Pick your team size and budget, and we’ll suggest the right setup.</p><button type="button" onClick={onOpenPlans}>View Plans &amp; Pricing <ArrowRight size={15}/></button><p className="mt-2"><QuoteOnWhatsApp variant="link" label="Or ask on WhatsApp" name={visitorName.trim() || undefined} company={invite?.company || undefined} context="plans card"/></p></div>
     <div><strong>Make it work for your team</strong><p>Tell us about your business when you are ready to discuss setup.</p><button type="button" aria-expanded={showEnquiry} aria-controls="demo-enquiry" onClick={() => setShowEnquiry(!showEnquiry)}>{showEnquiry ? 'Hide setup request' : 'Request a setup'} <ArrowRight size={15}/></button></div>
    </div>
    <div hidden={!showEnquiry} id="demo-enquiry" className="mt-8 max-w-3xl mx-auto w-full"><CustomizationEnquiryForm initialStoreFiles={storeFiles} /></div>

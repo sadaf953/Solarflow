@@ -51,16 +51,47 @@ export async function logActivity(
 // { company_branch: ['Delhi', 'Mumbai'], poc: ['Alice', 'Bob'], ... }
 import { useState, useEffect } from 'react';
 
+// Staff deactivated in User Management. Their names stay on old records but
+// move to the bottom of every staff dropdown and can't be picked again.
+const inactiveStaff = new Set();
+const staffKey = name => String(name || '').trim().toLowerCase();
+export const isInactiveStaff = name => inactiveStaff.has(staffKey(name));
+export const staffOptionLabel = name => isInactiveStaff(name) ? `${name} (inactive)` : name;
+export const STAFF_CATEGORIES = ['registration_by', 'integration_by'];
+export function activeFirst(names = []) {
+    return [...names].sort((a, b) => Number(isInactiveStaff(a)) - Number(isInactiveStaff(b)));
+}
+
+async function loadInactiveStaff() {
+    const [demo, real] = await Promise.all([
+        supabase.from('demo_profiles').select('name, status'),
+        supabase.from('profiles').select('name, status')
+    ]);
+    const active = new Set(), inactive = new Set();
+    for (const row of [...(demo.data || []), ...(real.data || [])]) {
+        const key = staffKey(row.name);
+        if (!key) continue;
+        (row.status === 'inactive' ? inactive : active).add(key);
+    }
+    inactiveStaff.clear();
+    // Someone with the same name who is still active keeps the name selectable.
+    for (const key of inactive) if (!active.has(key)) inactiveStaff.add(key);
+}
+
 export function useMetadata() {
     const [meta, setMeta] = useState({});
     useEffect(() => {
-        supabase.from('metadata').select('category, label').then(({ data }) => {
+        Promise.all([
+            supabase.from('metadata').select('category, label'),
+            loadInactiveStaff().catch(err => console.warn('Inactive staff lookup failed:', err))
+        ]).then(([{ data }]) => {
             if (!data) return;
             const grouped = {};
             data.forEach(({ category, label }) => {
                 if (!grouped[category]) grouped[category] = [];
                 grouped[category].push(label);
             });
+            for (const category of STAFF_CATEGORIES) if (grouped[category]) grouped[category] = activeFirst(grouped[category]);
             setMeta(grouped);
         });
     }, []);

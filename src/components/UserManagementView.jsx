@@ -1357,7 +1357,9 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
             String(p?.email || '').toLowerCase().includes(q) ||
             String(p?.channel_partner || '').toLowerCase().includes(q) ||
             String(p?.role || '').toLowerCase().includes(q);
-    });
+    })
+    // Deactivated staff always sit at the bottom of the list.
+    .sort((a, b) => Number(a?.status === 'inactive') - Number(b?.status === 'inactive'));
 
     // Live count per role for the dropdown, so you can see where people are
     // before selecting. Counts ignore the search box on purpose.
@@ -1535,8 +1537,8 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
                                                         </div>
                                                     ) : (
                                                         <div className="flex items-center gap-1.5 group/name">
-                                                            <p className={`text-xs font-bold ${isInactive ? 'text-stone-400' : 'text-stone-900'}`}>{profile.name || 'Unnamed'}</p>
-                                                            {ALLOW_NAME_EDIT && (
+                                                            <p className={`text-xs font-bold ${isInactive ? 'text-stone-400' : 'text-stone-900'}`}>{profile.name || 'Unnamed'}{isInactive && <span className="ml-1.5 text-[9px] font-bold uppercase text-stone-400">· deactivated, read-only</span>}</p>
+                                                            {ALLOW_NAME_EDIT && !isInactive && (
                                                             <button
                                                                 type="button"
                                                                 onClick={() => {
