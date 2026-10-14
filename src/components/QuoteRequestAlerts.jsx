@@ -11,15 +11,17 @@ const readSeen = () => { try { return new Set(JSON.parse(localStorage.getItem(SE
 const isQuote = item => item.kind === 'enquiry' && /Selected option: Quote:/.test(item.notes || '');
 // Every client in one list: new quote form, old enquiry form, and old forms you prepared but they haven't sent yet.
 const typeOf = item => item.kind === 'prepared' ? 'sent' : isQuote(item) ? 'new' : 'old';
-const TYPES = { new: 'New form', old: 'Old form', sent: 'Sent, not filled yet' };
+const TYPES = { new: 'New form', old: 'Old form', sent: 'Sent – not opened yet' };
+// New-form client who confirmed their details but hasn't shared the estimate yet.
+const opened = item => isQuote(item) && !/Estimated total:/.test(item.notes || '');
 const BADGE = { new: 'bg-emerald-100 text-emerald-800', old: 'bg-sky-100 text-sky-800', sent: 'bg-stone-100 text-stone-600' };
 const TABS = [['all', 'All'], ['new', 'New form'], ['old', 'Old form'], ['sent', 'Sent, not filled']];
 const when = iso => { try { return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); } catch { return ''; } };
 const estimate = notes => (notes || '').match(/Estimated total: ([^\n;]+)/)?.[1] || '';
-const refOf = notes => (notes || '').match(/Ref: ([^\n;]+)/)?.[1] || '';
+const refOf = notes => (notes || '').match(/Ref:? (SF-[A-Z0-9-]+)/i)?.[1] || '';
 const pkgOf = notes => (notes || '').match(/Selected option: Quote: (\w+)/)?.[1] || '';
 
-export default function QuoteRequestAlerts({ adminCode, onLocked }) {
+export default function QuoteRequestAlerts({ adminCode, onLocked, refreshKey = 0 }) {
   const code = adminCode;
   const [on, setOn] = useState(false);
   const [items, setItems] = useState([]);
@@ -34,7 +36,10 @@ export default function QuoteRequestAlerts({ adminCode, onLocked }) {
 
   async function check(pin) {
     try {
-      const all = await listAdminEnquiries(supabase, pin);
+      const raw = await listAdminEnquiries(supabase, pin);
+      // A sent form disappears from "Sent" once that client opens it (same phone number).
+      const answered = new Set(raw.filter(x => x.kind === 'enquiry').map(x => x.mobile));
+      const all = raw.filter(x => x.kind !== 'prepared' || !answered.has(x.mobile));
       setItems(all); setError(''); setOn(true);
       const fresh = all.filter(x => x.kind === 'enquiry' && !seen.current.has(x.id));
       if (fresh.length && !first.current) {
@@ -55,7 +60,7 @@ export default function QuoteRequestAlerts({ adminCode, onLocked }) {
     return () => clearInterval(t);
   }, [on, code]);
 
-  useEffect(() => { if (code) check(code); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (code) check(code); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const q = query.trim().toLowerCase();
   const shown = items.filter(x => (tab === 'all' || typeOf(x) === tab)
@@ -85,7 +90,7 @@ export default function QuoteRequestAlerts({ adminCode, onLocked }) {
               <li key={x.id} className="py-2.5">
                 <button type="button" onClick={() => setOpen(open === x.id ? '' : x.id)} className="flex w-full flex-wrap items-baseline justify-between gap-2 text-left">
                   <span><span className={`mr-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${BADGE[typeOf(x)]}`}>{TYPES[typeOf(x)]}</span><strong className="text-sm text-stone-900">{x.name || 'No name'}</strong> <span className="text-xs text-stone-500">{x.company || ''}</span></span>
-                  <span className="text-xs text-stone-600">{[refOf(x.notes), pkgOf(x.notes).replace(/^./, c => c.toUpperCase()), estimate(x.notes), when(x.draft_updated_at || x.created_at)].filter(Boolean).join(' · ')}</span>
+                  <span className="text-xs text-stone-600">{opened(x) ? <strong className="text-amber-700">Opened – not sent yet · </strong> : null}{[refOf(x.notes), opened(x) ? '' : pkgOf(x.notes).replace(/^./, c => c.toUpperCase()), estimate(x.notes), when(x.draft_updated_at || x.created_at)].filter(Boolean).join(' · ')}</span>
                 </button>
                 {open === x.id && (
                   <div className="mt-2 rounded-xl bg-stone-50 p-3">
@@ -94,7 +99,7 @@ export default function QuoteRequestAlerts({ adminCode, onLocked }) {
                       {x.mobile && <a href={`https://wa.me/91${x.mobile}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-[#25D366] px-3 text-xs font-bold text-[#073B1C]"><MessageCircle size={13}/> WhatsApp</a>}
                     </div>
                     {x.notes ? <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words font-sans text-xs text-stone-700">{x.notes}</pre>
-                      : <p className="text-xs text-stone-600">{x.kind === 'prepared' ? 'Form sent – the client has not sent it back yet. Open it below in “Edit old forms”.' : 'No answers yet.'}</p>}
+                      : <p className="text-xs text-stone-600">{x.kind === 'prepared' ? 'Form sent – the client hasn’t opened it yet.' : 'No answers yet.'}</p>}
                   </div>
                 )}
               </li>

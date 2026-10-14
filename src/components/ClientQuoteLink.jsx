@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Copy, Check, MessageCircle, Link2 } from 'lucide-react';
 import { PACKAGES } from '../pricing/packages';
+import { supabase } from '../supabase';
+import { createSavedBrief } from '../enquiries/brief';
 
 // Admin tool: make one personal quotation link per client.
 // The link opens the pricing page with their name, company and number filled in,
@@ -21,15 +23,27 @@ export function clientQuoteLink({ name, company, phone, pkg, ref }) {
 // Short reference so each client's answers can be matched to their link (e.g. SF-4K7Q).
 const newRef = () => 'SF-' + Math.random().toString(36).slice(2, 6).toUpperCase();
 
-export default function ClientQuoteLink() {
+export default function ClientQuoteLink({ adminCode = '', onSaved }) {
   const [f, setF] = useState(() => ({ name: '', company: '', phone: '', pkg: '', ref: newRef() }));
   const [copied, setCopied] = useState(false);
-  const set = (k, v) => { setF(x => ({ ...x, [k]: v })); setCopied(false); };
+  const [saved, setSaved] = useState(''); // '', 'saving', 'saved', 'failed', 'nophone'
+  const set = (k, v) => { setF(x => ({ ...x, [k]: v })); setCopied(false); setSaved(''); };
+  // Record every form we send, so it shows in All clients as "Sent – not opened yet".
+  async function record() {
+    if (saved === 'saved' || saved === 'saving') return;
+    if (!/^\d{10}$/.test(digits) || !f.name.trim()) { setSaved('nophone'); return; }
+    setSaved('saving');
+    try {
+      await createSavedBrief(supabase, { name: f.name.trim(), company: f.company.trim() || f.name.trim(), mobile: digits,
+        customRequest: `New quote form sent · Ref ${f.ref.trim()}${f.pkg ? ` · Suggested ${f.pkg}` : ''}` }, adminCode);
+      setSaved('saved'); onSaved?.();
+    } catch { setSaved('failed'); }
+  }
   const ready = f.name.trim() || f.company.trim();
   const link = clientQuoteLink(f);
   const digits = f.phone.replace(/\D/g, '').slice(-10);
   const message = `Hi ${f.name.trim() || 'there'}, here is your personal SolarFlow quotation page${f.company.trim() ? ` for ${f.company.trim()}` : ''}. It takes about a minute – pick a package, answer a few taps and share it back on WhatsApp. You can open the same link again to change anything:\n${link}`;
-  const copy = async () => { try { await navigator.clipboard.writeText(link); setCopied(true); } catch { setCopied(false); } };
+  const copy = async () => { record(); try { await navigator.clipboard.writeText(link); setCopied(true); } catch { setCopied(false); } };
 
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm sm:p-6" aria-label="Client quotation link">
@@ -54,9 +68,14 @@ export default function ClientQuoteLink() {
           <p className="break-all text-xs text-stone-700">{link}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={copy} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 text-sm font-bold text-stone-800">{copied ? <Check size={15}/> : <Copy size={15}/>} {copied ? 'Copied' : 'Copy link'}</button>
-            <a href={`https://wa.me/${digits ? `91${digits}` : ''}?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#25D366] px-3 text-sm font-bold text-[#073B1C]"><MessageCircle size={15}/> Send on WhatsApp</a>
-            <button type="button" onClick={() => setF({ name: '', company: '', phone: '', pkg: '', ref: newRef() })} className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-bold text-stone-500 underline">Next client</button>
+            <a href={`https://wa.me/${digits ? `91${digits}` : ''}?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer" onClick={record} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#25D366] px-3 text-sm font-bold text-[#073B1C]"><MessageCircle size={15}/> Send on WhatsApp</a>
+            <button type="button" onClick={() => { setF({ name: '', company: '', phone: '', pkg: '', ref: newRef() }); setSaved(''); setCopied(false); }} className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-bold text-stone-500 underline">Next client</button>
           </div>
+          {saved && <p role="status" className={`mt-2 text-xs font-semibold ${saved === 'saved' ? 'text-emerald-700' : saved === 'saving' ? 'text-stone-500' : 'text-rose-700'}`}>{
+            saved === 'saved' ? '✓ Saved – it shows in All clients as “Sent – not opened yet”.'
+            : saved === 'saving' ? 'Saving…'
+            : saved === 'nophone' ? 'Add their name and 10-digit number so this form shows in All clients.'
+            : 'Could not save it to All clients – the link still works. Try again.'}</p>}
         </div>
       )}
     </section>

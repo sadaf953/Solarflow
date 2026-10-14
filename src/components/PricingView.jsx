@@ -6,7 +6,11 @@ import QuoteOnWhatsApp from '../demo/QuoteOnWhatsApp';
 import { readPreparedBriefId } from '../enquiries/brief';
 import { readSubmittedEnquiryId } from '../enquiries/reopen';
 
+// A personal link we sent (name / phone / ref in it) opens straight on the client's details.
+const isPersonalLink = hash => { const q = new URLSearchParams(hash.split('?')[1] || ''); return !!(q.get('name') || q.get('phone') || q.get('ref')); };
+
 export default function PricingView() {
+    const [personal] = useState(() => isPersonalLink(window.location.hash));
     const [preparedBriefId, setPreparedBriefId] = useState(() => readPreparedBriefId(window.location.hash));
     const [submittedEnquiryId, setSubmittedEnquiryId] = useState(() => readSubmittedEnquiryId(window.location.hash));
     useEffect(() => {
@@ -25,14 +29,14 @@ export default function PricingView() {
         </main>
     );
     return (
-        <div className="max-w-7xl mx-auto py-8 md:py-12 space-y-8">
-            <header className="max-w-3xl space-y-3">
+        <div className={`max-w-7xl mx-auto ${personal ? 'py-4 space-y-3' : 'py-8 md:py-12 space-y-8'}`}>
+            {personal ? <p className="sf-kicker">Your SolarFlow quotation</p> : <header className="max-w-3xl space-y-3">
                 <p className="sf-kicker">SolarFlow for your team</p>
                 {LAUNCH_OFFER > 0 && <p className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Launch offer: {Math.round(LAUNCH_OFFER * 100)}% off every package</p>}
                 <h1 className="text-3xl md:text-4xl font-black text-stone-900">Pick your package. See your estimate in 1 minute.</h1>
                 <p className="text-sm leading-relaxed text-stone-600">Four packages, one-time payment, no monthly fee. Pick one, answer a few taps, and send it to us on WhatsApp – we reply with your final quotation.</p>
                 <p className="text-sm text-stone-600">Rather just talk? <QuoteOnWhatsApp variant="link" label="Ask for a quotation on WhatsApp" context="pricing page"/></p>
-            </header>
+            </header>}
             <QuoteBuilder/>
         </div>
     );

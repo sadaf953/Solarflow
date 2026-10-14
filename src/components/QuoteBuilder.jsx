@@ -9,6 +9,8 @@ import {
 } from '../pricing/packages';
 import { SALES_WHATSAPP } from '../demo/whatsapp';
 import SimpleCardPreview from './SimpleCardPreview';
+import StageCardPreview from './StageCardPreview';
+import DocPreview from './DocPreview';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Quote flow, built to be finished in about a minute on a phone:
@@ -86,12 +88,20 @@ function Choice({ value, onPick, options, cols = 'grid-cols-2 sm:grid-cols-4' })
 const draftKey = () => `solarflow_quote_${(urlParam('ref') || [urlParam('name'), urlParam('company')].filter(Boolean).join('|') || 'default').toLowerCase()}`;
 const readDraft = () => { try { return JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch { return null; } };
 
+// Small "View" button next to a feature that has sample documents.
+function ViewBtn({ onClick }) {
+  return <button type="button" onClick={onClick} className="flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center rounded-xl border-2 border-stone-200 bg-white px-2 text-[11px] font-bold text-stone-700 hover:border-orange-400" aria-label="View sample document"><Eye size={15}/>View</button>;
+}
+
 export default function QuoteBuilder() {
   const [draft] = useState(readDraft);
   const d = draft || {};
   const [linkPkg] = useState(() => (PKG_IDS.includes(urlParam('pkg')) ? urlParam('pkg') : ''));
   const [ref] = useState(() => urlParam('ref'));
-  const [step, setStep] = useState(1);
+  // A personal link (name / phone filled in by us) first asks the client to confirm their details.
+  const [fromLink] = useState(() => !!(urlParam('name') || urlParam('phone') || urlParam('ref')));
+  const [confirmed, setConfirmed] = useState(!!d.confirmed);
+  const [step, setStep] = useState(() => (fromLink && !d.confirmed ? 0 : 1));
   const [help, setHelp] = useState(d.help || { team: '', manage: [] });
   const [pkg, setPkg] = useState(d.pkg || '');
   const [card, setCard] = useState(d.card || 'simple');
@@ -99,7 +109,8 @@ export default function QuoteBuilder() {
   const [addons, setAddons] = useState(new Set(d.addons || []));
   const [dropped, setDropped] = useState(new Set(d.dropped || [])); // included features the client doesn't want
   const [interested, setInterested] = useState(new Set(d.interested || [])); // 'launching soon' features they want to hear about
-  const [preview, setPreview] = useState(false);
+  const [preview, setPreview] = useState(''); // '' | 'simple' | 'stage'
+  const [docView, setDocView] = useState(null); // { title, docIds, addonId, included }
   const [name, setName] = useState(() => d.name || urlParam('name') || stored('solarflow_visitor_name').replace(/\s*\(.*\)\s*$/, ''));
   const [company, setCompany] = useState(() => d.company || urlParam('company') || stored('solarflow_visitor_company'));
   const [mobile, setMobile] = useState(() => d.mobile || (urlParam('phone') || urlParam('mobile')).replace(/\D/g, '').slice(-10));
@@ -112,9 +123,9 @@ export default function QuoteBuilder() {
   // Keep every answer on this device so the same link opens filled in.
   useEffect(() => {
     try {
-      localStorage.setItem(draftKey(), JSON.stringify({ help, pkg, card, s, addons: [...addons], dropped: [...dropped], interested: [...interested], name, company, mobile, note, identity: identity.current, savedAt }));
+      localStorage.setItem(draftKey(), JSON.stringify({ confirmed, help, pkg, card, s, addons: [...addons], dropped: [...dropped], interested: [...interested], name, company, mobile, note, identity: identity.current, savedAt }));
     } catch { /* storage blocked – the form still works */ }
-  }, [help, pkg, card, s, addons, dropped, interested, name, company, mobile, note, savedAt]);
+  }, [confirmed, help, pkg, card, s, addons, dropped, interested, name, company, mobile, note, savedAt]);
   const top = useRef(null);
 
   const suggested = help.team ? helpPick(help.team, help.manage) : linkPkg;
@@ -188,6 +199,20 @@ export default function QuoteBuilder() {
     } catch { setSaveState('failed'); }
   }
 
+  // Client confirmed their details on a personal link – save straight away so it shows in admin.
+  async function confirmDetails(e) {
+    e.preventDefault();
+    if (!name.trim() || !phoneOk) { setError(!name.trim() ? 'Please enter your name.' : 'Please enter your 10-digit mobile number.'); return; }
+    setError(''); setConfirmed(true); go(1);
+    if (identity.current) return;
+    identity.current = { id: crypto.randomUUID(), editToken: crypto.randomUUID() };
+    try {
+      await saveEnquiryStep(supabase, enquiryPayload({ name, mobile, company, modelType: 'basic', storeFiles: 'unspecified', interests: [],
+        selectedInterest: `Quote: opened the form${ref ? ` (Ref ${ref})` : ''}`, remarks: '' }), identity.current, { contactOnly: true });
+      setSavedAt(new Date().toISOString());
+    } catch { /* saved again when they share */ }
+  }
+
   // Main action: save, then open WhatsApp with every answer typed in.
   function sendOnWhatsApp(e) {
     if (!name.trim() || !phoneOk) { e.preventDefault(); setError(!name.trim() ? 'Please enter your name.' : 'Please enter your 10-digit mobile number.'); return; }
@@ -201,7 +226,23 @@ export default function QuoteBuilder() {
 
   return (
     <section ref={top} className="scroll-mt-24 w-full space-y-3 pb-28 sm:pb-0" aria-label="Get your SolarFlow quotation">
-      {step <= 3 && (
+      {step === 0 && (
+        <form onSubmit={confirmDetails} className={box}>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-orange-700">Your personal quotation form</p>
+          <h2 className="mt-1 text-2xl font-black text-stone-900">Hi{name.trim() ? ` ${name.trim().split(' ')[0]}` : ''}, are these your details?</h2>
+          <p className="mt-1 text-sm text-stone-600">Change anything that’s wrong, then start. It takes about a minute.</p>
+          <div className="mt-4 grid gap-3">
+            <label className="block text-xs font-bold text-stone-700">Your name<input className="sf-input mt-1" value={name} onChange={e => setName(e.target.value)} autoComplete="name" required/></label>
+            <label className="block text-xs font-bold text-stone-700">Company<input className="sf-input mt-1" value={company} onChange={e => setCompany(e.target.value)} autoComplete="organization"/></label>
+            <label className="block text-xs font-bold text-stone-700">Mobile (WhatsApp)<input className="sf-input mt-1" value={mobile} onChange={e => setMobile(e.target.value.replace(/\D/g, '').slice(-10))} inputMode="numeric" autoComplete="tel" required/></label>
+          </div>
+          {error && <p role="alert" className="mt-3 text-sm font-semibold text-rose-700">{error}</p>}
+          <button type="submit" className="sf-btn-primary mt-4 min-h-12 w-full text-base font-black">Yes, that’s me – start <ArrowRight size={16} className="inline"/></button>
+          {ref && <p className="mt-2 text-center text-[11px] text-stone-400">Ref {ref}</p>}
+        </form>
+      )}
+
+      {step >= 1 && step <= 3 && (
         <div>
           <div className="flex items-baseline justify-between text-xs font-bold text-stone-500">
             <span className="text-stone-900">Step {step} of 3 · {STEPS[step - 1]}</span>
@@ -276,9 +317,12 @@ export default function QuoteBuilder() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-black text-stone-900">Two customer cards</p>
-              <p className="text-xs text-stone-500">Simple = everything on 4 tabs. Stage-by-stage = a tab for every step, lead to subsidy.</p>
+              <p className="text-xs text-stone-500">Starter and Growth: pick either, same price. Simple = everything on 4 tabs. Stage-by-stage = 13 stages, lead to subsidy, each filled by the person who does it.</p>
             </div>
-            <button type="button" onClick={() => setPreview(true)} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-800 hover:border-orange-400"><Eye size={14}/> See the Simple card</button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setPreview('simple')} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-800 hover:border-orange-400"><Eye size={14}/> See the Simple card</button>
+              <button type="button" onClick={() => setPreview('stage')} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-800 hover:border-orange-400"><Eye size={14}/> See the Stage-by-stage card</button>
+            </div>
           </div>
           <details className="mt-2">
             <summary className="cursor-pointer text-xs font-bold text-orange-800">Compare them</summary>
@@ -313,7 +357,9 @@ export default function QuoteBuilder() {
                   </button>
                 ); })}
               </div>
-              <button type="button" onClick={() => setPreview(true)} className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-bold text-stone-600 underline"><Eye size={13}/> See the Simple card</button>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {P.cards.map(id => <button key={id} type="button" onClick={() => setPreview(id)} className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 text-xs font-bold text-stone-700 hover:border-orange-400"><Eye size={13}/> Open the {id === 'simple' ? 'Simple' : 'Stage-by-stage'} card</button>)}
+              </div>
             </Row>
           )}
 
@@ -353,7 +399,7 @@ export default function QuoteBuilder() {
             <p className="mt-2 text-[11px] text-stone-500">{STORAGE_GUIDE} Prices from {['Google One', 'Google Workspace', 'Supabase'].map((n, i) => <span key={n}>{i ? ', ' : ''}<a className="underline" href={STORAGE_OPTIONS.filter(o => o.link)[i].link} target="_blank" rel="noopener noreferrer">{n}</a></span>)} on {STORAGE_PRICES_CHECKED}; they may change.</p>
           </Row>
 
-          <Row label="Features" hint="(green = in your package – untick what you don’t need · tick more if you want, the estimate goes up a little)">
+          <Row label="Features" hint="(green = in your package – tap View to see a sample document, untick what you don’t need · tick more if you want, the estimate goes up a little)">
             {ADDON_GROUPS.map(g => {
               const inc = includedFeatures(pkg).filter(x => x.group === g);
               const more = addonsFor(pkg).filter(x => x.group === g);
@@ -364,16 +410,22 @@ export default function QuoteBuilder() {
                   <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-stone-400">{g}{g === 'Commissions' && more.length > 1 ? ' – pick one' : ''}</p>
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {inc.map(x => { const on = !dropped.has(x.id); return (
-                      <button key={x.id} type="button" aria-pressed={on} onClick={() => toggleDropped(x.id)} className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-left text-sm ${on ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-stone-200 bg-white text-stone-400'}`}>
-                        <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${on ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-stone-300'}`}>{on && <Check size={14}/>}</span>
-                        <span className={on ? '' : 'line-through'}>{x.group === 'Commissions' ? `Commissions – ${x.label.toLowerCase()}` : x.label} <span className="text-[11px] font-bold">{on ? '· included' : '· not needed'}</span></span>
-                      </button>
+                      <div key={x.id} className="flex gap-1.5">
+                        <button type="button" aria-pressed={on} onClick={() => toggleDropped(x.id)} className={`flex flex-1 items-center gap-2 rounded-xl border-2 px-3 py-2 text-left text-sm ${on ? 'border-emerald-200 bg-emerald-50 text-emerald-900' : 'border-stone-200 bg-white text-stone-400'}`}>
+                          <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${on ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-stone-300'}`}>{on && <Check size={14}/>}</span>
+                          <span className={on ? '' : 'line-through'}>{x.group === 'Commissions' ? `Commissions – ${x.label.toLowerCase()}` : x.label} <span className="text-[11px] font-bold">{on ? '· included' : '· not needed'}</span></span>
+                        </button>
+                        {x.docs && <ViewBtn onClick={() => setDocView({ title: x.label, docIds: x.docs, addonId: x.id, inc: true, included: on })}/>}
+                      </div>
                     ); })}
                     {more.map(x => { const on = addons.has(x.id); return (
-                      <button key={x.id} type="button" aria-pressed={on} onClick={() => toggleAddon(x.id)} className={`flex gap-3 rounded-xl border-2 px-3 py-2 text-left ${on ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-orange-300'}`}>
+                      <div key={x.id} className="flex gap-1.5">
+                      <button type="button" aria-pressed={on} onClick={() => toggleAddon(x.id)} className={`flex flex-1 gap-3 rounded-xl border-2 px-3 py-2 text-left ${on ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-orange-300'}`}>
                         <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${on ? 'border-orange-500 bg-orange-500 text-white' : 'border-stone-300'}`}>{on && <Check size={14}/>}</span>
                         <span><span className="block text-sm font-bold text-stone-900">{g === 'Commissions' ? `Commissions – ${x.label.toLowerCase()}` : x.label} {x.custom && <span className="font-semibold text-stone-500">· price after a call</span>}</span>{x.example && <span className="text-xs text-stone-500">{x.example}</span>}</span>
                       </button>
+                      {x.docs && <ViewBtn onClick={() => setDocView({ title: x.label, docIds: x.docs, addonId: x.id, inc: false, included: on })}/>}
+                      </div>
                     ); })}
                     {soon.map(x => { const on = interested.has(x.id); return (
                       <button key={x.id} type="button" aria-pressed={on} onClick={() => setInterested(prev => { const n = new Set(prev); n.has(x.id) ? n.delete(x.id) : n.add(x.id); return n; })}
@@ -453,7 +505,11 @@ export default function QuoteBuilder() {
         </div>
       )}
 
-      {preview && <SimpleCardPreview onClose={() => setPreview(false)}/>}
+      {preview === 'simple' && <SimpleCardPreview onClose={() => setPreview('')}/>}
+      {preview === 'stage' && <StageCardPreview onClose={() => setPreview('')}/>}
+      {docView && <DocPreview {...docView} onClose={() => setDocView(null)}
+        onKeep={() => docView.inc ? setDropped(prev => { const x = new Set(prev); x.delete(docView.addonId); return x; }) : !addons.has(docView.addonId) && toggleAddon(docView.addonId)}
+        onRemove={() => docView.inc ? setDropped(prev => new Set(prev).add(docView.addonId)) : addons.has(docView.addonId) && toggleAddon(docView.addonId)}/>}
     </section>
   );
 }

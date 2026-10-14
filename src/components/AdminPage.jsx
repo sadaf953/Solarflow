@@ -8,6 +8,7 @@ import AdminGate, { readAdminCode, forgetAdminCode } from './AdminGate';
 // Nothing is shown until the admin code is checked by the server.
 export default function AdminPage() {
     const [adminCode, setAdminCode] = useState(readAdminCode);
+    const [refreshKey, setRefreshKey] = useState(0);
     const logOut = () => {forgetAdminCode();setAdminCode('');};
     if (!adminCode) return <AdminGate onUnlock={setAdminCode}/>;
     return (
@@ -20,8 +21,8 @@ export default function AdminPage() {
                 <h1 className="mt-2 text-2xl sm:text-3xl font-black text-stone-900">Clients & forms</h1>
                 <p className="mt-2 text-sm text-stone-600">1. Enter the client’s details and send them their form. 2. They fill it in (and can come back to edit). 3. It reaches you on WhatsApp and shows up in All clients below – together with every old client.</p>
             </header>
-            <ClientQuoteLink/>
-            <QuoteRequestAlerts adminCode={adminCode} onLocked={logOut}/>
+            <ClientQuoteLink adminCode={adminCode} onSaved={() => setRefreshKey(k => k + 1)}/>
+            <QuoteRequestAlerts adminCode={adminCode} onLocked={logOut} refreshKey={refreshKey}/>
             <details className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
                 <summary className="cursor-pointer text-sm font-bold text-stone-700">Edit old forms (open, change or re-send an old client form)</summary>
                 <div className="mt-3"><CustomizationEnquiryForm key="admin" startInPrepareMode adminCode={adminCode}/></div>

@@ -13,10 +13,10 @@ export const PACKAGES = [
   {
     id: 'starter', name: 'Starter', price: 40000, range: [null, 40000], tagline: 'For a small rooftop team with one office',
     logins: 'Up to 10 users', maxUsers: 10,
-    who: '2–3 login types: Admin + Staff, or Admin + Staff + Dealer', cards: ['simple'], docs: ['discom', 'feasibility'],
-    highlights: ['Simple customer card – 4 tabs', 'Quotation maker in your format', 'DISCOM agreement + feasibility report', 'Checklists, Google Drive links, Excel export · 30 days support'],
+    who: '2–3 login types: Admin + Staff, or Admin + Staff + Dealer', cards: ['simple', 'stage'], docs: ['quotation', 'discom', 'feasibility'],
+    highlights: ['Choose your card – Simple (4 tabs) or Stage-by-stage (13 stages)', 'Quotation maker in your format', 'DISCOM agreement + feasibility report', 'Checklists, Google Drive links, Excel export · 30 days support'],
     includes: [
-      'Simple customer card (our original version) – 4 tabs: Overview · Finance & Bank · Checklist · Notes & History',
+      'Choose your customer card – Simple (4 tabs: Overview · Finance & Bank · Checklist · Notes & History) or Stage-by-stage (a tab for each of 13 stages)',
       'Quotation maker in your format',
       'Every customer’s stage, next follow-up and pending work on one dashboard',
       'DISCOM agreement and bank feasibility report – filled from the customer card',
@@ -28,7 +28,7 @@ export const PACKAGES = [
   {
     id: 'growth', name: 'Growth', price: 52000, range: [40000, 60000], tagline: 'More staff and dealers, money tracked', popular: true,
     logins: 'Up to 25 users', maxUsers: 25,
-    who: 'Admin, Staff, Dealer', cards: ['simple', 'stage'], docs: ['discom', 'feasibility'],
+    who: 'Admin, Staff, Dealer', cards: ['simple', 'stage'], docs: ['quotation', 'discom', 'feasibility'],
     highlights: ['Everything in Starter', 'Dealer logins – each dealer sees only their own leads', 'Finance bundle – invoice maker, payments, loan & subsidy tracking', 'Dealer commissions · staff management · 60 days support'],
     includes: [
       'Everything in Starter',
@@ -43,7 +43,7 @@ export const PACKAGES = [
   {
     id: 'pro', name: 'Pro', price: 65000, range: [60000, 80000], tagline: 'Godown, delivery and installers',
     logins: 'Up to 50 users', maxUsers: 50,
-    who: 'Admin, Staff, Dealer, Installer, Godown', cards: ['stage'], docs: ['discom', 'feasibility', 'bom', 'truck', 'gatepass'],
+    who: 'Admin, Staff, Dealer, Installer, Godown', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
     highlights: ['Everything in Growth', 'Delivery bundle – delivery batches, BOM, challan, gate pass, truck loading sheet', 'Inventory (godown)', 'Installation bundle + installation team commissions · 90 days support'],
     includes: [
       'Everything in Growth',
@@ -57,7 +57,7 @@ export const PACKAGES = [
   {
     id: 'complete', name: 'Complete', price: 80000, range: [80000, null], tagline: 'Branches and the full operation',
     logins: 'Unlimited users', maxUsers: null,
-    who: 'Admin, Staff, Dealer, Installer, Godown, Branch', cards: ['stage'], docs: ['discom', 'feasibility', 'bom', 'truck', 'gatepass'],
+    who: 'Admin, Staff, Dealer, Installer, Godown, Branch', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
     highlights: ['Everything in Pro', 'Branch office logins', 'Attendance and calendar', 'Commercial projects – launching soon', 'Unlimited users · priority support'],
     includes: [
       'Everything in Pro',
@@ -82,20 +82,20 @@ export const TEAM_SIZES = ['1–3', '4–6', '7–10', '11–25', '26–50', '50
 export const LIVE_COUNTS = ['Under 50', '50 – 200', '200 – 500', '500+'];
 
 // The two customer cards. "simple" = the original SolarFlow card (old version),
-// "stage" = the current stage-by-stage card. Starter uses simple, Complete uses stage,
-// Growth lets the client choose.
+// "stage" = the current stage-by-stage card. Starter and Growth let the client choose
+// (same price); Pro and Complete use the stage card.
 export const CARDS = [
   {
     id: 'simple', name: 'Simple card', sub: 'Original version · 4 tabs',
     tabs: ['Overview', 'Finance & Bank', 'Checklist', 'Notes & History'],
-    bestFor: 'Fewer things to track · up to 25 users',
+    bestFor: 'Fewer things to track · one office person updates everything',
     packages: ['starter', 'growth'],
   },
   {
-    id: 'stage', name: 'Stage-by-stage card', sub: 'New version · 13 stage tabs',
+    id: 'stage', name: 'Stage-by-stage card', sub: 'New version · 13 stages',
     tabs: ['Lead', 'Registration', 'Loan / Cash', 'Material order', 'Integration', 'Delivery', 'Installation', 'Geo-tag photo', 'DISCOM submission', 'Meter', 'Inspection', 'Subsidy', 'Final review'],
     bestFor: 'Many things to track, different people per stage · any team size',
-    packages: ['growth', 'pro', 'complete'],
+    packages: ['starter', 'growth', 'pro', 'complete'],
   },
 ];
 
@@ -109,6 +109,29 @@ export const CARD_COMPARISON = [
   { label: 'Pending work', simple: 'Dashboard by status and follow-up date', stage: 'Dashboard per stage – see exactly where each customer is stuck' },
   { label: 'Learning time', simple: 'Ready in 1 day', stage: '2–3 days with training' },
 ];
+
+// Sample customer for the Stage-by-stage card preview. Stages and fields are the real
+// ones from the app (constants.js PRIMARY_STAGES + AgentStageDetails), demo data only.
+// A customer goes through Loan OR Cash, so a customer sees 13 of these 14.
+export const STAGE_CARD = {
+  name: 'Ramesh Patel', current: 'Material Delivery', payment: 'Loan',
+  stages: [
+    { id: 'Leads', who: 'Office / dealer', fields: [['Customer Name', 'Ramesh Patel'], ['Phone Number', '90000 00001'], ['Email', 'demo.customer@example.com'], ['Consumer No', 'DEMO-244001'], ['Village / Address', 'Demo Village'], ['Sub Division', 'Demo Division'], ['Channel Partner', 'Demo Partner'], ['Dealer', 'Demo Dealer'], ['Module Brand', 'SolarFlow'], ['Module WP', '580'], ['No. of Modules', '6'], ['System Capacity', '3.48 kWp'], ['Payment Type', 'Loan']], needs: ['Customer Name', 'Phone Number'] },
+    { id: 'Registration', who: 'Office', fields: [['Registration Date', '02 Oct 2026'], ['Registration By', 'Demo Staff'], ['Registration / Feasibility No.', 'REG-0001'], ['File No.', 'F-101'], ['Application Acknowledgment', 'Uploaded'], ['Feasibility Document', 'Uploaded'], ['Subsidy Token Photo', 'Uploaded']], needs: ['Registration Date', 'Payment Type (Loan or Cash)'] },
+    { id: 'Loan', who: 'Accounts / bank', fields: [['Jansamarth Application No.', 'JS-000123'], ['Loan Status', 'Sanctioned'], ['Vendor Feasibility', 'Uploaded'], ['Site Feasibility', 'Uploaded'], ['Digital Certificate', 'Uploaded'], ['Loan Timeline', 'Inprocess → Sanctioned']], needs: ['Jansamarth Application No.'] },
+    { id: 'Cash', who: 'Accounts', skip: true, fields: [['Total Amount', '–'], ['Payments', '–'], ['Total Received', '–'], ['Balance Remaining', '–']], needs: ['Payment Type'] },
+    { id: 'Material Order', who: 'Store / purchase', fields: [['Roof / Shed', 'Roof'], ['DC Cable', '30 m'], ['AC Cable', '15 m'], ['Front Leg Height', '1 ft'], ['Rear Leg Height', '3 ft'], ['Invoice Value', '₹1,80,000'], ['Notes / Instructions', 'Deliver before 10 Oct']], needs: ['Roof / Shed', 'Invoice Value'] },
+    { id: 'Material Integration', who: 'Store', fields: [['Inverter Make', 'DemoVolt'], ['Inverter Serial No.', 'INV-0001'], ['Panel Serial Numbers', 'PNL-0001 … PNL-0006'], ['Integration By', 'Demo Store']], needs: ['Inverter Make', 'Inverter Serial Number'] },
+    { id: 'Material Delivery', who: 'Store / driver', fields: [['Vendor', 'Demo Installers'], ['Invoice No.', 'INV-2026-044'], ['Delivery Date', '12 Oct 2026'], ['Vehicle / Truck No.', 'XX 00 AB 0001'], ['Driver Name', 'Demo Driver'], ['Driver Phone Number', '90000 00002'], ['Delivery Status', 'Out for delivery']], needs: ['Vendor Allotment', 'Delivery Date'] },
+    { id: 'Installation Status', who: 'Installer', fields: [['Installation Status', '–'], ['Installation Date', '–'], ['Assigned Vendor', 'Demo Installers'], ['Installation Note', '–']], needs: ['Installation Status must be Installed'] },
+    { id: 'Geo Tag Photo', who: 'Installer', fields: [['Geo Tag Status', '–'], ['Geo Tag Image', '–']], needs: ['Geo Tag Status must be Proceed'] },
+    { id: 'DISCOM Submission', who: 'Office / DISCOM', fields: [['Submitted By', '–'], ['Submission Date', '–'], ['First Party', '–'], ['Second Party', '–'], ['Stamp Value', '–'], ['Agreement Execution Date', '–']], needs: ['Submitted By and Date'] },
+    { id: 'Meter Installation', who: 'DISCOM', fields: [['Meter Installation', '–'], ['Meter Installation Date', '–'], ['Meter Installation Photo', '–']], needs: ['Meter Installation must be Yes', 'Installation Date'] },
+    { id: 'DISCOM Inspection', who: 'DISCOM', fields: [['DISCOM Inspection', '–']], needs: ['DISCOM Inspection must be Yes'] },
+    { id: 'Subsidy Status', who: 'Accounts', fields: [['Subsidy Status', '–'], ['Subsidy Amount', '₹78,000 expected'], ['Subsidy Timeline', '–']], needs: ['Subsidy Tag'] },
+    { id: 'Final Review', who: 'Admin', fields: [['Warranty Card', '–'], ['Insurance Status', '–']], needs: ['Customer Name'] },
+  ],
+};
 
 // Sample customer for the Simple card preview – same structure as the original basic CRM.
 // Demo data only.
@@ -208,11 +231,12 @@ export const STORAGE_GUIDE = '1 GB holds about 50 customers’ documents (≈ 20
 
 // Sample documents SolarFlow fills automatically. Files live in public/samples (demo data only).
 export const SAMPLE_DOCS = [
-  { id: 'discom', name: 'DISCOM agreement', what: 'Consumer–vendor agreement (Annexure 2), filled from the customer card.', file: 'discom-agreement', from: 'starter' },
-  { id: 'feasibility', name: 'Feasibility report', what: 'Bank / vendor feasibility format with loan declaration.', file: 'feasibility-report', from: 'starter' },
-  { id: 'bom', name: 'BOM & material integration', what: 'Bill of materials, panel and inverter serial numbers per customer.', file: 'bom-material-integration', from: 'pro' },
-  { id: 'truck', name: 'Truck loading sheet', what: 'Combined loading quantities for every customer on one truck.', file: 'truck-loading-sheet', from: 'pro' },
-  { id: 'gatepass', name: 'Delivery gate pass', what: 'Vehicle, driver and drop-off list with recipient signatures.', file: 'delivery-gate-pass', from: 'pro' },
+  { id: 'quotation', name: 'Quotation', what: 'Your quotation in your format – 3 pages, with brand options, subsidy and net price.', file: 'quotation', pages: 3, from: 'starter' },
+  { id: 'discom', name: 'DISCOM agreement', what: 'Consumer–vendor agreement (Annexure 2), filled from the customer card.', file: 'discom-agreement', pages: 4, from: 'starter' },
+  { id: 'feasibility', name: 'Feasibility report', what: 'Bank / vendor feasibility format with loan declaration.', file: 'feasibility-report', pages: 3, from: 'starter' },
+  { id: 'bom', name: 'BOM & material integration', what: 'Bill of materials, panel and inverter serial numbers per customer.', file: 'bom-material-integration', pages: 2, from: 'pro' },
+  { id: 'truck', name: 'Truck loading sheet', what: 'Combined loading quantities for every customer on one truck.', file: 'truck-loading-sheet', pages: 3, from: 'pro' },
+  { id: 'gatepass', name: 'Delivery gate pass', what: 'Vehicle, driver and drop-off list with recipient signatures.', file: 'delivery-gate-pass', pages: 1, from: 'pro' },
 ];
 const RANK = { starter: 0, growth: 1, pro: 2, complete: 3 };
 const BY_RANK = ['starter', 'growth', 'pro', 'complete'];
@@ -239,7 +263,7 @@ export function itemsRank({ team, logins = [], docs = [] }) {
 }
 export function computePackage({ team, card, logins, docs }) {
   let r = itemsRank({ team, logins, docs });
-  if (card === 'stage') r = Math.max(r, RANK.growth);
+  void card; // both cards are available from Starter, same price
   return BY_RANK[r];
 }
 // The Simple card exists only in Starter and Growth.
@@ -271,14 +295,14 @@ export const AFTER_CONFIRMATION = [
 // Commissions: pick dealers, installation team, or both (`exclusive` – one choice at a time).
 export const ADDON_GROUPS = ['Included documents', 'Bundles', 'Stand-alone', 'Commissions', 'Custom'];
 export const ADDONS = [
-  { id: 'quotation_maker', group: 'Included documents', label: 'Quotation maker', from: 'starter' },
-  { id: 'discom_doc', group: 'Included documents', label: 'DISCOM submission document', from: 'starter' },
-  { id: 'feasibility_doc', group: 'Included documents', label: 'Bank feasibility document', from: 'starter' },
+  { id: 'quotation_maker', group: 'Included documents', label: 'Quotation maker', from: 'starter', docs: ['quotation'] },
+  { id: 'discom_doc', group: 'Included documents', label: 'DISCOM submission document', from: 'starter', docs: ['discom'] },
+  { id: 'feasibility_doc', group: 'Included documents', label: 'Bank feasibility document', from: 'starter', docs: ['feasibility'] },
 
   { id: 'finance', group: 'Bundles', label: 'Finance bundle', price: 5000, from: 'growth',
     example: 'Bill / invoice maker, payments received and pending, loan tags (1st, 2nd payment) and subsidy tags.' },
   { id: 'delivery', group: 'Bundles', label: 'Delivery bundle', price: 7000, from: 'pro',
-    example: 'Delivery batches page, BOM maker, delivery challan, gate pass and truck loading sheet.' },
+    example: 'Delivery batches page, BOM maker, delivery challan, gate pass and truck loading sheet.', docs: ['bom', 'truck', 'gatepass'] },
   { id: 'installation', group: 'Bundles', label: 'Installation bundle', price: 5000, from: 'pro',
     example: 'Installer logins with job assignment, installation view, geo-tag photos and installer payments.' },
 
