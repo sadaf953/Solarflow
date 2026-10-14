@@ -7,7 +7,8 @@ import { CORE_DOCUMENT_OPTIONS, DATA_START_OPTIONS, OPTIONAL_DOCUMENT_OPTIONS, S
 import { findSubmittedEnquiries, listAdminEnquiries, openSubmittedEnquiry, parseSubmittedEnquiryNotes, submittedEnquiryLink, updateSubmittedEnquiry } from '../enquiries/reopen';
 import { readClientFormDraft, saveClientFormDraft } from '../enquiries/draft';
 
-export const DEFAULT_BASIC_VERSION_URL = 'https://solarcrm.deeprootsystems.in';
+// The old basic version (solarcrm) is retired; everything points to SolarFlow.
+export const DEFAULT_BASIC_VERSION_URL = 'https://solarflow.deeprootsystems.in';
 
 const OTHER_INTEREST_OPTIONS = [
     'Inventory',
@@ -36,7 +37,7 @@ const normalizeDraftAnswers = values => ({
 });
 
 
-export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, submittedEnquiryId = null, allowPrepare = false, startInPrepareMode = false}) {
+export default function CustomizationEnquiryForm({isModal = false, onClose = null, initialStoreFiles, selectedInterest = '', preparedBriefId = null, submittedEnquiryId = null, allowPrepare = false, startInPrepareMode = false, adminCode = ''}) {
     const [preparedBrief, setPreparedBrief] = useState(null);
     const [loadedEnquiry, setLoadedEnquiry] = useState(null);
     const [extraNoteLines, setExtraNoteLines] = useState([]);
@@ -71,7 +72,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
     const [adminFilter, setAdminFilter] = useState('all');
     const [adminSearch, setAdminSearch] = useState('');
     const [selectedAdminItem, setSelectedAdminItem] = useState(null);
-    const [preparePin, setPreparePin] = useState('');
+    const [preparePin, setPreparePin] = useState(adminCode);
     const [savedMatches, setSavedMatches] = useState([]);
     const [shareLink, setShareLink] = useState('');
     const [shareCode, setShareCode] = useState('');
@@ -268,16 +269,22 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
         if (savingRef.current) return;
         savingRef.current = true; setSubmitting(true); setError('');
         try {
-            if (preparePin === '0905') {
+            if (preparePin.length >= 8) {
                 setAdminCatalog(await listAdminEnquiries(supabase, preparePin));
                 setPrepareUnlocked(true);
                 setAdminScreen('list');
             } else {
-                await findSavedMatches();
+                throw new Error('Enter your admin code (8+ characters).');
             }
         } catch (err) { setError(err.message || 'Could not open the saved form. Please try again.'); }
         finally { savingRef.current = false; setSubmitting(false); }
     };
+    useEffect(() => {
+        if (!startInPrepareMode || !adminCode) return;
+        listAdminEnquiries(supabase, adminCode)
+            .then(list => {setAdminCatalog(list);setPrepareUnlocked(true);setAdminScreen('list');})
+            .catch(() => {});
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
     const openSavedMatch = async match => {
         if (match.kind === 'enquiry') {
             const draft = await readClientFormDraft(supabase, 'enquiry', match.id, preparePin);
@@ -401,7 +408,7 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 {!prepareMode && step === 'details' && !clientQuoteLink && <button type="button" disabled={submitting} onClick={() => {setError(''); setStep('done');}} className="mb-4 block text-sm font-semibold text-amber-300 underline disabled:opacity-50">Skip — contact me with what’s already saved</button>}
                 <p className="text-xs font-bold text-amber-300 mb-2">{needsUnlock ? 'Your custom quotation form' : prepareMode && prepareUnlocked ? 'Form overview' : prepareMode ? 'Prepare a client form' : clientQuoteLink ? 'Your custom quotation' : loadedEnquiry ? 'Saved enquiry' : step === 'contact' ? 'Step 1 · Quick enquiry' : step === 'details' ? 'Step 2 · Your business and tools' : 'Enquiry received'}</p>
                 <h3 id={`${formId}-title`} className="text-xl md:text-2xl font-bold pr-8">{needsUnlock ? 'Open your quotation form' : prepareMode && !prepareUnlocked ? 'Open your form overview' : prepareMode && adminScreen === 'list' ? 'Prepared and submitted forms' : prepareMode ? 'Prepare a new client form' : clientQuoteLink && step === 'contact' ? 'Confirm your contact details' : clientQuoteLink && step === 'details' ? 'Finish your quotation form' : loadedEnquiry && step === 'details' ? 'Update the saved enquiry' : step === 'contact' ? 'How can we reach you?' : step === 'details' ? 'Tell us what you need' : 'Thank you for your interest'}</h3>
-                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the access code sent with your link to open your form.' : prepareMode && !prepareUnlocked ? 'Enter 0905 to see all prepared and submitted forms. You can also enter a client’s four-digit code to open their form directly.' : prepareMode && adminScreen === 'list' ? 'Review your forms, create a new one, or share a client link so they can finish their answers.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The client can review and change any field.' : clientQuoteLink && step === 'contact' ? 'Your name, phone number and any answers already prepared are filled in. Review or change them, then continue to request your quotation.' : clientQuoteLink && step === 'details' ? 'Your saved answers are here. Tap through the short sections, change anything you need, and send your requirements.' : loadedEnquiry && step === 'details' ? 'These details were saved earlier. Update them here, or leave them as they are.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
+                <p className="mt-2 text-sm text-stone-300">{needsUnlock ? 'Enter the access code sent with your link to open your form.' : prepareMode && !prepareUnlocked ? 'Enter your admin code to see all prepared and submitted forms.' : prepareMode && adminScreen === 'list' ? 'Review your forms, create a new one, or share a client link so they can finish their answers.' : prepareMode ? 'Enter the client’s contact details and any answers you know. The client can review and change any field.' : clientQuoteLink && step === 'contact' ? 'Your name, phone number and any answers already prepared are filled in. Review or change them, then continue to request your quotation.' : clientQuoteLink && step === 'details' ? 'Your saved answers are here. Tap through the short sections, change anything you need, and send your requirements.' : loadedEnquiry && step === 'details' ? 'These details were saved earlier. Update them here, or leave them as they are.' : step === 'contact' ? 'Just your name and phone number to start. You can add more details after submitting.' : step === 'details' ? 'Your contact request is saved. Answer as many questions as you like, or skip.' : 'We have your contact details and will reach out to understand your needs.'}</p>
                 {selectedInterest && <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-sm text-amber-200">Interested in: {selectedInterest}</p>}
             </div>
             <div className="p-4 sm:p-6 md:p-7">
@@ -419,10 +426,10 @@ export default function CustomizationEnquiryForm({isModal = false, onClose = nul
                 </form> : prepareMode && !prepareUnlocked ? <form onSubmit={handlePrepareUnlock} className="space-y-4">
                     {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">{error}</p>}
                     <label className="block text-xs font-bold">Four-digit code
-                        <input required type="password" inputMode="numeric" pattern="[0-9]{4}" maxLength={4} autoComplete="off" value={preparePin} onChange={event => {setPreparePin(event.target.value.replace(/\D/g, '').slice(0, 4)); setSavedMatches([]);}} placeholder="Preparation or client code" className={fieldClass}/>
+                        <input required type="password" maxLength={64} autoComplete="current-password" value={preparePin} onChange={event => {setPreparePin(event.target.value); setSavedMatches([]);}} placeholder="Admin code" className={fieldClass}/>
                     </label>
-                    <button type="submit" disabled={submitting} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Checking…' : preparePin === '0905' ? 'Open form overview' : 'Open saved form'}</button>
-                    {preparePin === '0905' && <button type="button" disabled={submitting} onClick={findSavedInstead} className="w-full min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm font-bold text-stone-800 disabled:opacity-50">Open a saved form ending 0905</button>}
+                    <button type="submit" disabled={submitting} className="w-full min-h-11 rounded-xl bg-stone-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{submitting ? 'Checking…' : 'Open form overview'}</button>
+
                     {savedMatches.length > 1 && <div className="space-y-2" role="group" aria-label="Saved client forms"><p className="text-xs text-stone-600">More than one client uses this code. Choose the correct form:</p>{savedMatches.map(match => <button key={`${match.kind}-${match.id}`} type="button" disabled={submitting} onClick={() => openSelectedMatch(match)} className="w-full min-h-11 rounded-xl border border-stone-200 px-4 py-3 text-left text-sm hover:border-orange-400 disabled:opacity-50"><strong className="block">{match.name}</strong><span className="text-stone-600">{match.company || 'No company given'} · {match.kind === 'enquiry' ? 'Submitted enquiry' : 'Prepared form'}</span></button>)}</div>}
                 </form> : prepareMode && prepareUnlocked && adminScreen === 'list' ? (
                     <div className="space-y-5">

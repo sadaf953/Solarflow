@@ -595,7 +595,7 @@ function ProfessionalDocument({
                 <div>
                     <div className="professional-document-brand">SOLARFLOW ENERGY</div>
                     <p>Rooftop Solar EPC · Engineering · Installation · Service</p>
-                    <p>GSTIN: 24AAACS1234F1Z9 · +91 98765 43210 · solarcrm.deeprootsystems.in</p>
+                    <p>GSTIN: 24AAACS1234F1Z9 · +91 98765 43210 · solarflow.deeprootsystems.in</p>
                 </div>
                 <div className="professional-document-title">
                     <h3>{title}</h3>

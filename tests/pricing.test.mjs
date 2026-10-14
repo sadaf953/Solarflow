@@ -6,7 +6,7 @@ test('auto-pick never exceeds the chosen budget', () => {
   for (const team of ['small', 'growing', 'large', 'tools'])
     for (const b of BUDGETS.slice(0, 4)) assert.ok(total(team, autoPick(team, b.id)) <= b.max, `${team} ${b.id}`);
 });
-test('small team at 40–60k gets the starter tools', () => {
+test('small team at 60–85k gets the starter tools', () => {
   const s = autoPick('small', 'b2');
   for (const id of ['quotation', 'discom', 'bom']) assert.ok(s.has(id));
   assert.equal(budgetStatus('small', s, 'b2'), 'within');
@@ -19,4 +19,13 @@ test('estimate is a rounded range, not the exact total', () => {
 test('adding beyond budget is flagged', () => {
   const s = autoPick('small', 'b1'); s.add('dealers'); s.add('branches');
   assert.equal(budgetStatus('small', s, 'b1'), 'over');
+});
+
+import { essentialsTotal, ESSENTIALS_BASE, subscriptionCost } from '../src/pricing/plan.js';
+test('essentials base is the founding or list price', () => {
+  assert.ok([40000, 45000].includes(ESSENTIALS_BASE));
+  assert.equal(essentialsTotal(new Set(), 0), ESSENTIALS_BASE);
+});
+test('3-year subscription comparison for 8 users', () => {
+  assert.deepEqual(subscriptionCost(8), [230400, 403200]);
 });

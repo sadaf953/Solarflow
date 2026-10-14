@@ -75,7 +75,7 @@ async function ensureSession(client) {
 }
 
 export async function verifyPreparationPin(client, pin) {
-  if (!/^\d{4}$/.test(pin)) return false;
+  if (typeof pin !== 'string' || pin.length < 8 || pin.length > 64) return false; // admin code: 8+ characters, checked on the server
   await ensureSession(client);
   const {data, error} = await client.rpc('verify_preparation_pin', {p_pin:pin});
   if (error) throw error;
@@ -94,7 +94,7 @@ export async function findOwnedPreparedBriefs(client, phoneSuffix) {
 export async function createSavedBrief(client, draft, preparationPin) {
   const prepared = createPreparedBrief(draft);
   if (!prepared.name || !prepared.mobile || !prepared.company) throw new Error('Enter the client name, a valid 10-digit phone number, and company name.');
-  if (!/^\d{4}$/.test(preparationPin || '')) throw new Error('Enter the 4-digit preparation code.');
+  if (!preparationPin || preparationPin.length < 8) throw new Error('Enter your admin code.');
   await ensureSession(client);
   const {data, error} = await client.rpc('create_prepared_brief', {p_answers:prepared, p_prepare_code:preparationPin});
   if (error) throw error;

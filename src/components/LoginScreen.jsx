@@ -9,7 +9,7 @@ import { supabase } from '../supabase';
 import { APP_ROLES } from '../constants';
 import { ensureThreeDemoVendors, demoVendorTarget } from '../demo/vendors';
 import { getChecklistMode, setChecklistMode } from '../utils/checklistMode';
-import CustomizationEnquiryForm, { DEFAULT_BASIC_VERSION_URL } from './CustomizationEnquiryForm';
+import QuoteBuilder from './QuoteBuilder';
 import BrandMark from './BrandMark';
 import QuoteOnWhatsApp from '../demo/QuoteOnWhatsApp';
 import { rememberVisitor } from '../demo/whatsapp';
@@ -730,11 +730,10 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
    </div>
 
    <div className="demo-next-links">
-    <div><strong>Looking for a simpler CRM?</strong><p>Explore the basic version for leads, quotations and customer tracking.</p><p><strong>Demo credentials</strong><br/>Email: <code>admin@crm.com</code><br/>Password: <code>admin</code></p><a href={DEFAULT_BASIC_VERSION_URL} target="_blank" rel="noopener noreferrer">Explore Basic Version <ArrowRight size={15}/></a></div>
-    <div><strong>Plans for every team size</strong><p>Pick your team size and budget, and we’ll suggest the right setup.</p><button type="button" onClick={onOpenPlans}>View Plans &amp; Pricing <ArrowRight size={15}/></button><p className="mt-2"><QuoteOnWhatsApp variant="link" label="Or ask on WhatsApp" name={visitorName.trim() || undefined} company={invite?.company || undefined} context="plans card"/></p></div>
-    <div><strong>Make it work for your team</strong><p>Tell us about your business when you are ready to discuss setup.</p><button type="button" aria-expanded={showEnquiry} aria-controls="demo-enquiry" onClick={() => setShowEnquiry(!showEnquiry)}>{showEnquiry ? 'Hide setup request' : 'Request a setup'} <ArrowRight size={15}/></button></div>
+    <div><strong>Plans for every team size</strong><p>Four packages, one-time payment. See your estimate in about a minute.</p><button type="button" onClick={onOpenPlans}>View Plans &amp; Pricing <ArrowRight size={15}/></button><p className="mt-2"><QuoteOnWhatsApp variant="link" label="Or ask on WhatsApp" name={visitorName.trim() || undefined} company={invite?.company || undefined} context="plans card"/></p></div>
+    <div><strong>Make it work for your team</strong><p>Pick a package, answer a few taps and share your estimate with us on WhatsApp.</p><button type="button" aria-expanded={showEnquiry} aria-controls="demo-enquiry" onClick={() => setShowEnquiry(!showEnquiry)}>{showEnquiry ? 'Hide' : 'Get my estimate'} <ArrowRight size={15}/></button></div>
    </div>
-   <div hidden={!showEnquiry} id="demo-enquiry" className="mt-8 max-w-3xl mx-auto w-full"><CustomizationEnquiryForm initialStoreFiles={storeFiles} /></div>
+   <div hidden={!showEnquiry} id="demo-enquiry" className="mt-8 max-w-6xl mx-auto w-full">{showEnquiry && <QuoteBuilder/>}</div>
    <p className="demo-login-footnote mt-6">Private demo workspace with sample projects. No signup required.</p>
   </main>
  );

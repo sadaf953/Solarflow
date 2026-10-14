@@ -15,6 +15,7 @@ const AgentPortal=lazy(()=>import('./components/AgentPortal'));
 const VendorPortal=lazy(()=>import('./components/VendorPortal'));
 const StampPortal=lazy(()=>import('./components/StampPortal'));
 const PricingView=lazy(()=>import('./components/PricingView'));
+const AdminPage=lazy(()=>import('./components/AdminPage'));
 const Loader=()=> <div className="p-12 text-center text-stone-500" role="status">Opening your workspace…</div>;
 
 // Landing-page gate.
@@ -51,15 +52,22 @@ function scheduleBackgroundDemoCleanup(client) {
  }
 }
 
+// Hash routes for pages outside the demo: #/plans (pricing) and #/admin (private, no links to it).
+function routeOf(hash){
+ if(/^#\/admin(\?|\/|$)/.test(hash))return 'admin';
+ if(/^#\/plans\?/.test(hash)&&new URLSearchParams(hash.split('?')[1]).get('admin')==='1')return 'admin';
+ return /^#\/(plans|quote)(\?|$)/.test(hash)?'plans':null;
+}
+
 export default function App(){
  const [user,setUser]=useState(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
  const [recoveryMode, setRecoveryMode]=useState(false);
- const [publicView,setPublicView]=useState(()=>typeof window!=='undefined'&&(/^#\/(plans|quote)(\?|$)/.test(window.location.hash))?'plans':null);
+ const [publicView,setPublicView]=useState(()=>typeof window!=='undefined'?routeOf(window.location.hash):null);
  const [clientQuoteLink,setClientQuoteLink]=useState(()=>typeof window!=='undefined'&&Boolean(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)));
  useEffect(()=>{
   const sync=()=>{
    setClientQuoteLink(Boolean(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)));
-   setPublicView(/^#\/(plans|quote)(\?|$)/.test(window.location.hash)?'plans':null);
+   setPublicView(routeOf(window.location.hash));
   };
   window.addEventListener('hashchange',sync);
   window.addEventListener('popstate',sync);
@@ -75,7 +83,7 @@ export default function App(){
     // A shared quotation link always opens its client form, even in a browser
     // that previously entered the demo.
     if(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)
-      || (/^#\/plans\?/.test(window.location.hash) && new URLSearchParams(window.location.hash.split('?')[1]).get('admin')==='1'))return;
+      || routeOf(window.location.hash)==='admin')return;
     // Every page load starts at the landing page, even with a stored session,
     // so the demo password is asked again on each visit or reload.
    }catch(e){if(active)setError(e.message);}finally{if(active)setLoading(false);}
@@ -130,7 +138,9 @@ export default function App(){
      }}
     /></Suspense>
    )}
-   {!user ? (publicView === 'plans' ? (
+   {!user ? (publicView === 'admin' ? (
+    <div className="sf-page px-4"><Suspense fallback={<Loader/>}><AdminPage/></Suspense></div>
+   ) : publicView === 'plans' ? (
     <div className="sf-page">
      <div className="sticky top-0 z-20 bg-white/95 border-b border-stone-200 px-4 py-3 backdrop-blur">
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
