@@ -17,3 +17,4 @@ scratch/
 supabase/.temp/
 .vercel/
 .netlify/
+_applied_patches/
