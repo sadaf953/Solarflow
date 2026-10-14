@@ -127,6 +127,8 @@ export default function QuoteBuilder() {
     } catch { /* storage blocked – the form still works */ }
   }, [confirmed, help, pkg, card, s, addons, dropped, interested, name, company, mobile, note, savedAt]);
   const top = useRef(null);
+  // Browser tab shows whose quotation this is.
+  useEffect(() => { if (fromLink && (company.trim() || name.trim())) document.title = `SolarFlow quotation – ${company.trim() || name.trim()}`; }, [fromLink, company, name]);
 
   const suggested = help.team ? helpPick(help.team, help.manage) : linkPkg;
   const helpExtras = (pkgId) => helpAddons(help.manage).filter(id => pkgId && addonsFor(pkgId).some(a => a.id === id));
@@ -177,6 +179,9 @@ export default function QuoteBuilder() {
   };
 
   const phoneOk = mobile.replace(/\D/g, '').length === 10;
+  const first = name.trim().split(/\s+/)[0] || '';
+  const initials = (company.trim() || name.trim()).split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || 'SF';
+  const prettyPhone = phoneOk ? mobile.replace(/\D/g, '').replace(/^(\d{5})(\d{5})$/, '$1 $2') : '';
   // Save name + phone + every answer to the backend (enquiries). Saving again later edits the same record.
   // Two writes: the first creates the contact, the second adds the full answers – the backend
   // emails both (when email is set up) and they appear under Admin access → Quote requests.
@@ -242,6 +247,18 @@ export default function QuoteBuilder() {
         </form>
       )}
 
+      {fromLink && step >= 1 && (
+        <div className="flex items-center gap-3 rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-stone-900 text-sm font-black text-amber-300">{initials}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-700">Quotation prepared for</p>
+            <p className="truncate text-sm font-black text-stone-900">{company.trim() || name.trim()}</p>
+            <p className="truncate text-xs text-stone-600">{[company.trim() && name.trim(), prettyPhone, ref].filter(Boolean).join(' · ')}</p>
+          </div>
+          {step <= 3 && <button type="button" onClick={() => go(0)} className="min-h-10 shrink-0 px-1 text-xs font-bold text-orange-800 underline">Edit</button>}
+        </div>
+      )}
+
       {step >= 1 && step <= 3 && (
         <div>
           <div className="flex items-baseline justify-between text-xs font-bold text-stone-500">
@@ -262,7 +279,7 @@ export default function QuoteBuilder() {
       {/* ── STEP 1: choose a package ───────────────────────────── */}
       {step === 1 && (<>
         <div className={box}>
-          <p className="text-base font-black text-stone-900">Not sure which package? Answer two questions.</p>
+          <p className="text-base font-black text-stone-900">{fromLink && first ? `${first}, not sure which package? Answer two questions.` : 'Not sure which package? Answer two questions.'}</p>
           <div className="mt-4 grid gap-5 lg:grid-cols-2 lg:gap-8">
             <div>
               <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">1</span> How many people will use it?</p>
@@ -458,7 +475,7 @@ export default function QuoteBuilder() {
         ];
         return (
         <div className={box}>
-          <h2 className="text-lg font-black text-stone-900">Your final estimate</h2>
+          <h2 className="text-lg font-black text-stone-900">{fromLink && (company.trim() || first) ? `Final estimate for ${company.trim() || first}` : 'Your final estimate'}</h2>
           <div className="mt-3 rounded-2xl border-2 border-orange-200 bg-orange-50 p-4">
             <span className="text-[11px] font-bold uppercase tracking-wider text-orange-800">Estimated total · one-time</span>
             <span className="block text-3xl font-black text-stone-900">{q.range}</span>

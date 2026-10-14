@@ -99,7 +99,9 @@ export default function QuoteRequestAlerts({ adminCode, onLocked, refreshKey = 0
                       {x.mobile && <a href={`https://wa.me/91${x.mobile}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-[#25D366] px-3 text-xs font-bold text-[#073B1C]"><MessageCircle size={13}/> WhatsApp</a>}
                     </div>
                     {x.notes ? <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words font-sans text-xs text-stone-700">{x.notes}</pre>
-                      : <p className="text-xs text-stone-600">{x.kind === 'prepared' ? 'Form sent – the client hasn’t opened it yet.' : 'No answers yet.'}</p>}
+                      : <p className="text-xs text-stone-600">{x.kind !== 'prepared' ? 'No answers yet.'
+                        : x.draft_updated_at ? `Old form – the client started filling it (last change ${when(x.draft_updated_at)}). Open “Edit old forms” below to see every answer.`
+                        : `Form sent – the client hasn’t opened it yet.${x.interests?.length ? ` Interested in: ${x.interests.join(', ')}.` : ''}`}</p>}
                   </div>
                 )}
               </li>
