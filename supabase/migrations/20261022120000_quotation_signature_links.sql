@@ -116,3 +116,6 @@ grant execute on function public.quotation_sign_request(text) to anon, authentic
 grant execute on function public.submit_quotation_signature(text, text, text) to anon, authenticated;
 
 commit;
+
+-- Make the API see the new functions straight away.
+notify pgrst, 'reload schema';
