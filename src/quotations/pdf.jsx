@@ -1,37 +1,39 @@
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import DocumentPages, { fitQuotationPages, waitForQuotationAssets } from './DocumentPages';
+import { ProposalPages, fitProposalPages, pageCount } from './proposal/Pages';
+import { proposalFor, waitForProposalAssets } from './proposal/ProposalDocument';
 import { fromRow,pdfName,validate } from './model';
 
+// One JPEG per A4 proposal page (html2canvas) into an A4 jsPDF.
 export async function generateQuotationPdf(row) {
     const errors = validate(fromRow(row));
     if (errors.length) throw new Error(errors.join('\n'));
     const [{ default:html2canvas },{ jsPDF }] = await Promise.all([import('html2canvas'),import('jspdf')]);
+    const { snap,accepted } = proposalFor(row);
     const host = document.createElement('div');
+    host.className = 'pp-export';
     host.style.cssText = 'position:fixed;left:0;top:0;width:794px;background:white;z-index:-9999;pointer-events:none;';
     document.body.appendChild(host);
     const root = createRoot(host);
     try {
-        flushSync(() => root.render(<DocumentPages row={row} exportMode />));
-        await waitForQuotationAssets(host);
-        const pages = fitQuotationPages(host);
-        if (pages.length !== 3) throw new Error('Expected three quotation pages.');
+        flushSync(() => root.render(<ProposalPages snap={snap} accepted={accepted} idPrefix="pdf-page-" />));
+        await waitForProposalAssets(host);
+        const pages = fitProposalPages(host);
+        if (pages.length !== pageCount(snap.inputs)) throw new Error('The proposal pages did not render completely. Please try again.');
         const pdf = new jsPDF({ orientation:'portrait',unit:'mm',format:'a4',compress:true });
         for (let i = 0; i < pages.length; i++) {
             const canvas = await html2canvas(pages[i],{
-                scale:2.25,
+                scale:2,
                 backgroundColor:'#ffffff',
                 logging:false,
                 useCORS:true,
                 scrollX:0,
                 scrollY:0,
-                x:0,
-                y:0,
                 windowWidth:794,
                 windowHeight:1123,
             });
             if (i) pdf.addPage('a4','portrait');
-            pdf.addImage(canvas.toDataURL('image/jpeg',0.97),'JPEG',0,0,210,297,undefined,'FAST');
+            pdf.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,210,297,undefined,'FAST');
             canvas.width = 0; canvas.height = 0;
         }
         return new File([pdf.output('blob')],pdfName(row),{type:'application/pdf'});

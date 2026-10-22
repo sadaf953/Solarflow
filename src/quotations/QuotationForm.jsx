@@ -6,6 +6,8 @@ import { quotationRepository as repo } from './client';
 import { readRecovery, removeRecovery, writeRecovery } from './recovery';
 import { useGlobalPopup } from '../components/GlobalPopup';
 import { calculateSystemCapacityKwp } from '../utils/capacity';
+import { PAYMENT_METHODS, PROPOSAL_DEFAULTS, proposalOptionIndex } from './proposal/source';
+import { isLoanMethod } from './proposal/calc';
 
 const customerFields = [
     ['customer_name','Customer name','text',160],['customer_phone','Phone number','tel',20],['customer_email','Email address','email',160],
@@ -180,11 +182,27 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
                 <dl><div><dt>Net payable</dt><dd>{money(totals[i].netPayableAmount)}</dd></div><div><dt>After subsidy</dt><dd>{money(totals[i].netPriceAfterSubsidy)}</dd></div></dl>
                 {i === 0 && <div className="q-actions"><button onClick={() => update('options',form.options.map(o => ({...o,discount:option.discount})))}>Apply discount to all</button><button onClick={() => update('options',form.options.map(o => ({...o,subsidy:option.subsidy})))}>Apply subsidy to all</button></div>}
             </section>)}</div>}
+            {step === 2 && <section className="q-option q-proposal-fields"><h3>Proposal</h3>
+                <fieldset className="q-choice"><legend>Price the proposal on</legend>{totals.map((option,i) => <label key={i}><input type="radio" name="proposal_option" checked={proposalOptionIndex(form) === i} onChange={() => update('proposal_option',i)} /> {option.brandName || `Option ${i + 1}`} · {money(option.netPayableAmount)}</label>)}</fieldset>
+                <p className="q-muted">The proposal lists all three options, and works out savings, EMI and the acceptance page on this one.</p>
+                <div className="q-grid">
+                    <Field label="Monthly electricity use (units)" type="number" value={form.monthly_units} onChange={v => update('monthly_units',v)} />
+                    <Field label="Electricity tariff (₹ per unit)" type="number" value={form.tariff} onChange={v => update('tariff',v)} />
+                    <Field label="Payment method"><select value={form.payment_method} onChange={e => update('payment_method',e.target.value)}>{PAYMENT_METHODS.map(method => <option key={method}>{method}</option>)}</select></Field>
+                    {isLoanMethod(form.payment_method) && <>
+                        <Field label="Lender / bank" value={form.loan_bank} maxLength={80} onChange={v => update('loan_bank',v)} />
+                        <Field label="Loan interest rate (% a year)" type="number" value={form.loan_rate_pct} onChange={v => update('loan_rate_pct',v)} />
+                        <Field label="Loan tenure (years)" type="number" value={form.loan_tenure_years} onChange={v => update('loan_tenure_years',v)} />
+                        <Field label="Down payment (₹)" type="number" value={form.down_payment} onChange={v => update('down_payment',v)} />
+                    </>}
+                </div>
+                <p className="q-muted">Blank fields use {Number(form.capacity_kw) > 0 ? `${Math.round(Number(form.capacity_kw) * PROPOSAL_DEFAULTS.unitsPerKwMonth)} units a month` : `${PROPOSAL_DEFAULTS.unitsPerKwMonth} units a month per kW`} and ₹{PROPOSAL_DEFAULTS.tariff.toFixed(2)} per unit{isLoanMethod(form.payment_method) ? `, ${PROPOSAL_DEFAULTS.loanRatePct}% for ${PROPOSAL_DEFAULTS.loanTenureYears} years and ${PROPOSAL_DEFAULTS.downPaymentPct}% down` : ''}.</p>
+            </section>}
             {step === 3 && <>
                 <h3>Standard notes</h3><ul className="q-standard-notes">{template.page2.notes.map(note => <li key={note}>{note}</li>)}</ul>
                 <h3>Additional notes</h3>{form.custom_notes.map((note,i) => <div key={i} className="q-note"><Field label={`Note ${i + 1}`} type="textarea" maxLength={250} value={note} onChange={v => update('custom_notes',form.custom_notes.map((n,index) => index === i ? v : n))} /><button aria-label={`Remove note ${i + 1}`} onClick={() => update('custom_notes',form.custom_notes.filter((_,index) => index !== i))}><Trash2 size={18} /></button></div>)}
                 {form.custom_notes.length < 5 && <button onClick={() => update('custom_notes',[...form.custom_notes,''])}><Plus size={16} /> Add note</button>}
-                <h3 className="q-summary-title">Review quotation</h3><dl className="q-summary">{customerFields.map(([key,label]) => <div key={key}><dt>{label}</dt><dd>{form[key] || '—'}</dd></div>)}{[['capacity_kw','System capacity (kWp)'],['project_type','Project type'],['solar_panel_make','Panel make'],['solar_panel_qty','No of Modules'],['panel_wattage','Module Wp'],['inverter_brand','Inverter brand / make'],['geb_geda_charge','GEB / GEDA']].map(([key,label]) => <div key={key}><dt>{label}</dt><dd>{form[key] || '—'}</dd></div>)}</dl>
+                <h3 className="q-summary-title">Review quotation</h3><dl className="q-summary">{customerFields.map(([key,label]) => <div key={key}><dt>{label}</dt><dd>{form[key] || '—'}</dd></div>)}{[['capacity_kw','System capacity (kWp)'],['project_type','Project type'],['solar_panel_make','Panel make'],['solar_panel_qty','No of Modules'],['panel_wattage','Module Wp'],['inverter_brand','Inverter brand / make'],['geb_geda_charge','GEB / GEDA'],['monthly_units','Monthly electricity use (units)'],['tariff','Tariff (₹ per unit)'],['payment_method','Payment method']].map(([key,label]) => <div key={key}><dt>{label}</dt><dd>{form[key] || '—'}</dd></div>)}<div><dt>Proposal priced on</dt><dd>{totals[proposalOptionIndex(form)]?.brandName || '—'}</dd></div></dl>
                 {totals.map((option,i) => <div className="q-option" key={i}><strong>{option.brandName}</strong><p>Base {money(option.baseValue)} · Discount {money(option.discount)} · Subsidy {money(option.subsidy)}</p><p>Net payable <strong>{money(option.netPayableAmount)}</strong> · After subsidy <strong>{money(option.netPriceAfterSubsidy)}</strong></p></div>)}
                 <details><summary>Company, terms, warranty, BOM and bank details</summary><div className="q-template-summary"><h3>{template.company.name} {template.company.tagline}</h3><p>GST: {template.company.gstNo} · CIN: {template.company.cinNo}</p><p>{template.company.email}</p>{[['Terms and conditions',template.page3.termsAndConditions],['Warranties',template.page3.warranties]].map(([title,items]) => <section key={title}><h3>{title}</h3><dl className="q-summary">{items.map(item => <div key={item.sr}><dt>{item.parameter}</dt><dd>{item.remarks}</dd></div>)}</dl></section>)}<h3>Bill of materials</h3>{template.page3.bomItems.map(item => <p key={item.sr}><strong>{item.description}</strong> — {item.qty} {item.unit}, {item.size}, {item.make}</p>)}<h3>Other charges</h3><p>{template.page3.otherChargesText}</p><h3>Bank details</h3><p>{template.page3.bankDetails.accountName}</p><p>{template.page3.bankDetails.bankName} · {template.page3.bankDetails.branchName}</p><p>Account: {template.page3.bankDetails.accountNumber} · IFSC: {template.page3.bankDetails.ifscCode}</p><h3>Offices</h3><p>{template.footer.corporateOffice}</p><p>{template.footer.branchOffice}</p></div></details>
             </>}

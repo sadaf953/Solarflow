@@ -1,7 +1,10 @@
 import { payload, fromRow, validate } from './model.js';
 
 export const LIST_COLUMNS = 'id,quotation_no,owner_id,owner_name_snapshot,customer_name,customer_phone,quotation_date,capacity_kw,starting_price,status,source_lead_id,converted_lead_id,issued_at,created_at,updated_at';
+// Signature-link columns come from supabase/migrations/20261022120000_quotation_signature_links.sql.
+export const SIGN_COLUMNS = 'sign_token,sign_sent_at,sign_expires_at,signed_at';
 export const PAGE_SIZE = 20;
+const missingColumn = error => error?.code === '42703' || /column .* does not exist/i.test(error?.message || '');
 // PostgreSQL jsonb reorders object keys; compare canonical values, not wire key order.
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(k => [k,canonical(value[k])])) : value;
 const same = (a,b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
@@ -21,17 +24,22 @@ export function createQuotationRepository(client) {
     return {
         get, update,
         async list({ search = '', status = 'all', page = 0 }) {
-            let query = client.from('quotations').select(LIST_COLUMNS,{count:'exact'}).order('created_at',{ascending:false}).order('id',{ascending:false});
-            if (status !== 'all') query = query.eq('status',status);
-            // Never interpolate PostgREST filter punctuation or wildcards supplied by users.
-            const term = search.replace(/[^\p{L}\p{N}\s+-]/gu,'').trim().slice(0,100);
-            if (term) {
-                const number = term.replace(/^quote-?/i,'').trim();
-                const numberFilter = /^\d{1,15}$/.test(number) ? `,quotation_no.eq.${number}` : '';
-                query = query.or(`customer_name.ilike.%${term}%,customer_phone.ilike.%${term}%${numberFilter}`);
-            }
-            const { data,error,count } = await query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-            fail(error); return { rows:data, count };
+            const run = columns => {
+                let query = client.from('quotations').select(columns,{count:'exact'}).order('created_at',{ascending:false}).order('id',{ascending:false});
+                if (status !== 'all') query = query.eq('status',status);
+                // Never interpolate PostgREST filter punctuation or wildcards supplied by users.
+                const term = search.replace(/[^\p{L}\p{N}\s+-]/gu,'').trim().slice(0,100);
+                if (term) {
+                    const number = term.replace(/^quote-?/i,'').trim();
+                    const numberFilter = /^\d{1,15}$/.test(number) ? `,quotation_no.eq.${number}` : '';
+                    query = query.or(`customer_name.ilike.%${term}%,customer_phone.ilike.%${term}%${numberFilter}`);
+                }
+                return query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+            };
+            let result = await run(`${LIST_COLUMNS},${SIGN_COLUMNS}`);
+            // Until the signature-link migration has run, list without those columns.
+            if (missingColumn(result.error)) result = await run(LIST_COLUMNS);
+            fail(result.error); return { rows:result.data, count:result.count };
         },
         // Deferred lead integration: these helpers have no active UI entry point while
         // LEAD_INTEGRATION_ENABLED is false in QuotationModule.
@@ -42,6 +50,7 @@ export function createQuotationRepository(client) {
             const { data,error } = await query.range(page * PAGE_SIZE,(page + 1) * PAGE_SIZE - 1); fail(error); return data;
         },
         async save(id, previous, form, template, user) {
+            if (previous?.signed_at) throw new Error('The customer has signed this quotation, so it can no longer be changed. Create a new quotation instead.');
             const body = payload(form,template);
             body.quotation_data = { ...previous?.quotation_data, ...body.quotation_data };
             if (!previous) {

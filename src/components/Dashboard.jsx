@@ -372,16 +372,38 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
             return () => { cancelled = true; };
         }
         const loadDealers = async () => {
-            const { data, error } = await supabase
-                .from('demo_profiles')
-                .select('name')
-                .eq('user_type', 'agent2')
-                .eq(isChannelPartnerOffice ? 'parent_profile_id' : 'channel_partner', isChannelPartnerOffice ? (user.cpo_profile_id || user.demo_profile_id) : effectivePartnerFilter)
-                .eq('status', 'active')
-                .order('name');
+            // Dealer logins alone left the list empty for partners whose dealers
+            // exist only as names on customers (all of Demo Aurora Solar), so the
+            // filter could be opened but never used. Offer every dealer that
+            // actually appears on this partner's customers as well; the filter
+            // matches sub_channel_partner, so those names always return rows.
+            let customerQuery = supabase
+                .from(isChannelPartnerOffice ? 'cpo_leads' : 'admin')
+                .select('sub_channel_partner')
+                .is('deleted_at', null)
+                .not('sub_channel_partner', 'is', null)
+                .neq('sub_channel_partner', '')
+                .limit(5000);
+            if (!isChannelPartnerOffice) customerQuery = customerQuery.ilike('channel_partner', `%${effectivePartnerFilter}%`);
+            const [profiles, customerDealers] = await Promise.all([
+                supabase
+                    .from('demo_profiles')
+                    .select('name')
+                    .eq('user_type', 'agent2')
+                    .eq(isChannelPartnerOffice ? 'parent_profile_id' : 'channel_partner', isChannelPartnerOffice ? (user.cpo_profile_id || user.demo_profile_id) : effectivePartnerFilter)
+                    .eq('status', 'active')
+                    .order('name'),
+                customerQuery,
+            ]);
             if (!cancelled) {
-                if (error) console.error('Dealer filter load failed:', error);
-                setDealerOptions([...(new Set((data || []).map(row => row.name).filter(Boolean)))]);
+                if (profiles.error) console.error('Dealer filter load failed:', profiles.error);
+                if (customerDealers.error) console.error('Dealer filter load failed:', customerDealers.error);
+                const byKey = new Map();
+                [...(profiles.data || []).map(row => row.name), ...(customerDealers.data || []).map(row => row.sub_channel_partner)]
+                    .map(name => String(name || '').trim())
+                    .filter(Boolean)
+                    .forEach(name => { if (!byKey.has(name.toLowerCase())) byKey.set(name.toLowerCase(), name); });
+                setDealerOptions([...byKey.values()].sort((a, b) => a.localeCompare(b)));
             }
         };
         loadDealers();
@@ -677,12 +699,17 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         // captured in a stale closure.
     }, [selectedStage, user?.userType, isChannelPartnerOffice, partnerName, channelPartnerFilter, dealerFilter]);
 
-    // Sync selectedCustomer state with fresh database values when updates occur
+    // Sync selectedCustomer state with fresh database values when updates occur.
+    // List rows carry only the card columns, so merge them in: replacing a full
+    // record (opened from search, the tour or a realtime payload) with a card
+    // row dropped every other column from the open customer.
     useEffect(() => {
         if (selectedCustomer) {
             const fresh = customers.find(c => c.id === selectedCustomer.id);
-            if (fresh && JSON.stringify(fresh) !== JSON.stringify(selectedCustomer)) {
-                setSelectedCustomer(fresh);
+            if (!fresh) return;
+            const merged = { ...selectedCustomer, ...fresh };
+            if (JSON.stringify(merged) !== JSON.stringify(selectedCustomer)) {
+                setSelectedCustomer(merged);
             }
         }
     }, [customers]);

@@ -50,13 +50,19 @@ test('user limits: Starter 10, Growth 25, Pro 50, Complete unlimited', () => {
 });
 
 import { defaultsFor, computePackage, simpleAllowed } from '../src/pricing/packages.js';
+import { PACKAGES as PK } from '../src/pricing/packages.js';
+test('Starter and Growth let the client pick either card', () => {
+  assert.deepEqual(PK.find(p => p.id === 'starter').cards, ['simple', 'stage']);
+  assert.deepEqual(PK.find(p => p.id === 'growth').cards, ['simple', 'stage']);
+});
+
 test('ticked logins and documents decide the package', () => {
   const d = defaultsFor('starter');
   assert.deepEqual(d.logins, ['admin', 'staff', 'dealer']);
-  assert.deepEqual(d.docs, ['discom', 'feasibility']);
+  assert.deepEqual(d.docs, ['quotation', 'discom', 'feasibility']);
   assert.equal(computePackage({ team: '4–6', card: 'simple', ...d }), 'starter');
   assert.equal(computePackage({ team: '11–25', card: 'simple', ...d }), 'growth');
-  assert.equal(computePackage({ team: '4–6', card: 'stage', ...d }), 'growth');
+  assert.equal(computePackage({ team: '4–6', card: 'stage', ...d }), 'starter'); // Starter offers both cards
   assert.equal(computePackage({ team: '4–6', card: 'stage', logins: d.logins, docs: ['bom'] }), 'pro');
   assert.equal(computePackage({ team: '4–6', card: 'stage', logins: ['branch'], docs: [] }), 'complete');
   assert.equal(computePackage({ team: '26–50', card: 'stage', logins: ['admin'], docs: [] }), 'pro');

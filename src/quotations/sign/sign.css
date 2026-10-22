@@ -1,0 +1,75 @@
+/* Public signing page and the staff share dialog. Mobile first, large text, light only. */
+.sg-page { min-height: 100vh; min-height: 100dvh; background: #f6f3ee; color: #1f1d1a; display: flex; justify-content: center; padding: 16px; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+.sg-card { width: 100%; max-width: 520px; background: #fff; border-radius: 16px; padding: 20px 16px 24px; box-shadow: 0 6px 24px rgba(40, 32, 20, .1); display: flex; flex-direction: column; gap: 14px; align-self: flex-start; font-size: 18px; line-height: 1.5; box-sizing: border-box; overflow-wrap: anywhere; min-width: 0; }
+.sg-card.wide { max-width: 880px; }
+.sg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid #ebe7e0; min-width: 0; }
+.sg-logo { height: 40px; width: auto; max-width: 60%; object-fit: contain; }
+.sg-co-sub { font-size: 13px; color: #857f74; text-align: right; }
+.sg-title { font-size: 26px; margin: 4px 0 0; letter-spacing: -0.01em; font-weight: 800; }
+.sg-title-small { font-size: 22px; }
+.sg-lead { margin: 0; color: #3b3832; }
+.sg-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #f1ede6; padding: 4px; border-radius: 12px; }
+.sg-tabs button { min-height: 52px; border: 0; border-radius: 9px; background: none; font: inherit; font-size: 16px; font-weight: 650; color: #57524a; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; padding: 6px; }
+.sg-tabs button.on { background: #fff; color: #1f1d1a; box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.sg-panel { display: flex; flex-direction: column; gap: 10px; }
+.sg-panel[hidden] { display: none; }
+.sg-help { margin: 0; font-size: 16px; color: #57524a; }
+.sg-pad-wrap { position: relative; border: 2px dashed #c9c2b6; border-radius: 12px; background: #fff; }
+.sg-pad { display: block; width: 100%; height: 220px; touch-action: none; cursor: crosshair; border-radius: 10px; }
+.sg-line { position: absolute; left: 18px; right: 18px; bottom: 44px; border-bottom: 1.5px solid #d9d3c8; pointer-events: none; }
+.sg-photo { height: 200px; border: 1px solid #e0dbd2; border-radius: 12px; display: grid; place-items: center; padding: 10px; }
+.sg-photo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.checker { background-color: #fff; background-image: conic-gradient(#e6e6e6 25%, #fff 0 50%, #e6e6e6 0 75%, #fff 0); background-size: 16px 16px; }
+.sg-btn { min-height: 54px; border-radius: 12px; border: 1.5px solid #d6d0c5; background: #fff; font: inherit; font-size: 18px; font-weight: 650; color: #1f1d1a; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 0 16px; touch-action: manipulation; }
+.sg-btn.big { min-height: 120px; flex-direction: column; border-style: dashed; }
+.sg-btn.primary { background: #c9581a; border-color: #c9581a; color: #fff; font-size: 19px; }
+.sg-btn:disabled { opacity: .45; cursor: not-allowed; }
+.sg-btn:focus-visible, .sg-tabs button:focus-visible, .sg-call:focus-visible { outline: 3px solid #1f3fb4; outline-offset: 2px; }
+.sg-err { margin: 0; color: #b0336a; font-size: 16px; font-weight: 600; }
+.sg-small { margin: 0; font-size: 13px; color: #857f74; }
+.sg-msg { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 18px 4px; color: #57524a; }
+.sg-msg svg { color: #b0336a; }
+.sg-msg.ok svg { color: #2e7d32; }
+.sg-msg.sg-compact { padding: 4px 0; }
+.sg-msg h1 { margin: 0; font-size: 24px; color: #1f1d1a; }
+.sg-msg p { margin: 0; }
+.sg-call { display: inline-flex; align-items: center; gap: 8px; min-height: 50px; padding: 0 18px; border-radius: 12px; background: #1f3fb4; color: #fff; font-weight: 650; text-decoration: none; margin-top: 6px; align-self: center; }
+.sg-doc { margin: 0 -16px; padding: 12px 8px; background: #3a3833; min-width: 0; }
+.sg-accept { border-top: 1px solid #ebe7e0; padding-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+.sg-sum { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sg-sum div { background: #f6f3ee; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; }
+.sg-sum span { font-size: 13px; color: #857f74; } .sg-sum b { font-size: 18px; }
+.signature-review .sg-photo { background: white; border: 1px solid #e7e0d7; border-radius: 12px; margin: 6px 0; }
+.signature-review .sg-photo img { width: 100%; max-height: 220px; object-fit: contain; }
+.signature-progress { display: flex; list-style: none; gap: 12px; padding: 0; margin: 0; justify-content: space-between; font-size: 14px; }
+.signature-progress li { display: flex; gap: 6px; align-items: center; color: #777; }
+.signature-progress li.active { color: #a84818; font-weight: 650; }
+.signature-progress li > span { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid #d9d3c8; border-radius: 50%; }
+.signature-progress li.active > span { background: #fbede2; border-color: #b85a24; }
+.signature-entry:not([hidden]), .signature-review { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.signature-entry[hidden] { display: none !important; }
+.signature-review h2 { font-size: 22px; margin: 0; }
+.signature-review h2:focus { outline: none; }
+.signature-review .sg-btn { width: 100%; white-space: normal; padding: 12px 16px; }
+.signature-edit-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (min-width: 600px) { .sg-doc { border-radius: 12px; padding: 16px; } }
+@media (max-width: 600px) {
+  .sg-page { padding: 8px; }
+  .sg-card { padding: 16px 12px 24px; border-radius: 12px; max-width: 100%; }
+  .sg-title { font-size: 23px; } .sg-lead { font-size: 16px; line-height: 1.6; }
+  .sg-tabs button { font-size: 15px; } .sg-btn { width: 100%; min-height: 52px; }
+  .sg-pad { height: 210px; } .sg-doc { margin: 0; padding: 8px; border-radius: 8px; overflow: hidden; }
+  .sg-sum b { font-size: 17px; } .sg-call { white-space: normal; max-width: 100%; box-sizing: border-box; }
+  .signature-progress { gap: 6px; font-size: 13px; } .signature-edit-actions { grid-template-columns: 1fr; }
+}
+
+/* Staff: send-for-signature dialog and status pills in Quotation Maker. */
+.q-sign-state { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; background: #f5f5f4; color: #57534e; }
+.q-sign-state.signed { background: #dcfce7; color: #166534; }
+.q-sign-state.sent { background: #e0e7ff; color: #3730a3; }
+.q-sign-state.expired { background: #ffe4e6; color: #9f1239; }
+.q-sign-link { font-family: ui-monospace, monospace; font-size: 12px; width: 100%; }
+.q-sign-message { white-space: pre-wrap; overflow-wrap: anywhere; background: #f5f5f4; border-radius: 10px; padding: 8px 10px; font-size: 13px; margin: 0; }
+.q-module a.q-whatsapp { min-height: 44px; padding: 10px 14px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 13px; font-weight: 700; background: #059669; color: #fff; text-decoration: none; }
+.q-module a.q-whatsapp.q-open-link { background: #fff; color: #1c1917; border: 1px solid #e7e5e4; }
+.q-module .q-dialog h2 { display: flex; align-items: center; gap: 8px; }

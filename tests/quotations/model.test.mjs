@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculate,newForm,payload,freshTemplate,validate,fromRow,documentFor,toLead,canUseQuotations } from '../../src/quotations/model.js';
+import { calculate,newForm,payload,freshTemplate,validate,fromRow,toLead,canUseQuotations,pdfName } from '../../src/quotations/model.js';
+import { proposalSnapshot,proposalTotals } from '../../src/quotations/proposal/source.js';
 import { calculateSystemCapacityKwp } from '../../src/utils/capacity.js';
 const user = {id:'11111111-1111-4111-8111-111111111111',name:'Test agent',phone:'0000000000',userType:'agent'};
 function complete() {
@@ -47,8 +48,43 @@ test('saved form and PDF retain their template snapshot and recalculate totals',
     const template = freshTemplate();template.company.name='Archived company';const form=complete();
     const row={...payload(form,template),id:'quote',quotation_no:3255};
     row.quotation_data.form.options[0].netPayableAmount=1;
-    assert.equal(documentFor(row).page2.brandOptions[0].netPayableAmount,188000);
-    assert.equal(documentFor(row).company.name,'Archived company'); assert.equal(fromRow(row).customer_name,form.customer_name);
+    const snap = proposalSnapshot(row);
+    assert.equal(snap.inputs.options[0].netPayableAmount,188000);
+    assert.equal(snap.inputs.price,188000);
+    assert.equal(snap.company.name,'Archived company'); assert.equal(fromRow(row).customer_name,form.customer_name);
+    assert.equal(snap.number,'Quote-3255');
+});
+test('proposal prices on the chosen panel option and keeps proposal answers out of table columns',() => {
+    const form = complete(); form.options[2].baseValue = 210000; form.proposal_option = 2; form.monthly_units = '450'; form.tariff = '7';
+    const body = payload(form,freshTemplate());
+    for (const key of ['proposal_option','monthly_units','tariff','payment_method','loan_bank','loan_rate_pct','loan_tenure_years','down_payment']) assert.equal(key in body,false,`${key} is not a column`);
+    const snap = proposalSnapshot({...body,quotation_no:7});
+    assert.equal(snap.inputs.selectedOption,2); assert.equal(snap.inputs.moduleMake,'Adani'); assert.equal(snap.inputs.price,209000);
+    assert.equal(snap.inputs.monthlyUnits,450); assert.equal(snap.inputs.tariff,7);
+    assert.equal(snap.inputs.moduleQty,6); assert.equal(snap.inputs.moduleWp,580);
+    assert.equal(snap.inputs.customer.phone,'0000000001');
+    assert.deepEqual(proposalTotals(snap),{kwp:3.48,price:209000,subsidy:78000,effectiveCost:131000,emi:null});
+    form.proposal_option = 7; assert.ok(validate(form).some(e => e.includes('Choose the option')));
+});
+test('loan answers drive the EMI page and are validated',() => {
+    const form = {...complete(),payment_method:'Bank Solar Loan',loan_rate_pct:'9',loan_tenure_years:'5',down_payment:'20000'};
+    assert.deepEqual(validate(form),[]);
+    const snap = proposalSnapshot({...payload(form,freshTemplate()),quotation_no:8});
+    assert.equal(snap.inputs.loanAmount,168000); assert.equal(snap.inputs.loanRatePct,9);
+    assert.ok(proposalTotals(snap).emi > 3000);
+    assert.ok(validate({...form,down_payment:'999999'}).some(e => e.includes('Down payment')));
+    assert.ok(validate({...form,loan_rate_pct:'-1'}).some(e => e.includes('interest rate')));
+});
+test('older quotations without proposal answers use the demo defaults',() => {
+    const row = {...payload(complete(),freshTemplate()),quotation_no:9};
+    for (const key of ['proposal_option','monthly_units','tariff','payment_method']) delete row.quotation_data.form[key];
+    const snap = proposalSnapshot(row);
+    assert.equal(snap.inputs.selectedOption,0); assert.equal(snap.inputs.paymentMethod,'Cash / bank transfer');
+    assert.equal(snap.inputs.monthlyUnits,Math.round(3.48 * 120)); assert.equal(snap.inputs.tariff,6.5);
+});
+test('signed quotations download with a signed file name',() => {
+    assert.equal(pdfName({quotation_no:12,customer_name:'Asha Patel'}),'Quotation_12_Asha_Patel.pdf');
+    assert.equal(pdfName({quotation_no:12,customer_name:'Asha Patel',signed_at:'2026-10-22T10:00:00Z'}),'Quotation_12_Asha_Patel_signed.pdf');
 });
 test('unknown stored versions fail closed and module roles are explicit',() => {
     assert.throws(() => fromRow({schema_version:2}),/newer format/);
@@ -60,7 +96,9 @@ test('uploaded quotation artwork survives saved draft and PDF document reconstru
     const template = freshTemplate();
     template.assets = { demoQualityLogoUrl:'data:image/png;base64,Z2VkYQ==', demoEnergyLogoUrl:'data:image/png;base64,ZW1ibGVt', demoBannerUrl:'data:image/png;base64,YmFubmVy' };
     const row = { ...payload(complete(),template), quotation_no:51 };
-    assert.deepEqual(documentFor(row).assets,template.assets);
+    assert.deepEqual(row.quotation_data.template.assets,template.assets);
     const reopened = payload(fromRow(row,user),row.quotation_data.template);
-    assert.deepEqual(documentFor(reopened).assets,template.assets);
+    assert.deepEqual(reopened.quotation_data.template.assets,template.assets);
+    template.assets.solarflowLogoUrl = 'data:image/png;base64,bG9nbw==';
+    assert.equal(proposalSnapshot({...payload(complete(),template),quotation_no:51}).company.logo,template.assets.solarflowLogoUrl);
 });

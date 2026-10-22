@@ -231,7 +231,7 @@ export const STORAGE_GUIDE = '1 GB holds about 50 customers’ documents (≈ 20
 
 // Sample documents SolarFlow fills automatically. Files live in public/samples (demo data only).
 export const SAMPLE_DOCS = [
-  { id: 'quotation', name: 'Quotation', what: 'Your quotation in your format – 3 pages, with brand options, subsidy and net price.', file: 'quotation', pages: 3, from: 'starter' },
+  { id: 'quotation', name: 'Quotation', what: 'A 9-page solar proposal (10 with a loan): brand options, savings, payback, EMI, and an acceptance page the customer signs online.', file: 'quotation', pages: 9, from: 'starter' },
   { id: 'discom', name: 'DISCOM agreement', what: 'Consumer–vendor agreement (Annexure 2), filled from the customer card.', file: 'discom-agreement', pages: 4, from: 'starter' },
   { id: 'feasibility', name: 'Feasibility report', what: 'Bank / vendor feasibility format with loan declaration.', file: 'feasibility-report', pages: 3, from: 'starter' },
   { id: 'bom', name: 'BOM & material integration', what: 'Bill of materials, panel and inverter serial numbers per customer.', file: 'bom-material-integration', pages: 2, from: 'pro' },

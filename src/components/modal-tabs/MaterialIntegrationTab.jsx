@@ -655,7 +655,7 @@ export default function MaterialIntegrationTab({
                     <EditableDetailItem 
                         label="INVERTER MAKE *" 
                         field="inverter_make" 
-                        value={editData?.inverter_make || customer?.inverter_make} 
+                        value={editData?.inverter_make ?? customer?.inverter_make}
                         options={inverterMakeOptions}
                         category="inverter_make"
                         meta={meta}
@@ -665,8 +665,8 @@ export default function MaterialIntegrationTab({
                     <EditableDetailItem 
                         label="INVERTER SERIAL NO. *" 
                         field="inverter_serial_no" 
-                        value={editData?.inverter_serial_no || customer?.inverter_serial_no} 
-                        onChange={handleChange} 
+                        value={editData?.inverter_serial_no ?? customer?.inverter_serial_no}
+                        onChange={handleChange}
                         isEditing={editingSection === 'inverter_equip_details'} 
                     />
                 </div>

@@ -1,5 +1,5 @@
 // Development-only fixture. No production API calls or real customer records.
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../index.css';
 import { GlobalPopupProvider } from '../components/GlobalPopup';
@@ -10,6 +10,8 @@ import { newForm,payload } from '../quotations/model';
 import { brandedTemplate } from '../quotations/branding';
 import { quotationRepository } from '../quotations/client';
 import { generateQuotationPdf } from '../quotations/pdf';
+import SignQuotePage from '../quotations/sign/SignQuotePage';
+import { readSignToken } from '../quotations/sign/links';
 
 if (import.meta.env.DEV) {
     const user={id:'11111111-1111-4111-8111-111111111111',name:'Test Agent',phone:'0000000000',userType:new URLSearchParams(location.search).get('role') || 'agent'};
@@ -20,8 +22,15 @@ if (import.meta.env.DEV) {
     const seed=JSON.parse(sessionStorage.getItem('solarflow-demo-v2-fixture') || 'null') || {quotations:[row],admin:[lead],profiles:[{...user,phone_number:user.phone}]};
     const client=memoryClient(seed);
     supabase.from=client.from;
+    supabase.rpc=client.rpc;
     window.addEventListener('beforeunload',()=>sessionStorage.setItem('solarflow-demo-v2-fixture',JSON.stringify(client.state.tables)));
     window.quotationFixture={client,row,user,repo:quotationRepository,generateQuotationPdf};
     if(!location.hash) location.hash='/quotations';
-    createRoot(document.getElementById('root')).render(<GlobalPopupProvider><QuotationModule embedded user={user} meta={{}} onViewLead={selected=>window.alert(`View Lead: ${selected.customer_name}`)} onCreateLead={async(data,files,quote)=>quotationRepository.insertConversionLead(quote,data,user)} /></GlobalPopupProvider>);
+    // #/sign/<token> shows the customer's public signing page against the same fixture.
+    const Fixture=()=>{
+        const [token,setToken]=useState(()=>readSignToken(location.hash));
+        useEffect(()=>{const sync=()=>setToken(readSignToken(location.hash));window.addEventListener('hashchange',sync);return()=>window.removeEventListener('hashchange',sync);},[]);
+        return token ? <SignQuotePage token={token} client={client} /> : <GlobalPopupProvider><QuotationModule embedded user={user} meta={{}} onViewLead={selected=>window.alert(`View Lead: ${selected.customer_name}`)} onCreateLead={async(data,files,quote)=>quotationRepository.insertConversionLead(quote,data,user)} /></GlobalPopupProvider>;
+    };
+    createRoot(document.getElementById('root')).render(<Fixture />);
 } else { document.getElementById('root').textContent='This test fixture is available only in development.'; }

@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { supabase } from './supabase';
 import { readPreparedBriefId } from './enquiries/brief';
 import { readSubmittedEnquiryId } from './enquiries/reopen';
+import { readSignToken } from './quotations/sign/links';
 import {ensureThreeDemoVendors,demoVendorTarget} from './demo/vendors';
 import LoginScreen from './components/LoginScreen';
 import BrandMark from './components/BrandMark';
@@ -16,6 +17,7 @@ const VendorPortal=lazy(()=>import('./components/VendorPortal'));
 const StampPortal=lazy(()=>import('./components/StampPortal'));
 const PricingView=lazy(()=>import('./components/PricingView'));
 const AdminPage=lazy(()=>import('./components/AdminPage'));
+const SignQuotePage=lazy(()=>import('./quotations/sign/SignQuotePage'));
 const Loader=()=> <div className="p-12 text-center text-stone-500" role="status">Opening your workspace…</div>;
 
 // Landing-page gate.
@@ -52,8 +54,10 @@ function scheduleBackgroundDemoCleanup(client) {
  }
 }
 
-// Hash routes for pages outside the demo: #/plans (pricing) and #/admin (private, no links to it).
+// Hash routes for pages outside the demo: #/plans (pricing), #/admin (private, no links to it)
+// and #/sign/<token> (a customer accepting their quotation).
 function routeOf(hash){
+ if(readSignToken(hash))return 'sign';
  if(/^#\/admin(\?|\/|$)/.test(hash))return 'admin';
  if(/^#\/plans\?/.test(hash)&&new URLSearchParams(hash.split('?')[1]).get('admin')==='1')return 'admin';
  return /^#\/(plans|quote)(\?|$)/.test(hash)?'plans':null;
@@ -126,6 +130,8 @@ export default function App(){
   }
  }
  if(loading)return <Loader/>;
+ // A customer's signature link never shows the CRM, even in a browser that is signed in.
+ if(publicView==='sign')return <Suspense fallback={<Loader/>}><SignQuotePage token={readSignToken(window.location.hash)}/></Suspense>;
  const Portal=user?(['agent','agent2'].includes(user.userType)?AgentPortal:user.userType==='vendor'?VendorPortal:user.userType==='stamp'?StampPortal:Dashboard):null;
  return (
   <>

@@ -227,12 +227,19 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
         };
     }, [customer?.id, isFormDirty]);
 
-    // Keep editData in sync with realtime prop updates if the user isn't currently editing
+    // Keep editData in sync with realtime prop updates if the user isn't currently editing.
+    // The prop is usually a stage-card row, which carries only CUSTOMER_CARD_COLUMNS.
+    // Replacing the full record with it blanked every other column (Material Order,
+    // inverter, delivery date / vehicle / driver) after each Save until the card was
+    // reopened. Merge it over the full record instead: a missing key is not a cleared value.
     useEffect(() => {
         if (!isFormDirty && customer) {
-            loadedUpdatedAtRef.current = customer.updated_at || loadedUpdatedAtRef.current;
-            savedDataRef.current = { ...customer };
-            setEditData({ ...customer });
+            const loadedTime = new Date(loadedUpdatedAtRef.current || 0).getTime();
+            if (customer.updated_at && new Date(customer.updated_at).getTime() > loadedTime) {
+                loadedUpdatedAtRef.current = customer.updated_at;
+            }
+            savedDataRef.current = { ...savedDataRef.current, ...customer, updated_at: loadedUpdatedAtRef.current };
+            setEditData({ ...savedDataRef.current });
         }
     }, [customer, isFormDirty]);
 
@@ -852,6 +859,17 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
         });
     };
 
+    // Activity-log lines for the fields that really changed. Compared against the
+    // loaded record, not the `customer` prop: the prop is often a card row without
+    // most columns, so untouched fields were logged as "None → value", and number
+    // vs string pairs as edits (MODULE WP: 580 → 580).
+    const describeChanges = (updates, skipKeys = []) => {
+        const before = savedDataRef.current || {};
+        return [...getChangedFields(updates, before)]
+            .filter(key => !skipKeys.includes(key) && typeof updates[key] !== 'object')
+            .map(key => `${key.replace(/_/g, ' ').toUpperCase()}: ${before[key] || 'None'} → ${updates[key] || 'None'}`);
+    };
+
     // Child tabs have their own Save buttons. Once one succeeds, merge only
     // that saved patch into the baseline and keep the popup active solely for
     // any other fields that are still genuinely unsaved.
@@ -1020,12 +1038,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
             updates.loan_history = updates.loan_history.map(({ isNew, ...rest }) => rest);
         }
 
-        let changeSummary = [];
-        Object.keys(updates).forEach(key => {
-            if (updates[key] !== customer[key] && key !== 'id' && key !== 'created_at' && key !== 'crn' && key !== 'updated_at' && key !== 'stage' && key !== 'stages_remarks' && typeof updates[key] !== 'object') {
-                changeSummary.push(`${key.replace(/_/g, ' ').toUpperCase()}: ${customer[key] || 'None'} → ${updates[key] || 'None'}`);
-            }
-        });
+        const changeSummary = describeChanges(updates, ['stage', 'stages_remarks']);
 
         delete updates.id;
         delete updates.created_at;
@@ -1241,12 +1254,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
             }
         }
 
-        let changeSummary = [];
-        Object.keys(updates).forEach(key => {
-            if (updates[key] !== customer[key] && key !== 'id' && key !== 'updated_at' && typeof updates[key] !== 'object') {
-                changeSummary.push(`${key.replace(/_/g, ' ').toUpperCase()}: ${customer[key] || 'None'} → ${updates[key] || 'None'}`);
-            }
-        });
+        const changeSummary = describeChanges(updates);
 
         if (updates.subsidy_history) {
             updates.subsidy_history = updates.subsidy_history.map(({ isNew, ...rest }) => rest);
@@ -1256,7 +1264,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
         }
 
         // Compare subsidy_history
-        const oldSubsidy = customer.subsidy_history || [];
+        const oldSubsidy = savedDataRef.current?.subsidy_history || [];
         const newSubsidy = updates.subsidy_history || [];
         if (JSON.stringify(oldSubsidy) !== JSON.stringify(newSubsidy)) {
             const subChanges = [];
@@ -1294,7 +1302,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
         }
 
         // Compare loan_history
-        const oldLoan = customer.loan_history || [];
+        const oldLoan = savedDataRef.current?.loan_history || [];
         const newLoan = updates.loan_history || [];
         if (JSON.stringify(oldLoan) !== JSON.stringify(newLoan)) {
             const loanChanges = [];

@@ -24,8 +24,15 @@ export function newForm(user = {}) {
         inverter_option: '', inverter_brand: '', geb_geda_charge: 'Including', source_lead_id: null,
         options: INITIAL_QUOTATION.page2.brandOptions.map(b => ({ brandName: b.brandName, baseValue: '', discount: 0, subsidy: 0 })),
         custom_notes: [],
+        ...PROPOSAL_FIELDS,
     };
 }
+// Proposal-only answers. They live in quotation_data.form, never in table columns.
+export const PROPOSAL_FIELDS = {
+    proposal_option: 0, monthly_units: '', tariff: '', payment_method: 'Cash / bank transfer',
+    loan_bank: '', loan_rate_pct: '', loan_tenure_years: '', down_payment: '',
+};
+const FORM_ONLY = new Set(['options','custom_notes',...Object.keys(PROPOSAL_FIELDS)]);
 export function toLead(form) {
     return Object.fromEntries(Object.entries(leadMapping).map(([field, target]) => [target, form[field] ?? '']));
 }
@@ -65,6 +72,17 @@ export function validate(form) {
         if (Number(option.baseValue) > 999999999999.99) errors.push(`${prefix} amount is too large`);
     });
     if ((form.custom_notes || []).length > 5 || (form.custom_notes || []).some(n => n.length > 250)) errors.push('Notes & review: Use at most five notes of 250 characters each');
+    const option = Number(form.proposal_option ?? 0);
+    if (!Number.isInteger(option) || option < 0 || option > 2) errors.push('Pricing: Choose the option the proposal is priced on');
+    const optional = (key, title, max) => { const v = form[key]; if (v !== '' && v != null && (!Number.isFinite(Number(v)) || Number(v) < 0 || Number(v) > max)) errors.push(`Pricing: ${title} must be between 0 and ${max}`); };
+    optional('monthly_units','Monthly electricity use',100000);
+    optional('tariff','Electricity tariff',100);
+    if (/loan/i.test(form.payment_method || '')) {
+        optional('loan_rate_pct','Loan interest rate',40);
+        optional('loan_tenure_years','Loan tenure',30);
+        const chosen = calculate(form.options || [])[Number.isInteger(option) ? option : 0];
+        optional('down_payment','Down payment',chosen ? chosen.netPayableAmount : 0);
+    }
     return errors;
 }
 export function freshTemplate() { return clone(INITIAL_QUOTATION); }
@@ -73,7 +91,7 @@ export function fromRow(row, user) {
     return { ...newForm(user), ...Object.fromEntries(Object.keys(newForm(user)).filter(k => row[k] != null).map(k => [k,row[k]])), ...row.quotation_data?.form };
 }
 export function payload(form, template) {
-    const columns = Object.keys(newForm()).filter(k => !['options','custom_notes'].includes(k));
+    const columns = Object.keys(newForm()).filter(k => !FORM_ONLY.has(k));
     const values = Object.fromEntries(columns.map(k => [k, form[k] === '' ? null : form[k]]));
     ['capacity_kw','solar_panel_qty','panel_wattage'].forEach(k => { values[k] = Number(form[k]) > 0 ? Number(form[k]) : null; });
     const options = calculate(form.options);
@@ -81,19 +99,4 @@ export function payload(form, template) {
     return { ...values, starting_price: prices.length ? Math.min(...prices) : null, schema_version: 1,
         quotation_data: { schema_version: 1, template_version: 1, template: clone(template), form: { ...clone(form), options } } };
 }
-export function documentFor(row) {
-    const form = fromRow(row);
-    const data = clone(row.quotation_data?.template || INITIAL_QUOTATION);
-    data.page1 = { ...data.page1, customerName: form.customer_name || '', customerPhone: form.customer_phone || '',
-        quotationNo: row.quotation_no ? `Quote-${row.quotation_no}` : 'Quote-DRAFT', date: form.quotation_date ? form.quotation_date.split('-').reverse().join('-') : '',
-        capacityKw: form.capacity_kw ? `${form.capacity_kw} kWp` : '', yoursTrulyName: form.owner_name_snapshot || '', yoursTrulyPhone: form.owner_phone_snapshot || '',
-        address: [form.full_address, form.village, form.taluka, form.district, form.pincode].filter(Boolean).join(', '),
-        email: form.customer_email || '', validUntil: form.valid_until || '' };
-    data.page2 = { ...data.page2, solarPanelMake: form.solar_panel_make || '', solarPanelQty: form.solar_panel_qty || '',
-        inverterOption: form.inverter_option || '', inverterBrand: form.inverter_brand || '', gebGedaCharge: form.geb_geda_charge || 'Including',
-        projectType: form.project_type || 'Residential', projectSize: form.capacity_kw ? `${form.capacity_kw} kWp` : '', brandOptions: calculate(form.options || []),
-        notes: [...data.page2.notes, ...(form.custom_notes || []).filter(n => n && n.trim())] };
-    if (form.valid_until) data.page3.termsAndConditions = data.page3.termsAndConditions.map(t => t.sr === 10 ? { ...t, remarks: `Valid until ${form.valid_until.split('-').reverse().join('-')}` } : t);
-    return data;
-}
-export const pdfName = row => `Quotation_${row.quotation_no}_${row.customer_name.replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,80)}.pdf`;
+export const pdfName = row => `Quotation_${row.quotation_no}_${row.customer_name.replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,80)}${row.signed_at ? '_signed' : ''}.pdf`;
