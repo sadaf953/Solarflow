@@ -7,6 +7,7 @@ import { supabase } from '../supabase';
 import { stockDay } from '../inventory/model';
 import { getAttendanceRecords, ATTENDANCE_STATUSES } from '../utils/staffAttendance';
 import { demoVendorTarget } from '../demo/vendors';
+import { withoutOtherVisitors } from '../demo/visitors';
 import { containDialogFocus } from '../utils/dialogFocus';
 import { useGlobalPopup } from './GlobalPopup';
 
@@ -362,11 +363,11 @@ export default function CalendarView({ currentUser, onOpenCustomer }) {
             if (error) console.error('Could not load installers:', error);
             if (!cancelled) setInstallers([...new Set((data || []).map(row => row.name).filter(Boolean))]);
         });
-        supabase.from('profiles').select('name, user_type').neq('user_type', 'vendor').order('name').then(({ data }) => {
-            if (!cancelled) setStaff([...new Set((data || []).map(row => row.name).filter(Boolean))]);
+        supabase.from('profiles').select('id, name, email, user_type').neq('user_type', 'vendor').order('name').then(({ data }) => {
+            if (!cancelled) setStaff([...new Set(withoutOtherVisitors(data, currentUser?.id).map(row => row.name).filter(Boolean))]);
         });
         return () => { cancelled = true; };
-    }, [installerName]);
+    }, [installerName, currentUser?.id]);
 
     const grid = useMemo(() => {
         const first = `${month}-01`;

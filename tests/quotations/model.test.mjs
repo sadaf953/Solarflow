@@ -102,3 +102,12 @@ test('uploaded quotation artwork survives saved draft and PDF document reconstru
     template.assets.solarflowLogoUrl = 'data:image/png;base64,bG9nbw==';
     assert.equal(proposalSnapshot({...payload(complete(),template),quotation_no:51}).company.logo,template.assets.solarflowLogoUrl);
 });
+
+test('cards show the price of the option the proposal is priced on',async()=>{
+ const {quotedPrice}=await import('../../src/quotations/model.js');
+ const options=[{baseValue:205000,netPayableAmount:205000},{baseValue:220000,netPayableAmount:220000}];
+ assert.equal(quotedPrice({quoted_options:options,proposal_option:1,starting_price:205000}),220000);
+ assert.equal(quotedPrice({quoted_options:options,starting_price:205000}),205000);
+ assert.equal(quotedPrice({quoted_options:[{baseValue:0,netPayableAmount:0}],starting_price:null}),null);
+ assert.equal(quotedPrice({starting_price:169000}),169000);
+});

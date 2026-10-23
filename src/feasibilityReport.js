@@ -1,3 +1,4 @@
+import { stateFromPincode } from './utils/indianState.js';
 
 const A4 = [595.28, 841.89];
 const VENDOR = {
@@ -49,7 +50,7 @@ export function mapFeasibilityReport(customer) {
         janSamarthNo: clean(customer.jansamarth_application_no),
         address: clean(customer.full_address),
         district: clean(customer.district),
-        state: 'GUJARAT',
+        state: stateFromPincode(customer.pincode).toUpperCase(),
         pincode: clean(customer.pincode),
         capacity: clean(customer.system_capacity_kwp),
         projectCost: money(quote?.amount),

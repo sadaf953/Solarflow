@@ -1,6 +1,7 @@
-import { payload, fromRow, validate } from './model.js';
+import { payload, fromRow, quotedPrice, validate } from './model.js';
 
-export const LIST_COLUMNS = 'id,quotation_no,owner_id,owner_name_snapshot,customer_name,customer_phone,quotation_date,capacity_kw,starting_price,status,source_lead_id,converted_lead_id,issued_at,created_at,updated_at';
+// quoted_options and proposal_option let a card show the price the proposal is priced on (quotedPrice).
+export const LIST_COLUMNS = 'id,quotation_no,owner_id,owner_name_snapshot,customer_name,customer_phone,quotation_date,capacity_kw,starting_price,status,source_lead_id,converted_lead_id,issued_at,created_at,updated_at,quoted_options:quotation_data->form->options,proposal_option:quotation_data->form->proposal_option';
 // Signature-link columns come from supabase/migrations/20261022120000_quotation_signature_links.sql.
 export const SIGN_COLUMNS = 'sign_token,sign_sent_at,sign_expires_at,signed_at';
 export const PAGE_SIZE = 20;
@@ -11,6 +12,15 @@ const same = (a,b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(
 const fail = error => { if (error) throw error; };
 export const conflict = () => new Error('This quotation changed in another session. Reopen it to review the latest version. Your local recovery copy is retained.');
 const event = (type, user, extra = {}) => ({ type, actor_id: user.id, at: new Date().toISOString(), ...extra });
+// The Loan tab reads the quote from loan_history, so a converted lead starts with
+// the proposal's price there instead of someone typing it in again.
+const withQuoteAmount = (row, insertData) => {
+    const form = row.quotation_data?.form || {};
+    const price = quotedPrice({ quoted_options: form.options, proposal_option: form.proposal_option, starting_price: row.starting_price });
+    if (!(price > 0) || (Array.isArray(insertData.loan_history) && insertData.loan_history.length)) return insertData;
+    const now = new Date().toISOString();
+    return { ...insertData, loan_history: [{ status: 'Total Quotation', amount: String(price), date: now.slice(0, 10), remark: `Quote-${row.quotation_no}`, created_at: now }] };
+};
 const activityData = (row, entry) => ({ ...row.quotation_data, activity: [...(row.quotation_data?.activity || []), entry] });
 export function createQuotationRepository(client) {
     const get = async id => {
@@ -116,7 +126,7 @@ export function createQuotationRepository(client) {
             let leadId = fresh.converted_lead_id || fresh.id;
             let lead;
             if (!fresh.converted_lead_id) {
-                const result = await client.from('admin').insert({ ...insertData,id:leadId }).select('*').single();
+                const result = await client.from('admin').insert({ ...withQuoteAmount(fresh, insertData),id:leadId }).select('*').single();
                 if (result.error?.code !== '23505') fail(result.error);
                 lead = result.data;
             }

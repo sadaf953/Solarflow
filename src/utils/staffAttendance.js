@@ -3,6 +3,7 @@
 // Dual persistence: Supabase `staff_attendance` table + LocalStorage fallback.
 
 import { supabase } from '../supabase';
+import { isOtherVisitor } from '../demo/visitors';
 
 const STORAGE_KEY = 'solarflow_staff_attendance_v1';
 
@@ -202,9 +203,10 @@ function saveLocalAttendanceStore(records) {
 }
 
 /**
- * Fetch all office staff linked to profiles/demo_profiles or fallback
+ * Fetch all office staff linked to profiles/demo_profiles or fallback.
+ * Other demo visitors are left out: their profile names are real people.
  */
-export async function fetchOfficeStaff() {
+export async function fetchOfficeStaff(currentUserId) {
     const staffMap = new Map();
 
     // 1. Seed defaults first
@@ -219,7 +221,7 @@ export async function fetchOfficeStaff() {
 
         if (liveProfiles && liveProfiles.length > 0) {
             liveProfiles.forEach(p => {
-                if (!p.name) return;
+                if (!p.name || isOtherVisitor(p, currentUserId)) return;
                 const cleanName = p.name.trim();
                 const key = cleanName.toLowerCase();
                 const roleLabel = p.role || p.user_type || 'Staff';
@@ -247,7 +249,7 @@ export async function fetchOfficeStaff() {
 
         if (demoProfiles && demoProfiles.length > 0) {
             demoProfiles.forEach(p => {
-                if (!p.name) return;
+                if (!p.name || isOtherVisitor(p, currentUserId)) return;
                 const cleanName = p.name.trim();
                 const key = cleanName.toLowerCase();
                 if (!staffMap.has(key)) {

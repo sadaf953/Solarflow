@@ -21,6 +21,7 @@ import { PRIMARY_STAGES, STAGE_IDS, SUBSIDY_TAGS, SUBSIDY_TAG_COLORS, LOAN_TAGS,
 import { logActivity, formatDateToDDMMYYYY, formatINR, parseIndianNumber, fetchAgent2SubAgents, normalizeMeterInstallation, sanitizePhoneNumber, getTelephoneHref } from '../utils';
 import { supabase } from '../supabase';
 import HistoryEntryEditor from './HistoryEntryEditor';
+import { isOtherVisitor } from '../demo/visitors';
 import { AgreementPreview } from './agreement/AgreementPreview';
 import { Page1 } from './agreement/Page1';
 import { FileText, Printer } from 'lucide-react';
@@ -81,7 +82,10 @@ const formatDateTime = (date) => {
 const getChangedFields = (draft = {}, saved = {}) => {
     const changed = new Set();
     const ignoreKeys = new Set(['id', 'created_at', 'updated_at', 'crn']);
-    const keys = new Set([...Object.keys(saved || {}), ...Object.keys(draft || {})]);
+    // Only the draft's own keys count. A column the draft never loaded (it began
+    // as a card row) is not a cleared value: comparing it logged untouched fields
+    // as "REGISTRATION BY: Demo Office → None" on a Material Order save.
+    const keys = Object.keys(draft || {});
 
     keys.forEach(key => {
         if (ignoreKeys.has(key)) return;
@@ -512,11 +516,12 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
     };
 
     const fetchLogs = useCallback(async () => {
-        const { data } = await supabase.from('activity_log').select('*, profiles(name)')
+        const { data } = await supabase.from('activity_log').select('*, profiles(id, name, email)')
             .or(`new_value.eq.${customer.id},message.ilike.%${customer.customer_name}%`)
             .order('created_at', { ascending: false }).limit(25);
-        if (data) setActivityLogs(data);
-    }, [customer.id, customer.customer_name]);
+        // Other demo visitors' names are real people.
+        if (data) setActivityLogs(data.map(log => isOtherVisitor(log.profiles, user?.id) ? { ...log, profiles: { name: 'Demo visitor' } } : log));
+    }, [customer.id, customer.customer_name, user?.id]);
 
     const urlCacheRef = useRef({});
 

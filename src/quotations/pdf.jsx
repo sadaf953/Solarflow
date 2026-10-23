@@ -48,6 +48,10 @@ export function downloadQuotationFile(file) {
     window.dispatchEvent(new CustomEvent('solarflow:download-complete',{detail:{file,fileName:file.name}}));
 }
 
+// Phones can hand the PDF itself to WhatsApp; most desktop browsers cannot.
+export const canSharePdfFiles = () => typeof navigator !== 'undefined' && Boolean(navigator.canShare)
+    && navigator.canShare({ files: [new File([''], 'quotation.pdf', { type: 'application/pdf' })] });
+
 export async function shareQuotationFile(file) {
     if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {

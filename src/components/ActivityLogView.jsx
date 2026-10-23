@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { Activity, RefreshCw } from 'lucide-react';
 import { ACTION_COLORS, readableLogText } from '../constants';
+import { isOtherVisitor } from '../demo/visitors';
 
 const ACTION_FILTER_OPTIONS = [
     { value: 'all', label: 'All activities' },
@@ -31,7 +32,7 @@ const ACTION_FILTER_OPTIONS = [
     { value: 'error_occurred', label: 'Errors' }
 ];
 
-export default function ActivityLogView() {
+export default function ActivityLogView({ currentUser }) {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -47,15 +48,17 @@ export default function ActivityLogView() {
     // latest 200, which is what "filter by user" has to mean.
     const [userFilter, setUserFilter] = useState('all');   // 'all' | 'unattributed' | <profile id>
     const [actionFilter, setActionFilter] = useState('all');
-    const [allProfiles, setAllProfiles] = useState([]);              // [{ id, name }]
-    const actorNames = useMemo(() => new Map(allProfiles.map(p => [p.id, p.name])), [allProfiles]);
+    const [allProfiles, setAllProfiles] = useState([]);              // [{ id, name, email }]
+    // Other demo visitors' names are real people: their entries read "Demo visitor"
+    // and they are not offered in the user filter.
+    const actorNames = useMemo(() => new Map(allProfiles.map(p => [p.id, isOtherVisitor(p, currentUser?.id) ? 'Demo visitor' : p.name])), [allProfiles, currentUser?.id]);
 
     // Group unique names so each person appears only once in the dropdown
     const uniqueActors = useMemo(() => {
         const map = new Map();
         for (const p of allProfiles) {
             const name = (p.name || '').trim();
-            if (!name) continue;
+            if (!name || isOtherVisitor(p, currentUser?.id)) continue;
             if (!map.has(name)) {
                 map.set(name, { name, ids: [p.id] });
             } else {
@@ -63,7 +66,7 @@ export default function ActivityLogView() {
             }
         }
         return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-    }, [allProfiles]);
+    }, [allProfiles, currentUser?.id]);
 
     // Paging. PAGE_SIZE at a time; `hasMore` is true while the last page came
     // back full, which is the only reliable signal without a count query.
@@ -132,7 +135,7 @@ export default function ActivityLogView() {
     // Load profiles to resolve names and populate actor list
     useEffect(() => {
         let cancelled = false;
-        supabase.from('profiles').select('id, name').order('name').then(({ data, error }) => {
+        supabase.from('profiles').select('id, name, email').order('name').then(({ data, error }) => {
             if (!cancelled && !error) setAllProfiles(data || []);
         });
         return () => { cancelled = true; };

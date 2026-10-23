@@ -485,8 +485,8 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
         // already created and must not be rolled back, but the user has to
         // be told WHICH documents did not store - otherwise their only copy
         // is the file picker in a modal that is about to close.
+        const failedUploads = [];
         if (attachedFiles && attachedFiles.length > 0) {
-            const failedUploads = [];
             await Promise.all(attachedFiles.map(async item => {
             if (item.file) {
                 try {
@@ -511,6 +511,8 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
 
         setCustomers(prev => prev.some(customer => customer.id === newCustomer.id) ? prev : [newCustomer, ...prev]);
         setShowAddLead(false);
+        // The form just closed; without this the partner could not tell the save worked.
+        if (!failedUploads.length) showAlert(`${formData.customer_name || 'The customer'} was added to Leads.`, { title: 'Customer added', type: 'success' });
 
         void logActivity(
             user.id,
@@ -746,12 +748,15 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
     const inspPendingCount = customers.filter(c => c.stage === STAGE_IDS.DISCOM_INSPECTION).length;
     const operationalQueueCount = materialOrderCount + meterPendingCount + inspPendingCount;
     const inProgressCount = materialIntegrationCount + materialDeliveryCount + meterPendingCount + inspPendingCount;
+    // Stage ids contain spaces ('METER INSTALLATION'). The underscore keys used here
+    // before matched no customer, so Open work queue showed an empty list titled
+    // METER_INSTALLATION while customers were waiting.
     const priorityWorkdeskTab = meterPendingCount > 0
-        ? 'METER_INSTALLATION'
+        ? STAGE_IDS.METER_INSTALLATION
         : inspPendingCount > 0
-            ? 'DISCOM_INSPECTION'
+            ? STAGE_IDS.DISCOM_INSPECTION
             : materialOrderCount > 0
-                ? 'MATERIAL_ORDER'
+                ? STAGE_IDS.MATERIAL_ORDER
                 : STAGE_IDS.LEADS;
     const displayedStage = activeCustomerStage || selectedCust?.stage;
     const customerStageNavigation = PRIMARY_STAGES;
@@ -921,7 +926,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
             // This is the last Stage Operations task, so return to its filtered list.
             setSelectedCust(null);
             setActiveCustomerStage(null);
-            setActiveWorkdeskTab('DISCOM_INSPECTION');
+            setActiveWorkdeskTab(STAGE_IDS.DISCOM_INSPECTION);
         }
         return didSave;
     };
@@ -1221,14 +1226,16 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
 
             {/* MAIN CONTENT */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden bg-stone-50/50 relative">
-                {/* HEADER */}
-                <header className="bg-white border-b border-stone-200 px-4 md:px-6 py-3 md:py-4 shrink-0 flex items-center justify-between shadow-sm z-10">
-                    <div className="flex items-center gap-3">
+                {/* HEADER. The work queue sits in a phone-width column even on a laptop,
+                    so the demo controls get a row of their own; on one row the Guided
+                    tour button covered Add Lead. */}
+                <header className="bg-white border-b border-stone-200 px-4 md:px-6 py-3 md:py-4 shrink-0 flex flex-wrap items-center justify-between gap-y-2 shadow-sm z-10">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                         <button onClick={() => setIsSidebarOpen(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-900 text-white rounded-lg text-[10px] uppercase tracking-wide font-black shadow-sm active:scale-95 transition-transform">
                             <Layers size={14} /> Stages
                         </button>
-                        <div>
-                            <h2 className="text-sm md:text-lg font-black text-stone-900 uppercase tracking-tight flex items-center gap-2">
+                        <div className="min-w-0">
+                            <h2 className="text-sm md:text-lg font-black text-stone-900 uppercase tracking-tight leading-tight">
                                 {PRIMARY_STAGES.find(s => s.id === activeWorkdeskTab)?.label || activeWorkdeskTab}
                             </h2>
                         </div>
@@ -1273,7 +1280,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                             </button>
                         </div>
                     </div>
-                <div className="demo-portal-controls">{demoControls}</div>
+                <div className="demo-portal-controls is-own-row">{demoControls}</div>
             </header>
 
                 
@@ -1377,10 +1384,10 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                                 {cust.payment_type}
                                             </span>
                                         )}
-                                        {cust.discom_inspection === 'Yes' && activeWorkdeskTab === 'DISCOM_INSPECTION' && (
+                                        {cust.discom_inspection === 'Yes' && activeWorkdeskTab === STAGE_IDS.DISCOM_INSPECTION && (
                                             <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Inspected</span>
                                         )}
-                                        {cust.meter_installation === 'Yes' && activeWorkdeskTab === 'METER_INSTALLATION' && (
+                                        {cust.meter_installation === 'Yes' && activeWorkdeskTab === STAGE_IDS.METER_INSTALLATION && (
                                             <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Installed</span>
                                         )}
                                     </div>

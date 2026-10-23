@@ -3,14 +3,14 @@ import { ArrowLeft, ChevronDown, Download, Eye, FileText, PenLine, Plus, Search,
 import { supabase } from '../supabase';
 import AddLeadModal from '../components/AddLeadModal';
 import { useGlobalPopup } from '../components/GlobalPopup';
-import { canUseQuotations,fromRow,money,toLead,validate } from './model';
+import { canUseQuotations,fromRow,money,quotedPrice,toLead,validate } from './model';
 import { quotationRepository as repo } from './client';
 import { PAGE_SIZE } from './repository';
 import { recoveries } from './recovery';
 import QuotationForm from './QuotationForm';
 import { ProposalPreview, proposalFor } from './proposal/ProposalDocument';
 import { pageCount } from './proposal/Pages';
-import { downloadQuotationFile, generateQuotationPdf, shareQuotationFile } from './pdf';
+import { canSharePdfFiles, downloadQuotationFile, generateQuotationPdf, shareQuotationFile } from './pdf';
 import SignLinkDialog from './sign/SignLinkDialog';
 import { createSignLink, signLinkUrl, signState } from './sign/links';
 import './quotation.css';
@@ -170,6 +170,9 @@ export default function QuotationModule({ user,meta,channelPartners = [],onCreat
         const stored = await repo.get(quotation.id);
         const issues = validate(fromRow(stored));
         if (issues.length) { await showAlert(issues.join('\n'),{title:'Complete these fields',type:'warning'}); return; }
+        // Where the PDF cannot be shared (desktop), Share offers the customer link
+        // on WhatsApp or to copy, instead of downloading the PDF again.
+        if (action === 'share' && !stored.signed_at && !canSharePdfFiles()) { await openSignLink(stored); return; }
         const file = await generateQuotationPdf(stored);
         if (action === 'share') {
             const delivery = await shareQuotationFile(file);
@@ -193,7 +196,7 @@ export default function QuotationModule({ user,meta,channelPartners = [],onCreat
         }
     });
     // Shows the current link, or makes one. A new link replaces the old one.
-    const signLink = (quotation, renew = false) => run(async () => {
+    const openSignLink = async (quotation, renew = false) => {
         const stored = await repo.get(quotation.id);
         if (stored.signed_at) { setRow(current => current?.id === stored.id ? stored : current); setRefresh(n => n + 1); return; }
         if (!renew && signState(stored) === 'sent') { setShare({ row:stored, link:{ url:signLinkUrl(stored.sign_token), expiresAt:stored.sign_expires_at } }); return; }
@@ -204,7 +207,8 @@ export default function QuotationModule({ user,meta,channelPartners = [],onCreat
         setRow(current => current?.id === fresh.id ? fresh : current);
         setShare({ row:fresh, link });
         setRefresh(n => n + 1);
-    });
+    };
+    const signLink = (quotation, renew = false) => run(() => openSignLink(quotation, renew));
     const start = () => {
         if (busyRef.current) return;
         navigate(`/quotations/new/${crypto.randomUUID()}`);
@@ -238,7 +242,7 @@ export default function QuotationModule({ user,meta,channelPartners = [],onCreat
                 {!!localCopies.length && <div className="q-notice"><strong>Draft recovery on this device</strong>{localCopies.map(copy => <div key={copy.id}><button onClick={() => navigate(`/quotations/new/${copy.id}`)}>Recover {copy.form?.customer_name || 'unnamed quotation'}</button></div>)}</div>}
                 <div className="q-toolbar"><input className="q-search" aria-label="Search quotations" placeholder="Search quote, name, phone..." value={search} onChange={e => {setSearch(e.target.value);setPage(0);}} /><button aria-label="Refresh quotations" onClick={() => setRefresh(n => n + 1)}><Search size={17} /> Refresh</button></div>
                 <div className="q-filters">{statusLabels.map(s => <button key={s} aria-pressed={status === s} onClick={() => {setStatus(s);setPage(0);}}>{s[0].toUpperCase() + s.slice(1)}</button>)}</div>
-                <p className="q-muted" style={{margin: "12px 0", fontSize: 13}}>Preview a quotation to see the customer document, or edit its details. More actions includes download, sharing and lead conversion.</p>{loading ? <div className="q-empty" role="status">Loading quotations…</div> : !rows.length && !error ? <div className="q-empty"><h2>No quotations found</h2><p className="q-muted">Create your first quotation or try another search.</p><button onClick={start}>Create Quotation</button></div> : <div className="q-cards">{rows.map(item => <article className="q-card" key={item.id}><div className="q-card-heading"><span>Quote-{item.quotation_no} · {item.quotation_date}</span><span className={`q-status q-status-${item.status}`}>{item.status}</span></div><SignState row={item} /><h3>{item.customer_name}</h3><p>{item.customer_phone}</p><p>Created by {item.owner_name_snapshot || '—'}</p><dl><div><dt>System capacity</dt><dd>{item.capacity_kw ? `${item.capacity_kw} kWp` : '—'}</dd></div><div><dt>Starting price</dt><dd>{item.starting_price == null ? '—' : money(item.starting_price)}</dd></div></dl><QuotationActions id={item.id} primary={<><button className="q-primary" onClick={() => navigate(`/quotations/${item.id}/preview`)}><Eye size={15} /> Preview</button><button disabled={signState(item) === 'signed'} title={signState(item) === 'signed' ? 'Signed quotations cannot be edited' : undefined} onClick={() => navigate(`/quotations/${item.id}/edit`)}>Edit</button></>}>{signState(item) !== 'signed' && <button disabled={busy || !online || ['lost','converted'].includes(item.status)} onClick={() => signLink(item)}><PenLine size={15} /> {signState(item) === 'sent' ? 'Signature link' : 'Send for signature'}</button>}{signState(item) === 'sent' && <button disabled={busy || !online} onClick={() => signLink(item, true)}>New signature link</button>}<button disabled={busy || !online} onClick={() => generate(item, 'download')}><Download size={15} /> Download</button><button disabled={busy || !online} onClick={() => generate(item, 'share')}><Share2 size={15} /> Share</button><button disabled={item.status === 'lost' || busy || !online} title={!LEAD_INTEGRATION_ENABLED ? 'Lead integration will be enabled later' : undefined} onClick={() => convert(item)}>{item.converted_lead_id ? 'Open Lead' : 'Convert to Lead'}</button>{!item.converted_lead_id && (item.status === 'lost' ? <button disabled={busy || !online} onClick={() => run(async () => { const latest = await repo.get(item.id); await repo.outcome(latest,'reopened',user); setRefresh(n => n + 1); })}>Reopen</button> : <button disabled={busy || !online} onClick={() => {setLost(item);setReason('');setRemark('');}}>Mark Lost</button>)}</QuotationActions></article>)}</div>}
+                <p className="q-muted" style={{margin: "12px 0", fontSize: 13}}>Preview a quotation to see the customer document, or edit its details. More actions includes download, sharing and lead conversion.</p>{loading ? <div className="q-empty" role="status">Loading quotations…</div> : !rows.length && !error ? <div className="q-empty"><h2>No quotations found</h2><p className="q-muted">Create your first quotation or try another search.</p><button onClick={start}>Create Quotation</button></div> : <div className="q-cards">{rows.map(item => <article className="q-card" key={item.id}><div className="q-card-heading"><span>Quote-{item.quotation_no} · {item.quotation_date}</span><span className={`q-status q-status-${item.status}`}>{item.status}</span></div><SignState row={item} /><h3>{item.customer_name}</h3><p>{item.customer_phone}</p><p>Created by {item.owner_name_snapshot || '—'}</p><dl><div><dt>System capacity</dt><dd>{item.capacity_kw ? `${item.capacity_kw} kWp` : '—'}</dd></div><div><dt>Quoted price</dt><dd>{quotedPrice(item) == null ? '—' : money(quotedPrice(item))}</dd></div></dl><QuotationActions id={item.id} primary={<><button className="q-primary" onClick={() => navigate(`/quotations/${item.id}/preview`)}><Eye size={15} /> Preview</button><button disabled={signState(item) === 'signed'} title={signState(item) === 'signed' ? 'Signed quotations cannot be edited' : undefined} onClick={() => navigate(`/quotations/${item.id}/edit`)}>Edit</button></>}>{signState(item) !== 'signed' && <button disabled={busy || !online || ['lost','converted'].includes(item.status)} onClick={() => signLink(item)}><PenLine size={15} /> {signState(item) === 'sent' ? 'Signature link' : 'Send for signature'}</button>}{signState(item) === 'sent' && <button disabled={busy || !online} onClick={() => signLink(item, true)}>New signature link</button>}<button disabled={busy || !online} onClick={() => generate(item, 'download')}><Download size={15} /> Download</button><button disabled={busy || !online} onClick={() => generate(item, 'share')}><Share2 size={15} /> Share</button><button disabled={item.status === 'lost' || busy || !online} title={!LEAD_INTEGRATION_ENABLED ? 'Lead integration will be enabled later' : undefined} onClick={() => convert(item)}>{item.converted_lead_id ? 'Open Lead' : 'Convert to Lead'}</button>{!item.converted_lead_id && (item.status === 'lost' ? <button disabled={busy || !online} onClick={() => run(async () => { const latest = await repo.get(item.id); await repo.outcome(latest,'reopened',user); setRefresh(n => n + 1); })}>Reopen</button> : <button disabled={busy || !online} onClick={() => {setLost(item);setReason('');setRemark('');}}>Mark Lost</button>)}</QuotationActions></article>)}</div>}
                 <div className="q-pagination"><button disabled={page === 0 || loading} onClick={() => setPage(p => p - 1)}>Previous</button><span>{count} quotations · Page {page + 1}</span><button disabled={(page + 1) * PAGE_SIZE >= count || loading} onClick={() => setPage(p => p + 1)}>Next</button></div>
             </>}
             {validId && (loading || loadedRoute !== route) && !error && <div role="status" className="q-empty">Opening quotation…</div>}

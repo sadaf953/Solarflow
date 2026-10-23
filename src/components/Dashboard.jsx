@@ -365,6 +365,14 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
     const partnerName = (user?.channel_partner || user?.name || ' ').trim();
     const [scopeError,setScopeError]=useState('');
     const effectivePartnerFilter = isChannelPartnerOffice ? partnerName : channelPartnerFilter.trim();
+    // A dealer belongs to one partner, so changing or clearing the partner drops it
+    // in the same render. Leaving it to the effect below fetched once more with the
+    // old dealer, and that reply could land last: Clear left the list filtered with
+    // the dealer dropdown already gone.
+    const applyPartnerFilter = (value) => {
+        if (value !== channelPartnerFilter) setDealerFilter('');
+        setChannelPartnerFilter(value);
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -418,7 +426,9 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
     // realtime event - so one person saving a customer meant 30 connected
     // clients each running 3 queries. Metadata is now fetched on mount and when
     // the branch filter changes, not on every write anywhere in the system.
+    const metricsRequestRef = useRef(0);
     const fetchMetricsAndMeta = async (skipMeta = false) => {
+        const requestId = ++metricsRequestRef.current;
         const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
         const solarEquipmentPromise = fetchSolarEquipmentStats(
             isChannelPartnerOffice ? 'cpo_leads' : 'admin',
@@ -487,8 +497,10 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
             installationTagCount: 0, subsidyTagCount: 0, loanTagCount: 0
         };
 
+        if (requestId !== metricsRequestRef.current) return;
         if (!metricsRes.error && metricsRes.data) {
             const [solarEquipment, todaySummary] = await Promise.all([solarEquipmentPromise, todaySummaryPromise]);
+            if (requestId !== metricsRequestRef.current) return;
             finalMetrics = { 
                 ...finalMetrics,
                 ...metricsRes.data,
@@ -510,7 +522,10 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
     };
 
 
+    const stageRequestRef = useRef(0);
     const fetchStageCustomers = async (stage = selectedStage, pageNum = 0) => {
+        // Filters can change while a request is out; only the newest reply is shown.
+        const requestId = ++stageRequestRef.current;
         setLoading(true);
         const normalizedStage = (stage || STAGE_IDS.LEADS).toUpperCase();
         let query = supabase
@@ -567,6 +582,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         }
 
         const { data, error } = await query;
+        if (requestId !== stageRequestRef.current) return;
         if (!error && data) {
             if (pageNum === 0) {
                 setCustomers(data);
@@ -1586,12 +1602,12 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                                         value={channelPartnerFilterInput}
                                         onChange={e => { setChannelPartnerFilterInput(e.target.value); setShowChannelPartnerDrop(true); }}
                                         onFocus={() => setShowChannelPartnerDrop(true)}
-                                        onKeyDown={e => e.key === 'Enter' && (setChannelPartnerFilter(channelPartnerFilterInput.trim()), setShowChannelPartnerDrop(false))}
+                                        onKeyDown={e => e.key === 'Enter' && (applyPartnerFilter(channelPartnerFilterInput.trim()), setShowChannelPartnerDrop(false))}
                                         className="px-3 py-2 bg-stone-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 w-32"
                                     />
                                     <button
                                         onClick={() => {
-                                            setChannelPartnerFilter(channelPartnerFilterInput.trim());
+                                            applyPartnerFilter(channelPartnerFilterInput.trim());
                                             setShowChannelPartnerDrop(false);
                                         }}
                                         className="px-3 py-2 rounded-xl text-xs font-medium bg-stone-900 text-white hover:bg-stone-800 transition-colors">
@@ -1600,7 +1616,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                                     {(channelPartnerFilter || channelPartnerFilterInput) && (
                                         <button
                                             onClick={() => {
-                                                setChannelPartnerFilter('');
+                                                applyPartnerFilter('');
                                                 setChannelPartnerFilterInput('');
                                                 setShowChannelPartnerDrop(false);
                                             }}
@@ -1695,7 +1711,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     {currentView === 'channel_partner_mgmt' && user.userType === 'admin' && <ChannelPartnerManagementView currentUser={user} />}
                     {currentView === 'calendar' && ['admin', 'sales'].includes(user.userType) && <CalendarView currentUser={user} onOpenCustomer={setSelectedCustomer} />}
                     {currentView === 'installation_payments' && user.userType === 'admin' && <InstallationPaymentsView onSelectCustomer={setSelectedCustomer} currentUser={user} />}
-                    {currentView === 'activity' && user.userType === 'admin' && <ActivityLogView />}
+                    {currentView === 'activity' && user.userType === 'admin' && <ActivityLogView currentUser={user} />}
                     {currentView === 'users' && (user.userType === 'admin' || user.userType === 'channel_partner_office') && (
                         <UserManagementView currentUser={user} initialShowCreate={userMgmtAction === 'createUser'} />
                     )}

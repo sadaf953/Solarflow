@@ -24,3 +24,4 @@ test('lost quotation cannot create a lead until reopened, converted stays in bot
  assert.equal((await repo.list({status:'converted'})).rows.length,1);
  await assert.rejects(repo.outcome(await repo.get(row.id),'lost',user,'Later'),/converted quotation/);
 });
+test('a converted lead starts with the proposal price as its Total Quotation',async()=>{const{repo,row,client}=await setup();await repo.insertConversionLead(row,{customer_name:'Lead'},user);const entry=client.state.tables.admin[0].loan_history?.[0];assert.equal(entry?.status,'Total Quotation');assert.equal(Number(entry.amount),99900);assert.equal(entry.remark,`Quote-${row.quotation_no}`);});

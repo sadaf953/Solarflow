@@ -1,4 +1,5 @@
 import { useDemoTourNavigation } from '../demo/tour';
+import { isVisitorEmail } from '../demo/visitors';
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { supabase } from '../supabase';
 import { lazyWithRetry, logActivity, uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, deleteDocument, toIndianCommas, updateDocumentRemark, normalizeInstallationStatus, updateAdminRecord, downloadFileWithSaveAs } from '../utils';
@@ -49,9 +50,8 @@ const installerNameAliases = (name) => {
     return [];
 };
 
-// Demo visitors sign in anonymously and get a placeholder address
-// (anon.1a2b3c4d@solarflow.demo). It means nothing to them, so it is not shown.
-const shownEmail = (email) => /^anon\.[^@]*@solarflow\.demo$/i.test(email || '') ? '' : email;
+// A demo visitor's placeholder address means nothing to them, so it is not shown.
+const shownEmail = (email) => isVisitorEmail(email) ? '' : email;
 
 export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoControls }) {
     useDemoTourNavigation(async ({view,action},isCurrent) => {

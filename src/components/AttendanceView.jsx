@@ -112,9 +112,9 @@ export default function AttendanceView({ currentUser }) {
 
     // Load staff members
     const loadStaff = useCallback(async () => {
-        const staff = await fetchOfficeStaff();
+        const staff = await fetchOfficeStaff(currentUser?.id);
         setStaffList(staff);
-    }, []);
+    }, [currentUser?.id]);
 
     // Load attendance records
     const loadRecords = useCallback(async () => {

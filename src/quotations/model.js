@@ -99,4 +99,14 @@ export function payload(form, template) {
     return { ...values, starting_price: prices.length ? Math.min(...prices) : null, schema_version: 1,
         quotation_data: { schema_version: 1, template_version: 1, template: clone(template), form: { ...clone(form), options } } };
 }
+// The price of the option the proposal is priced on, which is what the customer is
+// quoted. starting_price is the cheapest option, so a proposal priced on Plus showed
+// the Essential price on its card.
+export function quotedPrice(row) {
+    const options = Array.isArray(row?.quoted_options) ? row.quoted_options : [];
+    const index = Number(row?.proposal_option);
+    const chosen = options[Number.isInteger(index) && index >= 0 && index < options.length ? index : 0];
+    const price = Number(chosen?.netPayableAmount);
+    return chosen && Number(chosen.baseValue) > 0 && Number.isFinite(price) ? price : row?.starting_price ?? null;
+}
 export const pdfName = row => `Quotation_${row.quotation_no}_${row.customer_name.replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,80)}${row.signed_at ? '_signed' : ''}.pdf`;
