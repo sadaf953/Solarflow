@@ -49,6 +49,10 @@ const installerNameAliases = (name) => {
     return [];
 };
 
+// Demo visitors sign in anonymously and get a placeholder address
+// (anon.1a2b3c4d@solarflow.demo). It means nothing to them, so it is not shown.
+const shownEmail = (email) => /^anon\.[^@]*@solarflow\.demo$/i.test(email || '') ? '' : email;
+
 export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoControls }) {
     useDemoTourNavigation(async ({view,action},isCurrent) => {
         if (!['DELIVERY','INSTALLATION','GEO'].includes(view)) return;
@@ -979,7 +983,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                 <div className="flex items-center gap-3">
                     <div className="text-right">
                         <span className="text-xs font-bold text-stone-800 block truncate max-w-[150px]">{user.name}</span>
-                        {user.email && <span className="text-[10px] text-stone-400 font-medium block truncate max-w-[150px]">{user.email}</span>}
+                        {shownEmail(user.email) && <span className="text-[10px] text-stone-400 font-medium block truncate max-w-[150px]">{user.email}</span>}
                     </div>
                     <button
                         type="button"
@@ -1022,7 +1026,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                         </div>
                         <div className="flex items-center justify-between gap-2">
                             <p className="text-[9px] uppercase tracking-widest text-amber-400 font-bold">Allotted Installation team</p>
-                            {user.email && (
+                            {shownEmail(user.email) && (
                                 <span className="text-[10px] text-amber-200/90 font-mono bg-white/10 px-2 py-0.5 rounded-md border border-white/10">{user.email}</span>
                             )}
                         </div>
