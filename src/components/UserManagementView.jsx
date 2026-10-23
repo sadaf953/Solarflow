@@ -814,7 +814,7 @@ export const DEFAULT_SYSTEM_USERS = [
     {
         id: 'system-user-vendor',
         name: 'Installer 1',
-        email: 'vendor@solarflow.demo',
+        email: 'installation@solarflow.demo',
         password: 'SolarFlow@2026',
         user_type: 'vendor',
         role: 'Installers',

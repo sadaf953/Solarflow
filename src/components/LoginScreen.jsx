@@ -386,7 +386,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
             { label: 'Manager', email: 'manager@solarflow.demo' },
             { label: 'Dealer', email: 'dealer@solarflow.demo' },
             { label: 'Partner', email: 'partner@solarflow.demo' },
-            { label: 'Installation team', email: 'vendor@solarflow.demo' },
+            { label: 'Installation team', email: 'installation@solarflow.demo' },
            ].map(r => (
             <button
              key={r.email}

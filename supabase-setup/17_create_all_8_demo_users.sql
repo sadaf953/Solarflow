@@ -50,10 +50,10 @@ DECLARE
       "channel_partner": "Demo Aurora Solar"
     },
     {
-      "email": "vendor@solarflow.demo",
-      "name": "Vendor 1",
+      "email": "installation@solarflow.demo",
+      "name": "Installer 1",
       "user_type": "vendor",
-      "role": "Vendors",
+      "role": "Installers",
       "channel_partner": "Demo Aurora Solar"
     },
     {
