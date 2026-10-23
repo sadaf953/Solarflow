@@ -4,6 +4,9 @@ export const demoVendorTarget=name=>{
  const match=/^(?:Demo )?(?:Vendor|Installer)(?: (\d+))?$/i.exec(String(name||'').trim());
  return match?`Installer ${match[1]?1+(Number(match[1])-1)%3:1}`:null;
 };
+// A demo visitor's profile keeps the name they typed, so the installer view looked
+// for jobs assigned to that name and showed none. It opens as one seeded installer.
+export const demoInstallerName=name=>demoVendorTarget(name)||'Installer 1';
 export async function ensureThreeDemoVendors(client){
  const read=await client.from('vendors').select('*');if(read.error)throw read.error;
  const obsolete=(read.data||[]).filter(v=>demoVendorTarget(v.name)&&v.name!==demoVendorTarget(v.name));

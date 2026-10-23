@@ -191,6 +191,9 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                 setLoading(false);
                 return;
             }
+            // Quoted for PostgREST or(): an unquoted visitor name such as
+            // "Ajay Kumar (s s solar energy)" broke the filter and emptied the list.
+            const orValue = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
             const buildQuery = () => {
                 let q = supabase.from('admin').select('*').is('deleted_at', null).order('updated_at', { ascending: false }).order('created_at', { ascending: false });
                 const myName = (user?.name || '').trim();
@@ -200,15 +203,17 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                     // Dealer: match by permanent profile ID first, or name + registered branch
                     const myBranch = (user?.channel_partner || '').trim();
                     if (userId) {
-                        q = q.or(`lead_creator_profile_id.eq.${userId},and(sub_channel_partner.ilike.${myName},channel_partner.ilike.${myBranch})`);
+                        q = q.or(`lead_creator_profile_id.eq.${userId},and(sub_channel_partner.ilike.${orValue(myName)},channel_partner.ilike.${orValue(myBranch)})`);
                     } else {
                         q = q.ilike('sub_channel_partner', myName)
                             .ilike('channel_partner', myBranch);
                     }
                 } else {
-                    // Independent Channel Partner: match by profile ID or channel_partner name
+                    // Independent Channel Partner: match by profile ID or channel_partner name.
+                    // A lead the partner adds is tagged with their branch as channel_partner
+                    // and their own name as sub_channel_partner, so match that too.
                     if (userId) {
-                        q = q.or(`lead_creator_profile_id.eq.${userId},channel_partner.ilike.${myName}`);
+                        q = q.or(`lead_creator_profile_id.eq.${userId},channel_partner.ilike.${orValue(myName)},sub_channel_partner.ilike.${orValue(myName)}`);
                     } else {
                         q = q.ilike('channel_partner', myName);
                     }

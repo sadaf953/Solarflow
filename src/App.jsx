@@ -5,7 +5,7 @@ import { supabase } from './supabase';
 import { readPreparedBriefId } from './enquiries/brief';
 import { readSubmittedEnquiryId } from './enquiries/reopen';
 import { readSignToken } from './quotations/sign/links';
-import {ensureThreeDemoVendors,demoVendorTarget} from './demo/vendors';
+import {ensureThreeDemoVendors,demoInstallerName} from './demo/vendors';
 import LoginScreen from './components/LoginScreen';
 import BrandMark from './components/BrandMark';
 import DemoHeader from './demo/DemoHeader';
@@ -122,7 +122,7 @@ export default function App(){
   if(error)throw error;if(!data?.id)throw new Error('Could not open this demo role.');
   window.history.replaceState(null,'',window.location.pathname);
   for(const key of ['solarflow_current_view','solarflow_selected_stage','solarflow_selected_customer_id'])sessionStorage.removeItem(key);
-  if(data.user_type==='vendor')data.name=demoVendorTarget(data.name)||data.name;
+  if(data.user_type==='vendor')data.name=demoInstallerName(data.name);
   markEnteredThisTab();
   setUser({...data,userType:data.user_type,isDemo:true});
   if(['admin','sales'].includes(data.user_type)){

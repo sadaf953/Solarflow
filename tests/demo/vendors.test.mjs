@@ -48,3 +48,10 @@ test('old and new spellings map to the same three installers; custom names are u
  assert.equal(demoVendorTarget('Sunrise Installers'),null);
  assert.equal(demoVendorTarget(''),null);
 });
+
+test('a demo visitor opens the installer view as a seeded installer',async()=>{
+ const {demoInstallerName}=await import('../../src/demo/vendors.js');
+ assert.equal(demoInstallerName('QA Check'),'Installer 1');
+ assert.equal(demoInstallerName('Vendor 2'),'Installer 2');
+ assert.equal(demoInstallerName('Installer 3'),'Installer 3');
+});

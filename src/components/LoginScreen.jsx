@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { APP_ROLES } from '../constants';
-import { ensureThreeDemoVendors, demoVendorTarget } from '../demo/vendors';
+import { ensureThreeDemoVendors, demoVendorTarget, demoInstallerName } from '../demo/vendors';
 import { getChecklistMode, setChecklistMode } from '../utils/checklistMode';
 import QuoteBuilder from './QuoteBuilder';
 import BrandMark from './BrandMark';
@@ -220,7 +220,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
    });
    if(roleError)throw roleError;
    if(!data?.id)throw new Error('The demo profile could not be created.');
-   if(data.user_type==='vendor')data.name=demoVendorTarget(data.name)||data.name;
+   if(data.user_type==='vendor')data.name=demoInstallerName(data.name);
    if(nameToUse){
     try { localStorage.setItem('solarflow_visitor_name', nameToUse); } catch { /* storage may be unavailable */ }
    }
