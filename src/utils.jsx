@@ -107,6 +107,9 @@ export function sanitizeAdminUpdate(updates) {
     const clean = {};
     const dropped = [];
     Object.keys(updates || {}).forEach(key => {
+        // undefined is "not sent", never "cleared". The write drops it anyway, but
+        // copied onto the open customer it hid saved values (Feasibility No "–").
+        if (updates[key] === undefined) return;
         if (ADMIN_COLUMNS.has(key)) clean[key] = updates[key];
         else dropped.push(key);
     });

@@ -761,8 +761,10 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
 
     useEffect(() => {
         setEditData(prev => {
-            // On first mount or customer ID change, do a full reset
-            if (!prev || prev.id !== customer.id) {
+            // On first mount or customer ID change, do a full reset. The id is read
+            // from the last customer seen, not the draft: a draft without an id is
+            // still this customer, and resetting it to a card row lost its columns.
+            if (!prev || (prevCustomerRef.current?.id ?? prev.id) !== customer.id) {
                 prevCustomerRef.current = customer;
                 return { ...customer };
             }
@@ -1045,10 +1047,11 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
 
         const changeSummary = describeChanges(updates, ['stage', 'stages_remarks']);
 
-        delete updates.id;
-        delete updates.created_at;
-        delete updates.crn;
-        delete updates.updated_at;
+        // `updates` becomes the draft below, so it keeps id, created_at, crn and
+        // updated_at. Deleting them here took the id off the draft, the effect
+        // that watches `customer` then read that as a different customer and reset
+        // the draft to the card row: every later save compared ~37 columns with
+        // the full record. getChangedFields ignores those four keys anyway.
 
         // Send only what actually changed, plus the stage and its remarks.
         // This used to spread the whole record (~89 columns), so advancing a
@@ -1073,6 +1076,10 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
             if (ok === false) throw new Error('The database did not accept the stage change.');
 
             savedDataRef.current = { ...savedDataRef.current, ...narrowed };
+            // Everything that changed was just written, so the form is clean
+            // again. The flag used to stay set, and closing the card after
+            // "Save & Move" asked about unsaved changes that did not exist.
+            setIsFormDirty(getChangedFields(updates, savedDataRef.current).size > 0);
             setActiveTab(destStageId);
 
             void logActivity(
