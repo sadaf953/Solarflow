@@ -25,10 +25,10 @@ with reserved as (
   set stock_on_hand = i.stock_on_hand + p.receive
   from plan p
   where p.id = i.id and p.receive > 0
-  returning i.id, i.demo_session_id, p.receive
+  returning i.id, p.receive
 )
-insert into public.inventory_movements(demo_session_id, item_id, request_id, kind, quantity, note)
-select demo_session_id, id, gen_random_uuid(), 'receipt', receive,
+insert into public.inventory_movements(item_id, request_id, kind, quantity, note)
+select id, gen_random_uuid(), 'receipt', receive,
        'Stock received for the demo projects (23 Oct 2026)'
 from stocked;
 
