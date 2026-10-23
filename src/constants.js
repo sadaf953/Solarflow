@@ -85,7 +85,7 @@ export const APP_ROLES = [
     { id: 'office2', label: 'Manager', user_type: 'office2', role: 'Channel Partner Manager' },
     { id: 'agent2', label: 'Dealer', user_type: 'agent2', role: 'Channel Partner' },
     { id: 'channel_partner', label: 'Channel Partners', user_type: 'agent', role: 'Channel Partners' },
-    { id: 'vendor', label: 'Vendors', user_type: 'vendor', role: 'Vendors' },
+    { id: 'vendor', label: 'Installation Teams', user_type: 'vendor', role: 'Installation Teams' },
     { id: 'stamp', label: 'Stamp Maker', user_type: 'stamp', role: 'Stamp' },
 ];
 
@@ -343,11 +343,31 @@ export const ACTION_COLORS = {
     login:        { bg: 'bg-stone-50',   text: 'text-stone-700',   border: 'border-stone-200',   dot: 'bg-stone-500',   label: 'Logged In' },
     attendance:   { bg: 'bg-teal-50',    text: 'text-teal-700',    border: 'border-teal-200',    dot: 'bg-teal-500',    label: 'Attendance' },
     operations:   { bg: 'bg-cyan-50',    text: 'text-cyan-700',    border: 'border-cyan-200',    dot: 'bg-cyan-500',    label: 'Operations' },
-    vendor:       { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200',  dot: 'bg-orange-500',  label: 'Vendor' },
+    vendor:       { bg: 'bg-orange-50',  text: 'text-orange-700',  border: 'border-orange-200',  dot: 'bg-orange-500',  label: 'Installation team' },
     payment:      { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-300', dot: 'bg-emerald-600', label: 'Payment' },
     dispatch:     { bg: 'bg-amber-50',   text: 'text-amber-800',   border: 'border-amber-300',   dot: 'bg-amber-600',   label: 'Dispatch' },
     stage_change: { bg: 'bg-violet-50',  text: 'text-violet-700',  border: 'border-violet-200',  dot: 'bg-violet-500',  label: 'Stage' },
 };
+
+// Field edits are logged as "<COLUMN>: before → after". The vendor_* columns keep
+// their database names, so they get installation-team labels instead.
+export const LOG_FIELD_LABELS = {
+    vendor: 'INSTALLATION TEAM',
+    vendor_quote: 'INSTALLATION TEAM QUOTE',
+    vendor_note: 'INSTALLATION TEAM NOTE',
+    vendor_paid_by: 'INSTALLATION TEAM PAID BY',
+    vendor_paid_date: 'INSTALLATION TEAM PAID DATE',
+    vendor_payment_status: 'INSTALLATION TEAM PAYMENT STATUS',
+    vendor_give_up_approved: 'INSTALLATION TEAM GIVE UP APPROVED',
+};
+export const logFieldLabel = key => LOG_FIELD_LABELS[key] || key.replace(/_/g, ' ').toUpperCase();
+
+// Older log rows were saved with the vendor wording ("VENDOR QUOTE: …",
+// "Assigned vendor to Vendor 2"). Rewrite them when shown; Vendor Feasibility stays.
+export const readableLogText = text => typeof text !== 'string' ? text : text
+    .replace(/\bVENDOR(?=:| (?:QUOTE|NOTE|PAID BY|PAID DATE|PAYMENT STATUS|GIVE UP APPROVED)\b)/g, 'INSTALLATION TEAM')
+    .replace(/\bAssigned vendor to\b/g, 'Assigned installation team to')
+    .replace(/\b(?:Demo )?Vendor ([1-3])\b/g, 'Installer $1');
 
 // ════════════════════════════════════════════════════════════
 // CHECKLIST FIELDS

@@ -27,7 +27,7 @@ const TOOL_GROUPS = [
         tools: [
             { id: 'customer_receipt', label: 'Customer receipt', description: 'Payment acknowledgement', icon: IndianRupee },
             { id: 'staff_receipt', label: 'Staff payment', description: 'Internal payment voucher', icon: UserCheck },
-            { id: 'vendor_receipt', label: 'Vendor payment', description: 'Contractor payment voucher', icon: Truck },
+            { id: 'vendor_receipt', label: 'Installation team payment', description: 'Contractor payment voucher', icon: Truck },
             { id: 'warranty', label: 'Warranty certificate', description: 'Customer warranty record', icon: ShieldCheck },
             { id: 'quick_quote', label: 'Quick quotation', description: 'One-page customer proposal', icon: FileText },
         ],
@@ -1026,7 +1026,7 @@ function VendorReceiptGenerator({ currentUser }) {
     const [vendorData, setVendorData] = useState({
         voucherNo: `SF-VEND-${Math.floor(1000 + Math.random() * 9000)}`,
         date: new Date().toISOString().split('T')[0],
-        vendorName: 'Demo Vendor 1',
+        vendorName: 'Installer 1',
         serviceType: 'Module Mounting & Fabrication Work',
         siteReference: '3.3 kWp Project - Bhavesh Shah (Surat)',
         grossAmount: '24000',
@@ -1042,20 +1042,20 @@ function VendorReceiptGenerator({ currentUser }) {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
                 <div>
-                    <h2 className="text-lg font-bold text-stone-900">Vendor & Contractor Payment Voucher</h2>
+                    <h2 className="text-lg font-bold text-stone-900">Installation team & Contractor Payment Voucher</h2>
                     <p className="text-xs text-stone-500">Record payments made to installation contractors, fabrication teams, and equipment suppliers.</p>
                 </div>
                 <button
                     onClick={() => window.print()}
                     className="sf-btn-primary"
                 >
-                    <Printer className="w-4 h-4" /> Print Vendor Voucher
+                    <Printer className="w-4 h-4" /> Print Installation Team Voucher
                 </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-stone-50 rounded-2xl border border-stone-200 print:hidden text-xs">
                 <div>
-                    <label className="font-semibold text-stone-600 block mb-1">Vendor Name</label>
+                    <label className="font-semibold text-stone-600 block mb-1">Installation Team Name</label>
                     <input
                         type="text"
                         value={vendorData.vendorName}
@@ -1112,10 +1112,10 @@ function VendorReceiptGenerator({ currentUser }) {
 
             {/* Printable Vendor Voucher */}
             <ProfessionalDocument
-                title="Vendor Payment Voucher"
+                title="Installation Team Payment Voucher"
                 documentNo={vendorData.voucherNo}
                 date={vendorData.date}
-                recipientLabel="Vendor / Contractor"
+                recipientLabel="Installation team / Contractor"
                 recipientLines={[vendorData.vendorName, vendorData.serviceType, vendorData.siteReference]}
                 referenceLines={[`Payment status: ${vendorData.status}`, `Payment mode: ${vendorData.paymentMode}`, `UTR / reference: ${vendorData.utrNo}`]}
                 rows={[
@@ -1124,14 +1124,14 @@ function VendorReceiptGenerator({ currentUser }) {
                 ]}
                 totalLabel="Net Amount Disbursed"
                 totalValue={money(netPayable)}
-                notes={['Payment is recorded against the referenced work assignment and banking reference.', 'The vendor confirms completion or acceptance of the work covered by this voucher.']}
-                signatures={['Verified By', 'Authorized Signatory', 'Vendor Stamp / Signature']}
+                notes={['Payment is recorded against the referenced work assignment and banking reference.', 'The installation team confirms completion or acceptance of the work covered by this voucher.']}
+                signatures={['Verified By', 'Authorized Signatory', 'Installation Team Stamp / Signature']}
             />
             <div className="hidden max-w-2xl mx-auto p-6 bg-white border border-stone-300 rounded-2xl shadow-sm text-stone-800 space-y-4">
                 <div className="flex justify-between items-center border-b border-stone-300 pb-3">
                     <div>
                         <div className="text-xl font-black text-stone-900">SOLARFLOW ENERGY</div>
-                        <div className="text-[11px] text-stone-500 font-semibold uppercase">Vendor / Contractor Payment Certificate</div>
+                        <div className="text-[11px] text-stone-500 font-semibold uppercase">Installation team / Contractor Payment Certificate</div>
                     </div>
                     <div className="text-right text-xs">
                         <div className="font-bold text-stone-800">Voucher: <span className="font-mono">{vendorData.voucherNo}</span></div>
@@ -1141,7 +1141,7 @@ function VendorReceiptGenerator({ currentUser }) {
 
                 <div className="grid grid-cols-2 gap-3 text-xs bg-stone-50 p-4 rounded-xl">
                     <div>
-                        <span className="text-stone-400">Vendor / Payee:</span>
+                        <span className="text-stone-400">Installation team / Payee:</span>
                         <div className="font-bold text-stone-900">{vendorData.vendorName}</div>
                         <div className="text-stone-500">Service: {vendorData.serviceType}</div>
                     </div>
@@ -1178,7 +1178,7 @@ function VendorReceiptGenerator({ currentUser }) {
                     </div>
                     <div className="text-right">
                         <div className="w-28 border-b border-stone-400 mb-1" />
-                        <div className="text-stone-400 text-[10px]">Vendor Stamp / Signature</div>
+                        <div className="text-stone-400 text-[10px]">Installation Team Stamp / Signature</div>
                     </div>
                 </div>
             </div>

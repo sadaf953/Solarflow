@@ -56,6 +56,7 @@ const mergeAgainstTemplate = (savedItems, template) => {
             ...tItem,
             id: saved?.id || null,
             stock_quantity: saved?.stock_quantity ?? null,
+            loaded_at: saved?.loaded_at || null,
             sr_no: idx + 1,
             quantity: saved?.quantity !== undefined && saved?.quantity !== null
                 ? String(saved.quantity)
@@ -69,6 +70,7 @@ const mergeAgainstTemplate = (savedItems, template) => {
     const mergedCustomItems = extraCustomItems.map((item, cIdx) => ({
         id: item.id || null,
         stock_quantity: item.stock_quantity ?? null,
+        loaded_at: item.loaded_at || null,
         sr_no: template.length + cIdx + 1,
         product_name: item.product_name || '',
         quantity: item.quantity !== undefined && item.quantity !== null ? String(item.quantity) : '',

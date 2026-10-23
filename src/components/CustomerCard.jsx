@@ -100,7 +100,7 @@ const CustomerCard = memo(function CustomerCard({ customer, onSelect, onMoveStag
                     {customer.vendor && (
                         <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium col-span-2">
                             <Package size={11} className="text-stone-300 flex-shrink-0" />
-                            <span>Vendor: {customer.vendor}</span>
+                            <span>Installation team: {customer.vendor}</span>
                         </div>
                     )}
                     {customer.delivery_batch_id && (

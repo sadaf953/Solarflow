@@ -50,7 +50,7 @@ export function generate200Customers(cpoPersonId = '44444444-4444-4444-8444-0000
     const modules = Math.round((capacityKwp * 1000) / 580);
     const invoiceVal = 145000 + (modules * 12000);
 
-    const vendor = `Vendor ${1 + (i % 3)}`;
+    const vendor = `Installer ${1 + (i % 3)}`;
 
     // Realistic delivery, installation, and commission calculations
     const regDateObj = new Date(dateStr);

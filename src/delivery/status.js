@@ -7,6 +7,18 @@ export async function updateDeliveryStatus(client, batchId, status, projectIds) 
     return data;
 }
 
+// Loading done: issues every project's BOM stock, records who loaded it and ticks the BOM.
+// Pressing it again on a loaded batch returns already_loaded instead of issuing twice.
+export async function markBatchLoaded(client, batchId, projectIds) {
+    const {data, error} = await client.rpc('mark_delivery_batch_loaded', {
+        p_batch_id: batchId, p_project_ids: projectIds
+    });
+    if (error?.code === 'PGRST202') throw new Error('Truck loading is not set up yet. Ask the demo owner to run the 23 Oct SQL update, then try again.');
+    if (error) throw error;
+    if (!data?.success) throw new Error('Loading was not confirmed. Refresh and try again.');
+    return data;
+}
+
 async function batchTransaction(client, name, args) {
     const {data, error} = await client.rpc(name, args);
     if (error?.code === 'PGRST202') throw new Error('Delivery batch setup is incomplete. Ask the demo owner to apply the updated SQL 07, then try again.');

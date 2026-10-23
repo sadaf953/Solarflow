@@ -9,7 +9,7 @@ export const stageRequirements = {
  'CASH': [['payment_type','Payment Type']],
  'MATERIAL ORDER': [['roof_shed','Roof / Shed'],['invoice_value','Invoice Value',positive]],
  'MATERIAL INTEGRATION': [['inverter_make','Inverter Make'],['inverter_serial_no','Inverter Serial Number']],
- 'MATERIAL DELIVERY': [['vendor','Vendor Allotment'],['material_delivery_date','Delivery Date']],
+ 'MATERIAL DELIVERY': [['vendor','Installation Team Allotment'],['material_delivery_date','Delivery Date']],
  'INSTALLATION STATUS': [['installation_status','Installation Status must be Installed',yes]],
  'GEO TAG PHOTO': [['geo_tag_status','Geo Tag Status must be Proceed',v=>v==='Proceed']],
  'DISCOM SUBMISSION': [['discom_submission','Submitted By and Date',v=>present(v?.submitted_by) && present(v?.date)]],

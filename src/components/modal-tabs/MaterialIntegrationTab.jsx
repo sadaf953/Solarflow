@@ -16,6 +16,17 @@ const parsePanelSerials = raw => {
     return serials.length ? serials : [''];
 };
 
+// A tick on BOM lines that left the godown when the delivery truck was marked loaded.
+const LoadedTick = ({ loadedAt }) => loadedAt ? (
+    <span
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white"
+        title={`Loaded ${new Date(loadedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`}
+        aria-label="Loaded on the truck"
+    >
+        <Check size={12} strokeWidth={3} />
+    </span>
+) : <span className="text-stone-300" aria-label="Not loaded yet">–</span>;
+
 export default function MaterialIntegrationTab({
     customer,
     editData,
@@ -417,6 +428,9 @@ export default function MaterialIntegrationTab({
                 const validItems = items.filter(item => item.product_name && item.product_name.trim() !== '');
 
                 if (validItems.length > 0) {
+                    // Loading done ticks lines in the database. Keep the ticks, and only send
+                    // the column when a line has one, so saving works before that SQL is run.
+                    const keepLoadedTicks = validItems.some(item => item.loaded_at);
                     const rowsToInsert = validItems.map((item, index) => ({
                         bom_id: currentBomId,
                         sr_no: index + 1,
@@ -425,7 +439,8 @@ export default function MaterialIntegrationTab({
                         product_name: item.product_name,
                         quantity: item.quantity !== undefined && item.quantity !== null ? String(item.quantity) : '',
                         integration_by: item.integration_by || null,
-                        note: item.note || null
+                        note: item.note || null,
+                        ...(keepLoadedTicks ? { loaded_at: item.loaded_at || null } : {})
                     }));
 
                     const { error: insertErr } = await supabase
@@ -454,8 +469,9 @@ export default function MaterialIntegrationTab({
             }
 
             // Keep the authoritative inline document in step with saved rows and reviewed stock quantities.
+            const loadedOnTruck=state.bom?.loaded_batch_no?{loaded_batch_no:state.bom.loaded_batch_no,material_loaded_at:state.bom.material_loaded_at||null}:{};
             const savedDocument={bom:{id:currentBomId,admin_id:targetCust.id,bom_type:currentType,
-                paper_prepared_by:prepBy,paper_prepared_date:prepDate,material_loaded_by:loadBy,material_loaded_date:loadDate},items};
+                paper_prepared_by:prepBy,paper_prepared_date:prepDate,material_loaded_by:loadBy,material_loaded_date:loadDate,...loadedOnTruck},items};
             const {data:savedProjects,error:documentError}=await supabase.from('admin').update({bom_data:savedDocument}).eq('id',targetCust.id).select('id');
             if(documentError || !savedProjects?.length)throw documentError || new Error('Could not save the BOM document.');
             setEditData(previous=>({...previous,bom_data:savedDocument}));
@@ -997,6 +1013,21 @@ export default function MaterialIntegrationTab({
                     setEditingSection={setEditingSection} 
                 />
 
+                {!loadingBom && (bom?.loaded_batch_no ? (
+                    <p role="status" className="mb-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800">
+                        Loaded on truck {bom.loaded_batch_no}{materialLoadedBy ? ` by ${materialLoadedBy}` : ''}{materialLoadedDate ? ` on ${materialLoadedDate}` : ''}.
+                        {' '}{(editData?.delivery_status ?? customer?.delivery_status) === 'DELIVERED' ? 'Delivered to site. ' : ''}
+                        Ticked lines have left Inventory; changing quantities here no longer changes stock.
+                    </p>
+                ) : bom && !customer?.bom_stock_issued_at && (['MATERIAL INTEGRATION', 'MATERIAL DELIVERY'].includes(editData?.stage ?? customer?.stage) || (editData?.delivery_batch_id ?? customer?.delivery_batch_id)) ? (
+                    <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+                        {(editData?.delivery_batch_id ?? customer?.delivery_batch_id)
+                            ? `On delivery batch ${editData?.delivery_batch_id ?? customer?.delivery_batch_id}. `
+                            : ''}
+                        These quantities are reserved in Inventory until the truck's Loading done is pressed.
+                    </p>
+                ) : null)}
+
                 {isEditingBom ? (
                     <div className="overflow-x-auto border border-stone-200 rounded-xl bg-white shadow-xs">
                         <table className="min-w-full divide-y divide-stone-200 text-xs">
@@ -1008,6 +1039,7 @@ export default function MaterialIntegrationTab({
                                     <th className="px-3 py-2 text-left w-20">UOM</th>
                                     <th className="px-3 py-2 text-left w-44">Integration By</th>
                                     <th className="px-3 py-2 text-left">Note</th>
+                                    <th className="px-3 py-2 text-center w-16">Loaded</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-stone-200 bg-white font-medium text-stone-700">
@@ -1088,6 +1120,10 @@ export default function MaterialIntegrationTab({
                                                 placeholder="Notes..."
                                             />
                                         </td>
+
+                                        <td className="px-3 py-2 text-center">
+                                            <LoadedTick loadedAt={item.loaded_at} />
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -1104,6 +1140,7 @@ export default function MaterialIntegrationTab({
                                     <th className="px-3 py-2 text-left w-20">UOM</th>
                                     <th className="px-3 py-2 text-left w-44">Integration By</th>
                                     <th className="px-3 py-2 text-left">Note</th>
+                                    <th className="px-3 py-2 text-center w-16">Loaded</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-stone-150 bg-white text-stone-700">
@@ -1142,6 +1179,10 @@ export default function MaterialIntegrationTab({
 
                                         <td className="px-3 py-2 text-stone-600">
                                             {item.note || '–'}
+                                        </td>
+
+                                        <td className="px-3 py-2 text-center">
+                                            <LoadedTick loadedAt={item.loaded_at} />
                                         </td>
                                     </tr>
                                 ))}

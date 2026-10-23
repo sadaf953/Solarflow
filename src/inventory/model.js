@@ -12,6 +12,20 @@ export function summarizeBomDemand(items,lines){
  }return totals;
 }
 
+// Saved BOMs reserve stock until their truck is loaded. Rows come from
+// get_inventory_reservations(): one per item and project.
+export function groupReservations(rows){
+ const byItem=new Map();
+ for(const row of rows||[]){
+  const quantity=Number(row.quantity)||0;if(quantity<=0)continue;
+  const entry=byItem.get(row.item_id)||{quantity:0,projects:[]};
+  entry.quantity=Math.round((entry.quantity+quantity)*1000)/1000;entry.projects.push({...row,quantity});byItem.set(row.item_id,entry);
+ }
+ for(const entry of byItem.values())entry.projects.sort((a,b)=>b.quantity-a.quantity||String(a.customer_name||'').localeCompare(String(b.customer_name||'')));
+ return byItem;
+}
+export const freeStock=(item,reserved=0)=>Math.round(((Number(item.stock_on_hand)||0)-(Number(reserved)||0))*1000)/1000;
+
 export const stockDay = value => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
 export function dailyStock(items,movements,day){
  return items.map(item=>{

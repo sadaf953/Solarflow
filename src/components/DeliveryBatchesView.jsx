@@ -1,6 +1,6 @@
 import {containDialogFocus} from '../utils/dialogFocus';
 import {loadDeliveryBatches} from '../delivery/load';
-import {updateDeliveryStatus,saveDeliveryBatch,deleteDeliveryBatch,removeDeliveryProject} from '../delivery/status';
+import {updateDeliveryStatus,saveDeliveryBatch,deleteDeliveryBatch,removeDeliveryProject,markBatchLoaded} from '../delivery/status';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Truck, Plus, Search, Filter, Calendar, User, Phone, MapPin, 
@@ -144,7 +144,7 @@ function MaterialDeliverySheet({ batch, matrix, loading, error }) {
                 <div><strong>Driver:</strong> {batch.driver_name || '–'}</div>
                 <div><strong>Driver phone:</strong> {batch.driver_phone || '–'}</div>
                 <div><strong>Stops:</strong> {matrix.customers.length}</div>
-                <div><strong>Vendor:</strong> {batch.vendor || '–'}</div>
+                <div><strong>Installation team:</strong> {batch.vendor || '–'}</div>
             </div>
             <h2 className="text-xs font-black uppercase tracking-wide mb-1">Delivery order</h2>
             <ol className="material-summary-stops grid grid-cols-3 gap-1.5 mb-3">
@@ -431,6 +431,8 @@ export default function DeliveryBatchesView({
 
     // Toggle Project Selection in Creation Modal
     const toggleProjectSelection = (projectId) => {
+        // A loaded truck keeps its projects: their stock has already left Inventory.
+        if (editingBatch?.loaded_at) return;
         setBatchForm(prev => {
             const exists = prev.selectedProjectIds.includes(projectId);
             const next = exists 
@@ -498,7 +500,7 @@ export default function DeliveryBatchesView({
 
             let updatedBatches;
             if (editingBatch) {
-                updatedBatches = batches.map(b => b.id === editingBatch.id ? batchPayload : b);
+                updatedBatches = batches.map(b => b.id === editingBatch.id ? { ...b, ...batchPayload } : b);
             } else {
                 updatedBatches = [batchPayload, ...batches];
             }
@@ -737,6 +739,43 @@ export default function DeliveryBatchesView({
         }
     };
 
+    // Loading done: the loaded materials leave Inventory now, and each customer's
+    // Material Integration records who loaded them with a tick on every loaded line.
+    const handleLoadingDone = async (batch) => {
+        if (saving || batch.loaded_at) return;
+        const projectCount = (batch.project_ids || []).length;
+        if (!await showConfirm(
+            `Stock for ${projectCount} ${projectCount === 1 ? 'project' : 'projects'} on ${batch.batch_no} leaves Inventory now, under your name. Each customer's BOM is ticked as loaded. This cannot be undone.`,
+            { title: 'Truck loading done?', confirmLabel: 'Yes, loading is done', cancelLabel: 'Not yet', type: 'warning' }
+        )) return;
+        setSaving(true);
+        try {
+            // Older trucks show as In Transit but were saved as Pending: start the trip first.
+            if (batch.status !== 'IN_TRANSIT') await updateDeliveryStatus(supabase, batch.id, 'IN_TRANSIT', batch.project_ids || []);
+            const result = await markBatchLoaded(supabase, batch.id, batch.project_ids || []);
+            setBatches(previous => previous.map(item => item.id === batch.id
+                ? { ...item, loaded_by_name: result.loaded_by || item.loaded_by_name, loaded_at: result.loaded_at || item.loaded_at || new Date().toISOString() }
+                : item));
+            if (!result.already_loaded) {
+                await logActivity(
+                    currentUser?.id || 'admin',
+                    'dispatch',
+                    `Delivery Batch ${batch.batch_no || batch.id}: Loading done`,
+                    `${projectCount} projects · ${result.movements ?? 0} stock movements · loaded by ${result.loaded_by || currentUser?.name || 'team member'}`
+                );
+            }
+            await handleRefresh();
+            showAlert(result.already_loaded
+                ? `${batch.batch_no} was already loaded by ${result.loaded_by || 'a team member'}.`
+                : `Loading done. ${result.movements ?? 0} stock movements recorded in Inventory and the BOMs are ticked.`,
+                { type: 'success' });
+        } catch (error) {
+            showAlert('Could not record loading: ' + (error.message || 'Unknown error'), { type: 'error' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleReorderProject = async (batch, projectId, direction) => {
         if (saving || batch.status === 'DELIVERED') return;
         const currentIds = [...(batch.project_ids || [])];
@@ -961,12 +1000,37 @@ export default function DeliveryBatchesView({
                                                 }`}
                                             >
                                                 <option value="IN_TRANSIT">In Transit</option>
-                                                <option value="DELIVERED">Delivered</option>
+                                                <option value="DELIVERED" disabled={!batch.loaded_at && batch.status !== 'DELIVERED'}>Delivered</option>
                                             </select>
                                             <span className="text-xs text-stone-400 font-medium">
                                                  Dispatched: <strong className="text-stone-700">{batch.dispatch_date || '–'}</strong>
                                             </span>
+                                            {batch.loaded_at ? (
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200" title={`Loaded ${new Date(batch.loaded_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`}>
+                                                    <CheckCircle2 size={12} /> Loaded{batch.loaded_by_name ? ` by ${batch.loaded_by_name}` : ''}
+                                                </span>
+                                            ) : batch.status !== 'DELIVERED' ? (
+                                                <button
+                                                    type="button"
+                                                    disabled={saving}
+                                                    onClick={() => handleLoadingDone(batch)}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-extrabold uppercase tracking-wider shadow-xs transition cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                                                    title="The truck is loaded: take the loaded materials out of Inventory"
+                                                >
+                                                    <Package size={12} /> Loading done
+                                                </button>
+                                            ) : null}
                                         </div>
+
+                                        {(batch.created_by_name || batch.started_by_name || batch.loaded_by_name) && (
+                                            <p className="text-[11px] text-stone-500 font-medium">
+                                                {[
+                                                    batch.created_by_name && `Added by ${batch.created_by_name}`,
+                                                    batch.started_by_name && `Trip started by ${batch.started_by_name}`,
+                                                    batch.loaded_by_name && `Loaded by ${batch.loaded_by_name}${batch.loaded_at ? ` · ${new Date(batch.loaded_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}`
+                                                ].filter(Boolean).join(' · ')}
+                                            </p>
+                                        )}
 
                                         <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-stone-600">
                                             {batch.vehicle_number && (
@@ -994,7 +1058,7 @@ export default function DeliveryBatchesView({
                                             )}
                                             {batch.vendor && (
                                                  <span className="flex items-center gap-1 font-medium text-stone-500">
-                                                     <Package size={12} className="text-stone-400" /> Vendor: <strong className="text-stone-700">{batch.vendor}</strong>
+                                                     <Package size={12} className="text-stone-400" /> Installation team: <strong className="text-stone-700">{batch.vendor}</strong>
                                                  </span>
                                             )}
                                             <span className="h-3 w-px bg-stone-300 mx-1"></span>
@@ -1073,10 +1137,10 @@ export default function DeliveryBatchesView({
 
                                          <button
                                              type="button"
-                                             disabled={saving}
+                                             disabled={saving || Boolean(batch.loaded_at)}
                                              onClick={() => handleDeleteBatch(batch.id)}
-                                             className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer"
-                                             title="Disband Batch"
+                                             className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-stone-400"
+                                             title={batch.loaded_at ? 'A loaded truck cannot be disbanded' : 'Disband Batch'}
                                          >
                                              <Trash2 size={15} />
                                          </button>
@@ -1102,9 +1166,10 @@ export default function DeliveryBatchesView({
                                      <div className="flex items-center gap-3">
                                          <button
                                              type="button"
-                                             disabled={saving || isAllDelivered}
+                                             disabled={saving || isAllDelivered || !batch.loaded_at}
+                                             title={!isAllDelivered && !batch.loaded_at ? 'Press Loading done first' : undefined}
                                              onClick={async () => {
-                                                 if (saving) return;
+                                                 if (saving || !batch.loaded_at) return;
                                                  setSaving(true);
                                                  const previousBatch = batch;
                                                  const previousOverrides = { ...localStatusOverrides };
@@ -1130,7 +1195,9 @@ export default function DeliveryBatchesView({
                                              className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition shadow-xs border ${
                                                  isAllDelivered 
                                                      ? 'bg-emerald-100 text-emerald-800 border-emerald-200 cursor-default opacity-80' 
-                                                     : 'bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 border-stone-200 hover:border-emerald-200 cursor-pointer'
+                                                     : !batch.loaded_at
+                                                         ? 'bg-stone-50 text-stone-400 border-stone-200 cursor-not-allowed'
+                                                         : 'bg-stone-100 hover:bg-emerald-50 text-stone-600 hover:text-emerald-700 border-stone-200 hover:border-emerald-200 cursor-pointer'
                                              }`}
                                          >
                                              {isAllDelivered ? '✓ All Delivered' : 'Mark All Delivered'}
@@ -1251,8 +1318,8 @@ export default function DeliveryBatchesView({
                                                                         }`}
                                                                     >
                                                                         <option value="IN_TRANSIT">In Transit</option>
-                                                                        <option value="DELIVERED">Delivered</option>
-                                                                        <option value="PENDING">Pending (Remove)</option>
+                                                                        <option value="DELIVERED" disabled={!batch.loaded_at && currentProjStatus !== 'DELIVERED'}>Delivered</option>
+                                                                        <option value="PENDING" disabled={Boolean(batch.loaded_at)}>Pending (Remove)</option>
                                                                     </select>
                                                                 );
                                                             })()}
@@ -1474,7 +1541,9 @@ export default function DeliveryBatchesView({
                                     </div>
                                 </div>
 
-                                <p className="text-xs text-stone-500">Selected projects stay visible across stage filters. Projects on another truck show their batch number; remove them from that batch before reassigning.</p>
+                                {editingBatch?.loaded_at
+                                    ? <p role="status" className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2">This truck is already loaded, so its projects cannot change. You can still edit the driver, vehicle and notes.</p>
+                                    : <p className="text-xs text-stone-500">Selected projects stay visible across stage filters. Projects on another truck show their batch number; remove them from that batch before reassigning.</p>}
                                 {projectsLoading && <p role="status" className="text-xs text-stone-500">Loading projects…</p>}
                                 {projectsError && <p role="alert" className="text-xs text-red-600">{projectsError} <button type="button" onClick={fetchAllCustomers}>Retry</button></p>}
                                 {!projectsLoading && !projectsError && eligibleProjects.length===0 && <p className="text-sm text-stone-500 p-3">No projects match this stage and search. Try All Stages or clear the search.</p>}

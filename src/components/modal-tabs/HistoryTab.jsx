@@ -2,7 +2,7 @@ import React from 'react';
 import { ShieldCheck, Send } from 'lucide-react';
 import { SectionHeader } from './shared';
 import { formatLogDate } from '../../utils';
-import { ACTION_COLORS } from '../../constants';
+import { ACTION_COLORS, readableLogText } from '../../constants';
 
 export default function HistoryTab({
     editData,
@@ -67,11 +67,11 @@ export default function HistoryTab({
                                 <div className="text-xs text-stone-700 font-medium whitespace-pre-wrap leading-relaxed">
                                     {String(log?.message || '').includes('|') ? (
                                         <div className="space-y-1">
-                                            {String(log?.message || '').split('|').map((line, idx) => (
+                                            {readableLogText(String(log?.message || '')).split('|').map((line, idx) => (
                                                 <div key={idx} className="flex items-center gap-1"><span className="text-stone-400">↳</span> {line.trim()}</div>
                                             ))}
                                         </div>
-                                    ) : (log?.message || '–')}
+                                    ) : (readableLogText(log?.message) || '–')}
                                 </div>
                                 <p className="text-[8px] text-stone-400 font-bold uppercase mt-2 border-t border-stone-50 pt-1.5">User: {log.profiles?.name || 'System'}</p>
                             </div>

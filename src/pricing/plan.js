@@ -33,7 +33,7 @@ export const FEATURES = [
   { id: 'uploads', group: 'Operations', label: 'Customer document uploads', price: 6000 },
   { id: 'attendance', group: 'Operations', label: 'Staff attendance', price: 8000 },
   { id: 'calendar', group: 'Operations', label: 'Calendar', price: 4000 },
-  { id: 'vendors', group: 'Team & partners', label: 'Vendor logins', price: 10000 },
+  { id: 'vendors', group: 'Team & partners', label: 'Installation team logins', price: 10000 },
   { id: 'technicians', group: 'Team & partners', label: 'Technician logins', price: 6000 },
   { id: 'dealers', group: 'Team & partners', label: 'Dealers & channel partner offices', price: 15000 },
   { id: 'branches', group: 'Team & partners', label: 'Branches', price: 12000 },
@@ -140,7 +140,7 @@ export const VERSIONS = [
     points: ['Customer card with 4 tabs – everything on one screen', 'Choose your own fields to track', 'Checklists instead of file uploads', 'Google Drive folder link on every customer'],
     not: 'No dealer/CPO logins or staff hierarchy' },
   { id: 'complete', name: 'SolarFlow Complete', from: 'Most teams ₹85k – ₹1.2L', who: 'Bigger teams · stage-by-stage work · dealers & branches',
-    points: ['A tab for every stage of the project', 'Inventory, BOM, delivery & installation', 'Dealer, CPO, vendor & staff logins', 'Commissions, attendance and reports'] },
+    points: ['A tab for every stage of the project', 'Inventory, BOM, delivery & installation', 'Dealer, CPO, installation team & staff logins', 'Commissions, attendance and reports'] },
   { id: 'tools', name: 'Just the tools', from: 'Pay only for the tools you pick', who: 'No CRM – only the document makers',
     points: ['Quotation, BOM and invoice makers', 'DISCOM & bank feasibility documents', 'Delivery challan & truck checklist'] },
 ];

@@ -386,7 +386,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
             { label: 'Manager', email: 'manager@solarflow.demo' },
             { label: 'Dealer', email: 'dealer@solarflow.demo' },
             { label: 'Partner', email: 'partner@solarflow.demo' },
-            { label: 'Vendor', email: 'vendor@solarflow.demo' },
+            { label: 'Installation team', email: 'vendor@solarflow.demo' },
            ].map(r => (
             <button
              key={r.email}
@@ -635,11 +635,11 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
         <div className="demo-question-info">
          <span className="demo-question-num">2</span>
          <div>
-          <strong>Do you want vendor logins for installation teams?</strong>
-          <small>{hasVendors ? 'Installation Vendor portal enabled with dispatch tracking.' : 'Internal installations only: Vendor portal hidden.'}</small>
+          <strong>Do you want installation team logins for installation teams?</strong>
+          <small>{hasVendors ? 'Installation team portal enabled with dispatch tracking.' : 'Internal installations only: Installation team portal hidden.'}</small>
          </div>
         </div>
-        <div className="demo-toggle-group" role="radiogroup" aria-label="Want vendor logins?">
+        <div className="demo-toggle-group" role="radiogroup" aria-label="Want installation team logins?">
          <button 
           type="button" 
           onClick={() => setHasVendors(false)}

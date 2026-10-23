@@ -38,3 +38,15 @@ test('project removal uses one transaction and disbands only the last project', 
  const failure={message:'Stock already issued'};
  await assert.rejects(removeDeliveryProject({rpc:async()=>({error:failure})},{id:'b',project_ids:['p','q']},'p'),error=>error===failure);
 });
+
+test('loading done is one transaction and needs a confirmed result', async () => {
+ const {markBatchLoaded}=await import('../../src/delivery/status.js');
+ let args;
+ const client={rpc:async(name,payload)=>{args={name,payload};return {data:{success:true,loaded_by:'Ravi'}};},from:()=>assert.fail('separate writes forbidden')};
+ assert.equal((await markBatchLoaded(client,'b',['p','q'])).loaded_by,'Ravi');
+ assert.equal(args.name,'mark_delivery_batch_loaded');assert.deepEqual(args.payload,{p_batch_id:'b',p_project_ids:['p','q']});
+ await assert.rejects(markBatchLoaded({rpc:async()=>({data:null})},'b',[]),/not confirmed/);
+ await assert.rejects(markBatchLoaded({rpc:async()=>({error:{code:'PGRST202'}})},'b',[]),/23 Oct SQL/);
+ const failure={message:'Not enough Solar Panel'};
+ await assert.rejects(markBatchLoaded({rpc:async()=>({error:failure})},'b',[]),error=>error===failure);
+});

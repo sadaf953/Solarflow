@@ -237,8 +237,8 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                 await logActivity(
                     currentUser?.id,
                     'payment',
-                    `${customerRecord.customer_name}: Vendor payment status set to ${nextStatus}${isPaid ? ` (Paid on: ${paidDate})` : ' (Cleared)'}`,
-                    `Vendor: ${customerRecord.installation_vendor || 'Assigned Vendor'} | Amount: ₹${toIndianCommas(customerRecord.vendor_payable_amount || 0)}`,
+                    `${customerRecord.customer_name}: Installation team payment status set to ${nextStatus}${isPaid ? ` (Paid on: ${paidDate})` : ' (Cleared)'}`,
+                    `Installation team: ${customerRecord.installation_vendor || 'Assigned Installation team'} | Amount: ₹${toIndianCommas(customerRecord.vendor_payable_amount || 0)}`,
                     customerRecord.id
                 );
             } else {
@@ -324,8 +324,8 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                 await logActivity(
                     currentUser?.id,
                     'payment',
-                    `Paid all ${unpaidRecords.length} client installations for vendor ${selectedVendor} (Total: ₹${toIndianCommas(pendingAmount)})`,
-                    `Vendor: ${selectedVendor} | Settled Projects: ${unpaidRecords.length} | Amount: ₹${toIndianCommas(pendingAmount)}`,
+                    `Paid all ${unpaidRecords.length} client installations for installation team ${selectedVendor} (Total: ₹${toIndianCommas(pendingAmount)})`,
+                    `Installation team: ${selectedVendor} | Settled Projects: ${unpaidRecords.length} | Amount: ₹${toIndianCommas(pendingAmount)}`,
                     unpaidIds[0]
                 );
             } else {
@@ -356,7 +356,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                         </button>
                     </div>
                     <p className="text-xs text-stone-500 font-medium mt-0.5 max-w-xl">
-                        Track installations completed with tag <b>"Yes"</b>, manage vendor commissions, and process payouts.
+                        Track installations completed with tag <b>"Yes"</b>, manage installation team commissions, and process payouts.
                     </p>
                 </div>
             </div>
@@ -381,7 +381,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                         <CheckCircle2 size={20} />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Total Paid to Vendors</p>
+                        <p className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">Total Paid to Installation teams</p>
                         <div className="flex items-baseline gap-2 mt-0.5">
                             <p className="text-xl font-black text-emerald-600">₹{toIndianCommas(paidAmount)}</p>
                             <span className="text-[11px] font-bold text-emerald-700/80">({paidCount} paid)</span>
@@ -440,7 +440,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                             </button>
                         ) : (
                             <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-2 rounded-xl border border-emerald-200 flex items-center gap-1.5">
-                                <Check size={13} className="stroke-[3]" /> All Clients Paid for this Vendor
+                                <Check size={13} className="stroke-[3]" /> All Clients Paid for this Installation team
                             </span>
                         )}
                     </div>
@@ -455,7 +455,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                         <Search className="absolute left-3 top-2.5 text-stone-400 w-4 h-4 pointer-events-none" />
                         <input
                             type="text"
-                            placeholder="Search by customer, vendor, phone or consumer no..."
+                            placeholder="Search by customer, installation team, phone or consumer no..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="pl-9 pr-4 py-2 bg-white border border-stone-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 w-full font-medium"
@@ -469,7 +469,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                                 onChange={e => setSelectedVendor(e.target.value)}
                                 className="pl-3 pr-8 py-2 bg-white border border-stone-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 font-semibold text-stone-750 appearance-none cursor-pointer"
                             >
-                                <option value="All">All Vendors ({vendorsList.length})</option>
+                                <option value="All">All Installation teams ({vendorsList.length})</option>
                                 {vendorsList.map(v => (
                                     <option key={v} value={v}>{v}</option>
                                 ))}
@@ -519,7 +519,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                             <thead>
                                 <tr className="border-b border-stone-100 bg-stone-50/40">
                                     <th className="px-5 py-3.5 text-[9px] font-black text-stone-400 uppercase tracking-widest">Customer Details</th>
-                                    <th className="px-5 py-3.5 text-[9px] font-black text-stone-400 uppercase tracking-widest">Vendor</th>
+                                    <th className="px-5 py-3.5 text-[9px] font-black text-stone-400 uppercase tracking-widest">Installation team</th>
                                     <th className="px-5 py-3.5 text-[9px] font-black text-stone-400 uppercase tracking-widest">Commission</th>
                                     <th className="px-5 py-3.5 text-[9px] font-black text-stone-400 uppercase tracking-widest">Material Delivery Date</th>
                                     <th className="px-5 py-3.5 text-[9px] font-black text-stone-400 uppercase tracking-widest">Installation Date</th>
@@ -575,7 +575,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                                                 {r.vendor ? (
                                                     <p className="text-xs font-bold text-stone-800">{r.vendor}</p>
                                                 ) : (
-                                                    <span className="text-xs text-stone-400 italic">No vendor allotted</span>
+                                                    <span className="text-xs text-stone-400 italic">No installation team allotted</span>
                                                 )}
                                             </td>
 

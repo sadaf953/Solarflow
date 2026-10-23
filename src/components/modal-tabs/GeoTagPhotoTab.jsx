@@ -64,9 +64,9 @@ export default function GeoTagPhotoTab({
                 <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 flex items-center gap-3">
                     <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
                     <div>
-                        <p className="text-xs font-bold text-amber-900">Vendor Controlled Stage</p>
+                        <p className="text-xs font-bold text-amber-900">Installation Team Controlled Stage</p>
                         <p className="text-[11px] text-amber-700 font-medium">
-                            Geo Tag Photo verification and status are configured directly by the Vendor. You have view-only access.
+                            Geo Tag Photo verification and status are configured directly by the Installation team. You have view-only access.
                         </p>
                     </div>
                 </div>
@@ -126,7 +126,7 @@ export default function GeoTagPhotoTab({
                     </span>
                 </div>
                 {!canUploadImage && (
-                    <p className="text-[10px] text-stone-400 font-semibold italic">Only vendors can edit this section. You have view-only access.</p>
+                    <p className="text-[10px] text-stone-400 font-semibold italic">Only installation teams can edit this section. You have view-only access.</p>
                 )}
                 <div className="flex flex-col gap-2">
                     <CheckboxRemarkItem 

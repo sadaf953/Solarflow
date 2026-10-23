@@ -18,7 +18,7 @@ export async function sendVendorLeadNotification({
     const cust = customer || {};
     const targetVendor = (vendorName || cust.vendor || '').trim();
     if (!targetVendor) {
-        throw new Error('No vendor is allotted to this customer, so no notification can be sent.');
+        throw new Error('No installation team is allotted to this customer, so no notification can be sent.');
     }
     let recipient = ''; // no fallback
 
@@ -40,7 +40,7 @@ export async function sendVendorLeadNotification({
     }
 
     if (!recipient) {
-        throw new Error(`No email address is saved for vendor "${targetVendor}".`);
+        throw new Error(`No email address is saved for installation team "${targetVendor}".`);
     }
 
     // Material Delivery email must be sent by the server-side Edge Function.
@@ -63,7 +63,7 @@ export async function sendVendorLeadNotification({
             }
             if (/failed to send a request|failed to fetch|functionsfetcherror/i.test(detail)) {
                 const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'this website';
-                detail = `The vendor email Edge Function could not be reached from ${currentOrigin}. Deploy the latest send-lead-to-vendor function so its CORS settings allow this website.`;
+                detail = `The installation team email Edge Function could not be reached from ${currentOrigin}. Deploy the latest send-lead-to-vendor function so its CORS settings allow this website.`;
             }
             throw new Error(detail);
         }

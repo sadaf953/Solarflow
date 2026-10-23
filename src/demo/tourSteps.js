@@ -19,14 +19,14 @@ export const workflowTour = [
  admin('14. Inventory: stock on hand','Inventory lists materials and sample opening quantities. Select a material to add received quantity or record an issue with a note.','inventory',{tab:'stock'}),
  admin('15. Review individual customer BOM','Each customer’s BOM is reviewed and configured individually in their Material Integration tab. Inventory shows all available warehouse quantities ready to be allocated when delivery trips are prepared.','inventory',{tab:'stock'}),
  admin('16. Open Delivery Batches','Create a trip and choose the driver and vehicle. In Select Projects to Club on this Truck, add several eligible customers. Selected rows remain visible; a project assigned to another trip is labelled so you can manage its existing assignment.','delivery_batches'),
- customer('17. Assign the installation vendor','In the customer’s Delivery tab, choose Vendor 1, 2 or 3 and a Delivery Date. Save the assignment. The chosen vendor sees that customer in its own portal; a trip can contain several customers with their own vendor assignments.','MATERIAL DELIVERY'),
+ customer('17. Assign the installation team','In the customer’s Delivery tab, choose Installer 1, 2 or 3 and a Delivery Date. Save the assignment. The chosen installation team sees that customer in its own portal; a trip can contain several customers with their own installation team assignments.','MATERIAL DELIVERY'),
  admin('18. Dispatch and mark the trip delivered','Open a batch to review all customers, driver, vehicle and rent. Mark Delivered only when the materials reach site. Each customer’s saved BOM quantity is deducted once. Missing quantities or insufficient stock block delivery and show what to fix.','delivery_batches'),
  admin('19. Verify outgoing stock','Movements records receipts and issues. Delivery creates customer-linked stock issues automatically. Creating a BOM alone does not reduce stock, and marking an already-issued customer delivered again does not deduct twice.','inventory',{tab:'movements'}),
  admin('20. Daily godown report','Choose a day to review opening stock, incoming quantity, outgoing quantity and closing stock for every material. Use this to reconcile the godown after trips and incoming supplies.','inventory',{tab:'daily'}),
- customer('21. Vendor receives assigned work','When a vendor logs into their portal, they see this customer under their assigned Delivery tab with dispatch details. Jobs assigned to other vendors belong to their respective accounts.','MATERIAL DELIVERY'),
- customer('22. Vendor completes installation','The assigned vendor completes physical installation on site and updates Installation Status to Installed / Yes with the installation date. Save & Move sends the project to Geo Tag Photo.','INSTALLATION STATUS'),
- customer('23. Vendor completes the geo stage','The vendor reviews the site and sets Geo Tag Status to Proceed, then Save & Move to Discom Submission. Photos can be uploaded with 1 click; missing photos do not block this demo stage.','GEO TAG PHOTO'),
- admin('24. Vendor work and installation payment','A vendor assignment links the job; an installed status makes it eligible here. Review capacity, rate and amount, then record the vendor’s payment details and mark payment status only after the payment is actually recorded. This demo does not transfer money.','installation_payments'),
+ customer('21. Installation team receives assigned work','When an installation team logs into their portal, they see this customer under their assigned Delivery tab with dispatch details. Jobs assigned to other installation teams belong to their respective accounts.','MATERIAL DELIVERY'),
+ customer('22. Installation team completes installation','The assigned installation team completes physical installation on site and updates Installation Status to Installed / Yes with the installation date. Save & Move sends the project to Geo Tag Photo.','INSTALLATION STATUS'),
+ customer('23. Installation team completes the geo stage','The installation team reviews the site and sets Geo Tag Status to Proceed, then Save & Move to Discom Submission. Photos can be uploaded with 1 click; missing photos do not block this demo stage.','GEO TAG PHOTO'),
+ admin('24. Installation team work and installation payment','An installation team assignment links the job; an installed status makes it eligible here. Review capacity, rate and amount, then record the installation team’s payment details and mark payment status only after the payment is actually recorded. This demo does not transfer money.','installation_payments'),
  admin('25. First loan payment','Return to Loan Tags → 1st Payment. Open the customer, record the bank’s first release and save the tag/history. These records remain available even though the installation stage has moved forward.','loan_tags',{tag:'1st Payment'}),
  customer('26. Discom sends work to Stamp Maker','In Discom Submission, enter Submitted By and Date, choose the linked Stamp Maker, stamp value and description, then use the send action. The assignment routes this customer’s document work to that maker’s queue. Optional photos do not block stage progression.','DISCOM SUBMISSION'),
  customer('27. Stamp Maker uploads and returns the file','The assigned Stamp Maker receives this customer card in their Stamp Maker portal, uploads the completed stamp agreement, and marks it Complete. The completed file is instantly attached back to this customer.','DISCOM SUBMISSION'),
@@ -40,11 +40,11 @@ export const workflowTour = [
  admin('35. Subsidy received','Received is the final subsidy tag. Review the payment evidence and dated history before saving it; final tags lock the record. The customer and its earlier history remain available.','subsidy',{tag:'Received'}),
  admin('36. Second loan payment','Pull up Loan Tags → 2nd Payment. Record the second bank release and the corresponding history on the customer. Project progress does not automatically mean the money has been received.','loan_tags',{tag:'2nd Payment'}),
  admin('37. Total loan payment received','Once all bank payments are reconciled, select Total Loan Payment Received. It is the final loan tag, so check the amounts and history before saving.','loan_tags',{tag:'Total Loan Payment Received'}),
- customer('38. Final review','Review customer details, installation, vendor payments, loan and subsidy history, and any files supplied. Save remaining corrections and move to Completed when the work is finished.','FINAL REVIEW'),
+ customer('38. Final review','Review customer details, installation, installation team payments, loan and subsidy history, and any files supplied. Save remaining corrections and move to Completed when the work is finished.','FINAL REVIEW'),
  admin('39. Completed customer records','Completed projects stay in the CRM with their customer details, documents and history. Dashboard totals reflect the final project stage.','stages',{stage:'COMPLETED'}),
  customer('40. Paused projects belong in Lost Project','Use Pause / Move to Lost Project from an active customer. Its origin stage is saved. Add a reason or follow-up date here; Resume returns it to that origin stage. Lost Project also has its own dashboard count.','LOST PROJECT'),
  admin('41. Review the audit trail','Activity Log records saved changes and stage moves. Use the customer history and this log to check which role completed each handoff. You can replay the tour or continue working from any portal.','activity'),
- admin('42. Operations: Drivers, Vendors & Directories','In Operations (Channel Partner Management), Admin can register installation vendors, drivers with vehicle numbers, branch offices, and technical staff. These directories automatically populate project delivery batches and vendor assignments across the CRM.','channel_partner_mgmt'),
+ admin('42. Operations: Drivers, Installation teams & Directories','In Operations (Channel Partner Management), Admin can register installation teams, drivers with vehicle numbers, branch offices, and technical staff. These directories automatically populate project delivery batches and installation team assignments across the CRM.','channel_partner_mgmt'),
  admin('43. Adding and managing users','User Management lets Admin add team members, assign any of the 8 roles, map users to branch channel partners, and manage authentication. Click "+ Create User" to onboard staff, set passwords directly, or dispatch password recovery links via email.','users',{action:'createUser'}),
 ];
 
@@ -53,7 +53,7 @@ export const workflowChapters = [
  {title:'Sales & customer setup', start:0},
  {title:'Registration & finance', start:6},
  {title:'Materials & delivery', start:11},
- {title:'Installation & vendor payments', start:21},
+ {title:'Installation & installation team payments', start:21},
  {title:'Electricity approvals & documents', start:26},
  {title:'Subsidy & final payments', start:32},
  {title:'Completion & team management', start:38},
@@ -81,7 +81,7 @@ export function tourSteps(role){
  ];
 
  if(role === 'vendor') return [
-  step('Vendor Installation Portal','Welcome to the Vendor portal. Only solar projects assigned to your vendor account appear here.',role,'DELIVERY'),
+  step('Installation Team Portal','Welcome to the Installation team portal. Only solar projects assigned to your installation team account appear here.',role,'DELIVERY'),
   step('1. Assigned deliveries','Review incoming dispatch schedules, driver contacts, and site customer details ready for installation.',role,'DELIVERY'),
   step('2. Mark physical installation','Update installation dates and set Installation Status to Installed / Yes once field work is completed.',role,'INSTALLATION',{action:'customer'}),
   step('3. Geo-tag photo verification','Submit site coordinates and geo-tag photos to verify completion for DISCOM submission.',role,'GEO',{action:'customer'})

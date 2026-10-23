@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { Building2, Mail, Zap, Trash2, Plus, Copy, Check, ClipboardPaste, Layers, Printer, Truck, User, Edit3, IndianRupee, Calendar, AlertTriangle, X } from 'lucide-react';
 import { SectionHeader, EditableDetailItem, fetchVendorNames } from './shared';
 import { sendVendorLeadNotification } from '../../utils/vendorNotification';
-import { formatInputValue } from '../../utils';
+import { formatInputValue, lazyWithRetry } from '../../utils';
 import { isVendorUnavailableOn } from '../../utils/vendorAvailability';
-import VendorCalendarView from '../VendorCalendarView';
+
+const CalendarView = lazyWithRetry(() => import('../CalendarView'));
 
 const parsePanelSerials = (raw) => {
     if (!raw) return [''];
@@ -68,8 +69,15 @@ export default function MaterialDeliveryTab({
     const filledCount = panelSerials.filter(Boolean).length;
 
     const activeDeliveryDate = editData?.material_delivery_date || customer?.material_delivery_date;
-    const vendorAvailabilityCheck = useMemo(() => {
-        return isVendorUnavailableOn(editData?.vendor, activeDeliveryDate);
+    // Installers mark their "not available" days on the shared calendar.
+    const [vendorAvailabilityCheck, setVendorAvailabilityCheck] = useState({ unavailable: false, reason: '' });
+    useEffect(() => {
+        let cancelled = false;
+        setVendorAvailabilityCheck({ unavailable: false, reason: '' });
+        if (editData?.vendor && activeDeliveryDate) {
+            isVendorUnavailableOn(editData.vendor, activeDeliveryDate).then(result => { if (!cancelled) setVendorAvailabilityCheck(result); });
+        }
+        return () => { cancelled = true; };
     }, [editData?.vendor, activeDeliveryDate]);
 
     useEffect(() => {
@@ -125,7 +133,7 @@ export default function MaterialDeliveryTab({
             <div className="flex flex-wrap justify-between items-center gap-2 border-b border-stone-100 pb-2">
                 <div>
                     <h4 className="text-xs font-bold text-stone-700 uppercase tracking-widest">Material Delivery & Dispatch</h4>
-                    <p className="text-[11px] text-stone-500 font-medium mt-1">Vendor assignment, equipment serial numbers and dispatch note.</p>
+                    <p className="text-[11px] text-stone-500 font-medium mt-1">Installation team assignment, equipment serial numbers and dispatch note.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button
@@ -138,23 +146,23 @@ export default function MaterialDeliveryTab({
                 </div>
             </div>
 
-            {/* Pick a Vendor Section */}
+            {/* Pick an Installer Section */}
             <section id="section-pick_vendor">
                 <div className="flex items-center justify-between mb-3 border-b border-stone-100 pb-1.5">
                     <h3 className="text-[9px] font-bold text-stone-400 uppercase tracking-widest flex items-center gap-2">
-                        <Building2 size={12} /> Pick a Vendor <span className="text-red-500">*</span>
+                        <Building2 size={12} /> Pick an Installation team <span className="text-red-500">*</span>
                     </h3>
                     <button
                         type="button"
                         onClick={() => setShowVendorCalendarModal(true)}
                         className="text-[10px] font-bold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                     >
-                        <Calendar size={11} /> Check Vendor Schedules
+                        <Calendar size={11} /> Check the calendar
                     </button>
                 </div>
                 <div className="bg-stone-50 p-4 rounded-[20px] border border-stone-150 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1 min-w-[200px]">
-                        <p className="text-[9px] text-stone-400 tracking-wide mb-1 font-bold">VENDOR ALLOTMENT <span className="text-red-500">*</span></p>
+                        <p className="text-[9px] text-stone-400 tracking-wide mb-1 font-bold">INSTALLATION TEAM ALLOTMENT <span className="text-red-500">*</span></p>
                         <select
                             disabled={!isEditable}
                             value={editData.vendor || ''}
@@ -173,7 +181,7 @@ export default function MaterialDeliveryTab({
                                         logActivity(
                                             user.id,
                                             'update',
-                                            `${customer.customer_name}: Removed assigned vendor`,
+                                            `${customer.customer_name}: Removed assigned installation team`,
                                             '',
                                             customer.id
                                         ).then(fetchLogs);
@@ -182,7 +190,7 @@ export default function MaterialDeliveryTab({
                             }}
                             className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-300 font-semibold text-stone-700 disabled:bg-stone-100 disabled:text-stone-500"
                         >
-                            <option value="">Select Vendor...</option>
+                            <option value="">Select Installation team...</option>
                             {vendors.map(v => (
                                 <option key={v} value={v}>{v}</option>
                             ))}
@@ -208,7 +216,7 @@ export default function MaterialDeliveryTab({
                                         await logActivity(
                                             user.id,
                                             'email',
-                                            `Vendor notification triggered for ${editData.vendor} (${res.recipient || 'no email found'})`,
+                                            `Installation team notification triggered for ${editData.vendor} (${res.recipient || 'no email found'})`,
                                             '',
                                             customer.id
                                         );
@@ -248,9 +256,9 @@ export default function MaterialDeliveryTab({
                     <div className="mt-2.5 p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-900 flex items-start gap-2.5 shadow-2xs animate-in fade-in">
                         <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                         <div>
-                            <span className="font-bold text-rose-950">⚠️ Vendor Availability Conflict: </span>
+                            <span className="font-bold text-rose-950">Installation team not available: </span>
                             <span>
-                                <strong>{editData.vendor}</strong> is marked unavailable on <strong>{activeDeliveryDate}</strong> ({vendorAvailabilityCheck.reason}). Please coordinate schedule with the vendor or adjust the delivery date.
+                                <strong>{editData.vendor}</strong> is marked not available on <strong>{activeDeliveryDate}</strong>{vendorAvailabilityCheck.reason ? ` (${vendorAvailabilityCheck.reason})` : ''}{vendorAvailabilityCheck.markedBy ? `, added by ${vendorAvailabilityCheck.markedBy}` : ''}. Coordinate with the installation team or change the delivery date.
                             </span>
                         </div>
                     </div>
@@ -319,13 +327,13 @@ export default function MaterialDeliveryTab({
                     <div className="pt-4 mt-4 border-t border-stone-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                                <IndianRupee size={11} /> Commission / Vendor Quote (₹)
+                                <IndianRupee size={11} /> Commission / Installation Team Quote (₹)
                             </label>
                             <input
                                 type="text"
                                 inputMode="decimal"
                                 disabled={!isEditable}
-                                placeholder="Enter vendor quote..."
+                                placeholder="Enter installation team quote..."
                                 value={editData.vendor_quote !== undefined && editData.vendor_quote !== null && editData.vendor_quote !== '' ? formatInputValue(editData.vendor_quote) : ''}
                                 onChange={e => setEditData(prev => ({ ...prev, vendor_quote: formatInputValue(e.target.value) }))}
                                 className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-300 font-semibold text-stone-700 disabled:bg-stone-100 disabled:text-stone-500"
@@ -333,7 +341,7 @@ export default function MaterialDeliveryTab({
                         </div>
                         <div>
                             <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                                <Calendar size={11} /> Vendor Payment Status
+                                <Calendar size={11} /> Installation Team Payment Status
                             </label>
                             <select
                                 disabled={!isEditable}
@@ -482,7 +490,7 @@ export default function MaterialDeliveryTab({
                                 <table>
                                     <tbody>
                                         <tr>
-                                            <td className="w-1/4 bg-stone-50 font-bold text-stone-600">Allotted Vendor:</td>
+                                            <td className="w-1/4 bg-stone-50 font-bold text-stone-600">Allotted Installation team:</td>
                                             <td className="w-1/4 font-bold text-stone-900">{editData?.vendor || '–'}</td>
                                             <td className="w-1/4 bg-stone-50 font-bold text-stone-600">Invoice Number:</td>
                                             <td className="w-1/4 font-bold text-stone-900">{editData?.invoice_no || '–'}</td>
@@ -604,7 +612,7 @@ export default function MaterialDeliveryTab({
                         <div className="bg-stone-50 border-b border-stone-100 p-4">
                             <h3 className="font-bold text-stone-800 text-sm flex items-center gap-2">
                                 <Building2 size={16} className="text-blue-500" />
-                                Confirm Vendor Assignment
+                                Confirm Installation Team Assignment
                             </h3>
                         </div>
                         <div className="p-5 space-y-4">
@@ -639,7 +647,7 @@ export default function MaterialDeliveryTab({
                                     await logActivity(
                                         user.id,
                                         'update',
-                                        `${customer.customer_name}: Assigned vendor to ${selectedVal}`,
+                                        `${customer.customer_name}: Assigned installation team ${selectedVal}`,
                                         '',
                                         customer.id
                                     );
@@ -656,7 +664,7 @@ export default function MaterialDeliveryTab({
                                         await logActivity(
                                             user.id,
                                             'email',
-                                            `Vendor notification triggered for ${selectedVal} (${res.recipient || 'no email found'})`,
+                                            `Installation team notification triggered for ${selectedVal} (${res.recipient || 'no email found'})`,
                                             '',
                                             customer.id
                                         );
@@ -679,7 +687,7 @@ export default function MaterialDeliveryTab({
                 </div>
             )}
 
-            {/* Vendor Availability Calendar Modal for Admin */}
+            {/* Shared calendar, to check installers before assigning a delivery */}
             {showVendorCalendarModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
                     <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-stone-200 p-6 relative">
@@ -689,8 +697,8 @@ export default function MaterialDeliveryTab({
                                     <Calendar className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-bold text-stone-900">Vendor Availability Schedule</h3>
-                                    <p className="text-[11px] text-stone-500">Inspect vendor availability before assigning delivery or installation batches</p>
+                                    <h3 className="text-sm font-bold text-stone-900">Calendar</h3>
+                                    <p className="text-[11px] text-stone-500">Check installation teams' days off, installations and trucks before assigning a delivery</p>
                                 </div>
                             </div>
                             <button
@@ -703,10 +711,9 @@ export default function MaterialDeliveryTab({
                             </button>
                         </div>
 
-                        <VendorCalendarView 
-                            vendorName={editData.vendor || 'Vendor 1'} 
-                            isAdmin={true} 
-                        />
+                        <Suspense fallback={<p role="status" className="py-10 text-center text-xs font-bold text-stone-400">Loading calendar…</p>}>
+                            <CalendarView currentUser={user} />
+                        </Suspense>
 
                         <div className="mt-6 pt-4 border-t border-stone-100 flex justify-end">
                             <button
@@ -714,7 +721,7 @@ export default function MaterialDeliveryTab({
                                 onClick={() => setShowVendorCalendarModal(false)}
                                 className="px-5 py-2 text-xs font-bold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl transition cursor-pointer"
                             >
-                                Close Schedule
+                                Close calendar
                             </button>
                         </div>
                     </div>

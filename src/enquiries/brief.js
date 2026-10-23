@@ -13,9 +13,9 @@ export const DATA_START_OPTIONS = ['Transfer existing data', 'Start fresh', 'Not
 export const INTEREST_OPTIONS = [
   'Option 1: Small team setup', 'Option 2: Detailed operations', 'A mix of both options', 'Tools only — no CRM',
   'Customer tracking', ...DOCUMENT_OPTIONS, 'Inventory',
-  'Vendor login', 'Technician login', 'Dealers',
+  'Installation team login', 'Technician login', 'Dealers',
   'Channel partner offices (CPOs)', 'Branches', 'Staff management',
-  'Installation view', 'Installation commission view', 'Vendor commission page',
+  'Installation view', 'Installation commission view', 'Installation team commission page',
   'Channel partner commission view', 'Operations page', 'Dealer-based filtering',
   'Finance', 'Attendance', 'Calendar', 'Checklists', 'Document uploads'
 ];

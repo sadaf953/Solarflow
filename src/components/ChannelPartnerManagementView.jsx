@@ -471,7 +471,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
         const name = oldName;
         const email = editingVendorEmail.trim();
         if (!email) {
-            showAlert('Vendor Email cannot be empty.');
+            showAlert('Installation Team Email cannot be empty.');
             return;
         }
 
@@ -483,7 +483,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
         try {
             const res = await runWrite(
                 supabase.from('vendors').update({ email }).eq('id', id).select('id'),
-                { action: 'vendor email change' }
+                { action: 'installer email change' }
             );
             if (!res.ok) throw res.error;
 
@@ -517,30 +517,30 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
                     : p
             ));
             setEditingId(null);
-            if (loginNote) showAlert('Vendor updated.' + loginNote, { type: 'success' });
-            await logActivity(currentUser?.id, 'operations', `Updated Vendor: "${oldName}" → "${name}" (${email})`);
+            if (loginNote) showAlert('Installation team updated.' + loginNote, { type: 'success' });
+            await logActivity(currentUser?.id, 'operations', `Updated Installation team: "${oldName}" → "${name}" (${email})`);
         } catch (e) {
             console.error('Error updating vendor:', e);
-            showAlert('Error updating vendor: ' + e.message, { type: 'error' });
+            showAlert('Error updating installation team: ' + e.message, { type: 'error' });
         }
     };
 
     // Delete Vendor
     const handleDeleteVendor = async (id, name) => {
-        if (!window.confirm(`Are you sure you want to delete vendor "${name}"?`)) return;
+        if (!window.confirm(`Are you sure you want to delete installation team "${name}"?`)) return;
 
         try {
             const res = await runWrite(
                 supabase.from('vendors').delete().eq('id', id).select('id'),
-                { action: 'vendor deletion' }
+                { action: 'installer deletion' }
             );
             if (!res.ok) throw res.error;
 
             setVendors(prev => prev.filter(v => v.id !== id));
-            await logActivity(currentUser?.id, 'operations', `Deleted Vendor: "${name}"`);
+            await logActivity(currentUser?.id, 'operations', `Deleted Installation team: "${name}"`);
         } catch (e) {
             console.error('Error deleting vendor:', e);
-            showAlert('Error deleting vendor: ' + e.message, { type: 'error' });
+            showAlert('Error deleting installation team: ' + e.message, { type: 'error' });
         }
     };
 
@@ -893,8 +893,8 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
                                             <Users className="w-5 h-5 text-stone-600 group-hover:text-amber-600 transition-colors duration-305" />
                                         </div>
                                         <div>
-                                            <h3 className="font-extrabold text-stone-800 text-xs group-hover:text-amber-600 transition-colors duration-305">Vendors Allotment</h3>
-                                            <p className="text-[11px] text-stone-400 font-medium mt-0.5">{vendors.length} active vendors</p>
+                                            <h3 className="font-extrabold text-stone-800 text-xs group-hover:text-amber-600 transition-colors duration-305">Installation Teams Allotment</h3>
+                                            <p className="text-[11px] text-stone-400 font-medium mt-0.5">{vendors.length} active installation teams</p>
                                         </div>
                                     </div>
                                     <span className="text-[11px] font-bold text-stone-600 group-hover:text-amber-650 flex items-center gap-1 transition-colors duration-305">
@@ -1206,9 +1206,9 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
                     addHandler = handleAddIntegration;
                     placeholder = 'Enter integration staff name...';
                 } else if (activeManageCategory === 'vendor') {
-                    title = 'Manage Vendors Allotment';
+                    title = 'Manage Installation Teams Allotment';
                     list = vendors;
-                    placeholder = 'Enter vendor name...';
+                    placeholder = 'Enter installation team name...';
                 } else if (activeManageCategory === 'driver') {
                     title = 'Manage Drivers';
                     list = drivers;
@@ -1315,7 +1315,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
                                         in this list made a directory entry with no login behind it -
                                         which is exactly what the "No Login in User Mgmt" badge flags. */}
                                     <p className="text-[11px] text-stone-500 font-medium">
-                                        Vendors are added in <b className="text-stone-700">User Management</b>, so the login and the
+                                        Installation teams are added in <b className="text-stone-700">User Management</b>, so the login and the
                                         directory entry are created together. This list is for reviewing them and correcting an email.
                                     </p>
                                 </div>
@@ -1382,7 +1382,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
                                                                 their own work. Stays locked until identities move to UUIDs. */}
                                                             <span
                                                                 className="flex-1 bg-stone-100 border border-stone-200 rounded-lg px-2.5 py-1 text-xs font-bold text-stone-500 truncate flex items-center"
-                                                                title="Vendor names cannot be changed - they link the vendor to their jobs"
+                                                                title="Installation team names cannot be changed - they link the installation team to their jobs"
                                                             >
                                                                 {editingVendorName}
                                                             </span>

@@ -35,7 +35,7 @@ const STAGE_FIELDS = {
         ['Panel Serial Numbers', 'panel_serial_no'], ['Integration By', 'integration_by'],
     ],
     [STAGE_IDS.MATERIAL_DELIVERY]: [
-        ['Vendor', 'vendor'], ['Invoice No.', 'invoice_no'], ['Delivery Date', 'material_delivery_date'],
+        ['Installation team', 'vendor'], ['Invoice No.', 'invoice_no'], ['Delivery Date', 'material_delivery_date'],
         ['Vehicle / Truck No.', 'vehicle_number', 'delivery_vehicle_no'], ['Driver Name', 'driver_name'],
         ['Driver Phone Number', 'driver_phone_number'], ['Delivery Status', 'delivery_status'],
     ],
@@ -45,7 +45,7 @@ const STAGE_FIELDS = {
         // commission is admin-only (MaterialDeliveryTab gates it on
         // user?.userType === 'admin'), and this component renders inside the
         // Dealer / Channel Partner portal.
-        ['Assigned Vendor', 'vendor'], ['Vendor Note / Give-up Reason', 'vendor_note'],
+        ['Assigned Installation team', 'vendor'], ['Installation Team Note / Give-up Reason', 'vendor_note'],
         ['Give-up Approved', 'vendor_give_up_approved'],
         ['Installation Note', 'installation_note'], ['Material Delivery Date', 'material_delivery_date'],
     ],

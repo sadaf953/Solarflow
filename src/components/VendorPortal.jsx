@@ -1,7 +1,7 @@
 import { useDemoTourNavigation } from '../demo/tour';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { supabase } from '../supabase';
-import { logActivity, uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, deleteDocument, toIndianCommas, updateDocumentRemark, normalizeInstallationStatus, updateAdminRecord, downloadFileWithSaveAs } from '../utils';
+import { lazyWithRetry, logActivity, uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, deleteDocument, toIndianCommas, updateDocumentRemark, normalizeInstallationStatus, updateAdminRecord, downloadFileWithSaveAs } from '../utils';
 import { 
     User, Phone, Mail, MapPin, Zap, Building2, CheckCircle2, ChevronRight, LogOut, Loader2, AlertCircle, AlertTriangle,
     Hash, Folder, Tag, ChevronLeft, Search, ClipboardList, Banknote, Calendar, ClipboardCheck,
@@ -13,7 +13,7 @@ import { ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE, STAGE_IDS, PRIMARY_STAGES, INSTAL
 import { isReturnedDocument } from './modal-tabs/shared';
 import { useGlobalPopup } from './GlobalPopup';
 import BrandMark from './BrandMark';
-import VendorCalendarView from './VendorCalendarView';
+const CalendarView = lazyWithRetry(() => import('./CalendarView'));
 
 const parsePanelSerials = (raw) => {
     if (!raw) return [''];
@@ -32,6 +32,21 @@ const parsePanelSerials = (raw) => {
         return raw.split(',').map(s => String(s).trim()).filter(Boolean);
     }
     return [raw.trim()];
+};
+
+// The three seeded installers used to be named "Vendor N" / "Demo Vendor N". Projects can
+// still be saved under either spelling, so every spelling of a number is an alias of the others.
+const INSTALLER_ALIASES = [
+    ['Installer 1', 'Demo Installer 1', 'Demo Installer', 'installer 1', 'Vendor 1', 'Demo Vendor 1', 'Demo Vendor', 'vendor 1'],
+    ['Installer 2', 'Demo Installer 2', 'Vendor 2', 'Demo Vendor 2'],
+    ['Installer 3', 'Demo Installer 3', 'Vendor 3', 'Demo Vendor 3'],
+];
+const installerNameAliases = (name) => {
+    const lower = String(name || '').toLowerCase();
+    if (lower.includes('installer 1') || lower.includes('vendor 1') || lower === 'installer' || lower === 'demo installer' || lower === 'installer1' || lower === 'demo vendor' || lower === 'vendor1') return INSTALLER_ALIASES[0];
+    if (lower.includes('installer 2') || lower.includes('vendor 2')) return INSTALLER_ALIASES[1];
+    if (lower.includes('installer 3') || lower.includes('vendor 3')) return INSTALLER_ALIASES[2];
+    return [];
 };
 
 export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoControls }) {
@@ -160,7 +175,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                     product_name: t.product_name,
                     make: t.default_make || 'Standard',
                     uom: t.uom || 'Nos',
-                    integration_by: t.default_integration || 'Vendor',
+                    integration_by: t.default_integration || 'Installer',
                     note: ''
                 })));
             }
@@ -177,7 +192,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                 product_name: t.product_name,
                 make: t.default_make || 'Standard',
                 uom: t.uom || 'Nos',
-                integration_by: t.default_integration || 'Vendor',
+                integration_by: t.default_integration || 'Installer',
                 note: ''
             })));
         } finally {
@@ -209,7 +224,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
 
         const cleanName = String(targetBomCust?.customer_name || 'Customer').replace(/[^a-zA-Z0-9_-]/g, '_');
         const cleanRef = String(targetBomCust?.folder_no || targetBomCust?.consumer_no || 'Site').replace(/[^a-zA-Z0-9_-]/g, '_');
-        const docTitle = `BOM_Vendor_Dispatch_${cleanName}_${cleanRef}`;
+        const docTitle = `BOM_Installer_Dispatch_${cleanName}_${cleanRef}`;
         const prevDocTitle = document.title;
 
         // Remove any old print portal
@@ -252,9 +267,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
             user?.email,
             (user?.email || '').toLowerCase().includes('deeproot') ? 'deeproot' : null,
             (user?.email || '').toLowerCase().includes('deeproot') ? 'test vendor' : null,
-            (user?.name || '').toLowerCase().includes('vendor 1') || (user?.name || '').toLowerCase().includes('demo vendor') ? 'vendor 1' : null,
-            (user?.name || '').toLowerCase().includes('vendor 1') || (user?.name || '').toLowerCase().includes('demo vendor') ? 'demo vendor 1' : null,
-            (user?.name || '').toLowerCase().includes('vendor 1') || (user?.name || '').toLowerCase().includes('demo vendor') ? 'demo vendor' : null
+            ...installerNameAliases(user?.name)
         ].filter(Boolean).map(s => String(s).trim().toLowerCase());
     }, [user?.channel_partner, user?.name, user?.title, user?.email]);
 
@@ -307,23 +320,10 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
             // Use profile name as fallback if not found in vendors table
             let searchNames = matchedVendorNames.length > 0 ? matchedVendorNames : (userName ? [userName] : []);
             
-            // Expand aliases so Vendor 1 can access all assigned customer projects
+            // Expand aliases so Installer 1 can access all assigned customer projects,
+            // whether they were saved under the new "Installer N" or the legacy "Vendor N" name
             const expanded = new Set(searchNames);
-            searchNames.forEach(n => {
-                const lower = n.toLowerCase();
-                if (lower.includes('vendor 1') || lower.includes('demo vendor 1') || lower === 'demo vendor' || lower === 'vendor1') {
-                    expanded.add('Vendor 1');
-                    expanded.add('Demo Vendor 1');
-                    expanded.add('Demo Vendor');
-                    expanded.add('vendor 1');
-                } else if (lower.includes('vendor 2') || lower.includes('demo vendor 2')) {
-                    expanded.add('Vendor 2');
-                    expanded.add('Demo Vendor 2');
-                } else if (lower.includes('vendor 3') || lower.includes('demo vendor 3')) {
-                    expanded.add('Vendor 3');
-                    expanded.add('Demo Vendor 3');
-                }
-            });
+            searchNames.forEach(n => installerNameAliases(n).forEach(alias => expanded.add(alias)));
             searchNames = Array.from(expanded);
 
             if (searchNames.length === 0) {
@@ -554,7 +554,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                     void logActivity(
                         user.id,
                         'update',
-                        `Vendor ${user.name || ''} uploaded Geo Tag Photo (${file.name})`,
+                        `Installation team ${user.name || ''} uploaded Geo Tag Photo (${file.name})`,
                         '',
                         selectedCust.id
                     );
@@ -675,7 +675,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
         if (activeTab === 'INSTALLATION') {
             addAuditChange('Installation Status', selectedCust?.installation_status, installationStatus);
             addAuditChange('Installation Date', selectedCust?.installation_date, effectiveInstallDate);
-            addAuditChange('Vendor Note', selectedCust?.vendor_note, vendorNote);
+            addAuditChange('Installation Team Note', selectedCust?.vendor_note, vendorNote);
         } else if (activeTab === 'GEO') {
             addAuditChange('Geo Tag Status', selectedCust?.geo_tag_status, geoTagStatus);
         }
@@ -751,7 +751,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
             const { ok, error } = await updateAdminRecord(selectedCust.id, updatePayload);
             if (!ok) throw error;
 
-            let logMsg = `Vendor ${user.name} updated ${
+            let logMsg = `Installation team ${user.name} updated ${
                 activeTab === 'DELIVERY' 
                     ? 'Material Delivery Details' 
                     : activeTab === 'INSTALLATION'
@@ -833,7 +833,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                 void logActivity(
                     user.id,
                     'update',
-                    `Vendor ${user.name} gave up installation for ${selectedCust.customer_name}${giveUpReason ? `: "${giveUpReason}"` : ''}`,
+                    `Installation team ${user.name} gave up installation for ${selectedCust.customer_name}${giveUpReason ? `: "${giveUpReason}"` : ''}`,
                     '',
                     selectedCust.id
                 );
@@ -975,7 +975,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
         <div className="min-h-screen bg-[#FCFBFA] text-stone-850 font-sans flex flex-col pb-8">
             {/* Top Header */}
             <header className="bg-white border-b border-stone-100 px-4 py-3 sticky top-0 z-30 flex items-center justify-between shadow-sm">
-                <BrandMark label="Vendor Portal" />
+                <BrandMark label="Installation Team Portal" />
                 <div className="flex items-center gap-3">
                     <div className="text-right">
                         <span className="text-xs font-bold text-stone-800 block truncate max-w-[150px]">{user.name}</span>
@@ -1014,14 +1014,14 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
             </header>
 
             {view === 'list' ? (
-                <main className={`flex-1 p-4 mx-auto w-full space-y-4 animate-in fade-in duration-300 ${activeTab === 'PAYOUTS' ? 'max-w-4xl' : 'max-w-md'}`}>
+                <main className={`flex-1 p-4 mx-auto w-full space-y-4 animate-in fade-in duration-300 ${['PAYOUTS', 'AVAILABILITY'].includes(activeTab) ? 'max-w-4xl' : 'max-w-md'}`}>
                     {/* Welcome banner */}
                     <div className="bg-stone-900 text-white p-5 rounded-[24px] shadow-lg relative overflow-hidden">
                         <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 opacity-[0.07]">
                             <BrandMark variant="white" size="lg" />
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                            <p className="text-[9px] uppercase tracking-widest text-amber-400 font-bold">Allotted Vendor</p>
+                            <p className="text-[9px] uppercase tracking-widest text-amber-400 font-bold">Allotted Installation team</p>
                             {user.email && (
                                 <span className="text-[10px] text-amber-200/90 font-mono bg-white/10 px-2 py-0.5 rounded-md border border-white/10">{user.email}</span>
                             )}
@@ -1109,7 +1109,9 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
 
                     {/* Customers List, Calendar, or Payouts Ledger */}
                     {activeTab === 'AVAILABILITY' ? (
-                        <VendorCalendarView vendorName={user.name} currentUser={user} />
+                        <Suspense fallback={<p role="status" className="py-10 text-center text-xs font-bold text-stone-400">Loading calendar…</p>}>
+                            <CalendarView currentUser={user} />
+                        </Suspense>
                     ) : activeTab === 'PAYOUTS' ? (
                         <div className="bg-white rounded-2xl border border-stone-100 p-4 shadow-sm space-y-4">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
@@ -2123,7 +2125,7 @@ export default function VendorPortal({ user, onLogout, onOpenDevSwitcher, demoCo
                                         </div>
                                         <div>
                                             <div className="border-b border-stone-400 pb-6 mb-1"></div>
-                                            <p className="font-black uppercase text-stone-900">Vendor Signature</p>
+                                            <p className="font-black uppercase text-stone-900">Installation Team Signature</p>
                                         </div>
                                     </div>
                                 </>

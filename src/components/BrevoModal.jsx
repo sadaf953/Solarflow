@@ -24,7 +24,7 @@ export default function BrevoModal({ isOpen, onClose, defaultUser = null }) {
     const [isSending, setIsSending] = useState(false);
     const [dispatchLogs, setDispatchLogs] = useState([
         { id: 1, time: '11:20 AM', channel: 'Email', recipient: 'nikhil.patel@solarflow.in', template: 'New User Credentials', status: 'Delivered' },
-        { id: 2, time: '10:45 AM', channel: 'SMS', recipient: '+91 98250 99881', template: 'Vendor Dispatch Notice', status: 'Delivered' },
+        { id: 2, time: '10:45 AM', channel: 'SMS', recipient: '+91 98250 99881', template: 'Installation Team Dispatch Notice', status: 'Delivered' },
         { id: 3, time: '09:15 AM', channel: 'WhatsApp', recipient: '+91 98790 44321', template: 'Customer Stage Update', status: 'Delivered' }
     ]);
 
@@ -152,7 +152,7 @@ export default function BrevoModal({ isOpen, onClose, defaultUser = null }) {
                                             <Smartphone className="w-3.5 h-3.5" /> 3. WhatsApp Business
                                         </div>
                                         <p className="text-[11px] text-stone-600 mt-1">
-                                            Official WhatsApp messages with PDF attachments for client proposals and vendor work orders.
+                                            Official WhatsApp messages with PDF attachments for client proposals and installation team work orders.
                                         </p>
                                     </div>
                                 </div>
@@ -342,7 +342,7 @@ export default function BrevoModal({ isOpen, onClose, defaultUser = null }) {
                                         <span className="text-[10px] font-bold uppercase text-emerald-700">WhatsApp Business Notification Preview</span>
                                         <div className="p-3 bg-white rounded-lg border border-emerald-200 text-xs text-stone-800 mt-2 space-y-1">
                                             <div className="font-bold text-emerald-900">☀️ SolarFlow Dispatch Update</div>
-                                            <p>Hello Vendor 1, a new installation job has been assigned for customer <strong>Ramesh Patel</strong> (Ahmedabad Plot 14). Delivery Date: <strong>2026-09-22</strong>.</p>
+                                            <p>Hello Installer 1, a new installation job has been assigned for customer <strong>Ramesh Patel</strong> (Ahmedabad Plot 14). Delivery Date: <strong>2026-09-22</strong>.</p>
                                             <div className="text-[11px] text-stone-400 pt-1">Reply ACCEPT to confirm schedule.</div>
                                         </div>
                                     </div>

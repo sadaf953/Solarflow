@@ -340,7 +340,7 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-stone-400 font-bold uppercase tracking-wide">Vendor / Tech</p>
+                                            <p className="text-stone-400 font-bold uppercase tracking-wide">Installation team / Tech</p>
                                             <p className="text-xs font-semibold text-amber-600 truncate mt-0.5">
                                                 {c.vendor || '–'}
                                             </p>

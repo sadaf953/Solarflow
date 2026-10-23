@@ -28,9 +28,9 @@ export default function DiscomInspectionTab({
                 <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-4 flex items-center gap-3">
                     <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0" />
                     <div>
-                        <p className="text-xs font-bold text-amber-900">Vendor & Admin Controlled Stage</p>
+                        <p className="text-xs font-bold text-amber-900">Installation team & Admin Controlled Stage</p>
                         <p className="text-[11px] text-amber-700 font-medium">
-                            Discom Inspection verification reports are configured directly by the Allotted Vendor or Admin. Office users have view-only access.
+                            Discom Inspection verification reports are configured directly by the Allotted Installation team or Admin. Office users have view-only access.
                         </p>
                     </div>
                 </div>

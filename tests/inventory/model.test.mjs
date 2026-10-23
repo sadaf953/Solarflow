@@ -35,3 +35,12 @@ test('reference partner, staff and office labels are explicitly fictional or com
   for(const line of design.items)if(line.integration_by)assert.ok(line.integration_by.startsWith('Demo ') || indianNames.has(line.integration_by));
  }
 });
+test('reserved stock is grouped per item and taken off what is free',async()=>{
+ const {groupReservations,freeStock}=await import('../../src/inventory/model.js');
+ const grouped=groupReservations([
+  {item_id:'a',customer_name:'Tom',quantity:'8'},{item_id:'a',customer_name:'Ina',quantity:6},
+  {item_id:'b',customer_name:'Ina',quantity:'0.1'},{item_id:'b',customer_name:'Sam',quantity:'0.2'},{item_id:'c',customer_name:'Zero',quantity:0}]);
+ assert.equal(grouped.get('a').quantity,14);assert.deepEqual(grouped.get('a').projects.map(p=>p.customer_name),['Tom','Ina']);
+ assert.equal(grouped.get('b').quantity,0.3);assert.equal(grouped.has('c'),false);
+ assert.equal(freeStock({stock_on_hand:'20'},14),6);assert.equal(freeStock({stock_on_hand:10},14),-4);assert.equal(freeStock({stock_on_hand:5}),5);
+});

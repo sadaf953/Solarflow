@@ -24,7 +24,7 @@ test('stages use at most two requirements, without photo or document flags',()=>
 test('full tour orders role handoffs and finance followups; CPO stays scoped',()=>{
  const titleIndex=text=>workflowTour.findIndex(s=>s.title.includes(text));
  assert.ok(titleIndex('Agent fills') < titleIndex('Prepare the customer BOM'));
- assert.ok(titleIndex('Vendor completes installation') < titleIndex('Vendor work and installation payment'));
+ assert.ok(titleIndex('Installation team completes installation') < titleIndex('Installation team work and installation payment'));
  assert.ok(titleIndex('Discom sends') < titleIndex('Stamp Maker uploads'));
  assert.ok(titleIndex('Stamp Maker uploads') < titleIndex('Returned stamp file'));
  assert.ok(titleIndex('First loan payment') < titleIndex('Second loan payment'));

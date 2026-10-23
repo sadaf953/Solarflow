@@ -30,7 +30,7 @@ const ChannelPartnerManagementView = lazyWithRetry(() => import('./ChannelPartne
 const InstallationPaymentsView = lazyWithRetry(() => import('./InstallationPaymentsView'));
 const InventoryView = lazyWithRetry(() => import('../inventory/InventoryView'));
 const DeliveryBatchesView = lazyWithRetry(() => import('./DeliveryBatchesView'));
-const VendorCalendarView = lazyWithRetry(() => import('./VendorCalendarView'));
+const CalendarView = lazyWithRetry(() => import('./CalendarView'));
 const AttendanceView = lazyWithRetry(() => import('./AttendanceView'));
 const ToolboxView = lazyWithRetry(() => import('./ToolboxView'));
 const DataExportView = lazyWithRetry(() => import('./DataExportView'));
@@ -236,6 +236,8 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         if (typeof window !== 'undefined') {
             if (window.location.hash.startsWith('#/quotations')) return 'quotations';
             const saved = window.sessionStorage.getItem('solarflow_current_view');
+            // Vendor Availability became the shared Calendar.
+            if (saved === 'vendor_availability') return 'calendar';
             if (saved && !['quotations', 'pricing'].includes(saved)) return saved;
         }
         return 'dashboard';
@@ -1347,7 +1349,6 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
     const isSystemView = [
         'attendance',
         'channel_partner_mgmt',
-        'vendor_availability',
         'installation_payments',
         'activity',
         'users',
@@ -1367,7 +1368,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                 : currentView === 'exports' ? 'Data Exports'
                 : currentView === 'channel_partner_mgmt' ? 'Operations'
                     : currentView === 'installation_payments' ? 'Installation Payments'
-                    : currentView === 'vendor_availability' ? 'Vendor Availability & Schedule'
+                    : currentView === 'calendar' ? 'Calendar'
                     : currentView === 'activity' ? 'Activity Log'
                         : currentView === 'users' ? 'User Management'
                             : currentView === 'trash' ? 'Trash'
@@ -1390,6 +1391,9 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     style={{ minHeight: 0, maxHeight: 'calc(100vh - 150px)', WebkitOverflowScrolling: 'touch' }}
                 >
                     <NavBtn view="dashboard" icon={LayoutDashboard} label="Dashboard" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                    {['admin', 'sales'].includes(user.userType) && (
+                        <NavBtn view="calendar" icon={Calendar} label="Calendar" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
+                    )}
                     {['admin', 'sales'].includes(user.userType) && <button onClick={() => { openQuotations(); setCurrentView('quotations'); setSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold mb-0.5 transition-colors cursor-pointer ${currentView === 'quotations' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'}`}><Tag className="w-4 h-4 flex-shrink-0" /> Quotation Maker</button>}
                     <button
                         onClick={() => { setCurrentView('toolbox'); setSidebarOpen(false); }}
@@ -1429,10 +1433,9 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     {user.userType === 'admin' && (
                         <div className="pt-2">
                             <p className="px-3 pt-3 pb-1 text-[10px] uppercase font-bold text-stone-500 tracking-widest">Systems</p>
-                            <SidebarGroup label="Team & administration" defaultOpen={false} activeKey={['attendance', 'channel_partner_mgmt', 'vendor_availability', 'installation_payments'].includes(currentView) ? currentView : null}>
+                            <SidebarGroup label="Team & administration" defaultOpen={false} activeKey={['attendance', 'channel_partner_mgmt', 'installation_payments'].includes(currentView) ? currentView : null}>
                                 <NavBtn view="attendance" icon={UserCheck} label="Staff Attendance & Leave" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                                 <NavBtn view="channel_partner_mgmt" icon={Users} label="Operations" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
-                                <NavBtn view="vendor_availability" icon={Calendar} label="Vendor Availability" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                                 <NavBtn view="installation_payments" icon={CreditCard} label="Installation Payments" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
                             </SidebarGroup>
                             <NavBtn view="activity" icon={Activity} label="Activity Log" count={0} currentView={currentView} selectedStage={selectedStage} setCurrentView={setCurrentView} setSelectedStage={setSelectedStage} setSidebarOpen={setSidebarOpen} />
@@ -1690,7 +1693,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
 
                     {currentView === 'attendance' && <AttendanceView currentUser={user} />}
                     {currentView === 'channel_partner_mgmt' && user.userType === 'admin' && <ChannelPartnerManagementView currentUser={user} />}
-                    {currentView === 'vendor_availability' && user.userType === 'admin' && <VendorCalendarView isAdmin={true} currentUser={user} />}
+                    {currentView === 'calendar' && ['admin', 'sales'].includes(user.userType) && <CalendarView currentUser={user} onOpenCustomer={setSelectedCustomer} />}
                     {currentView === 'installation_payments' && user.userType === 'admin' && <InstallationPaymentsView onSelectCustomer={setSelectedCustomer} currentUser={user} />}
                     {currentView === 'activity' && user.userType === 'admin' && <ActivityLogView />}
                     {currentView === 'users' && (user.userType === 'admin' || user.userType === 'channel_partner_office') && (

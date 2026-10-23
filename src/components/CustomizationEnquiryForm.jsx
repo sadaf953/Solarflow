@@ -12,7 +12,7 @@ export const DEFAULT_BASIC_VERSION_URL = 'https://solarflow.deeprootsystems.in';
 
 const OTHER_INTEREST_OPTIONS = [
     'Inventory',
-    'Installation view', 'Installation commission view', 'Vendor commission page',
+    'Installation view', 'Installation commission view', 'Installation team commission page',
     'Channel partner commission view', 'Attendance', 'Calendar'
 ];
 const DOCUMENT_COPY = {

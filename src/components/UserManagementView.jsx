@@ -343,7 +343,7 @@ function CreateUserModal({ onClose, onCreated, currentUser, branchOptions = [] }
                 }
 
                 // Vendor directory sync
-                if (finalForm.user_type === 'vendor' || finalForm.role === 'Vendors' || (finalForm.role || '').toLowerCase().includes('vendor')) {
+                if (finalForm.user_type === 'vendor' || finalForm.role === 'Vendors' || finalForm.role === 'Installers' || finalForm.role === 'Installation Teams' || (finalForm.role || '').toLowerCase().includes('vendor')) {
                     try {
                         const { data: existingVendor } = await supabase
                             .from('vendors')
@@ -476,7 +476,7 @@ function CreateUserModal({ onClose, onCreated, currentUser, branchOptions = [] }
                 }
             }
             // If the created user is a vendor, check if present in vendors table; if not, auto-add
-            if (finalForm.user_type === 'vendor' || finalForm.role === 'Vendors' || (finalForm.role || '').toLowerCase().includes('vendor')) {
+            if (finalForm.user_type === 'vendor' || finalForm.role === 'Vendors' || finalForm.role === 'Installers' || finalForm.role === 'Installation Teams' || (finalForm.role || '').toLowerCase().includes('vendor')) {
                 try {
                     const { data: existingVendor } = await supabase
                         .from('vendors')
@@ -496,12 +496,12 @@ function CreateUserModal({ onClose, onCreated, currentUser, branchOptions = [] }
                             });
                         if (vendorInsertErr) {
                             console.warn('User created, but adding them to the Vendors directory failed:', vendorInsertErr.message);
-                            directoryWarning = `The login for ${finalForm.name} was created, but adding them to the Operations vendor directory failed. They will not appear under Operations > Vendors - tell your developer.`;
+                            directoryWarning = `The login for ${finalForm.name} was created, but adding them to the Operations installation team directory failed. They will not appear under Operations > Installation teams - tell your developer.`;
                         }
                     }
                 } catch (vErr) {
                     console.warn('Vendor table sync warning:', vErr);
-                    directoryWarning = `The login for ${finalForm.name} was created, but the Operations vendor directory could not be checked. Confirm they appear under Operations > Vendors.`;
+                    directoryWarning = `The login for ${finalForm.name} was created, but the Operations installation team directory could not be checked. Confirm they appear under Operations > Installation teams.`;
                 }
             }
 
@@ -813,11 +813,11 @@ export const DEFAULT_SYSTEM_USERS = [
     },
     {
         id: 'system-user-vendor',
-        name: 'Vendor 1',
+        name: 'Installer 1',
         email: 'vendor@solarflow.demo',
         password: 'SolarFlow@2026',
         user_type: 'vendor',
-        role: 'Vendors',
+        role: 'Installers',
         channel_partner: 'Demo Aurora Solar',
         status: 'active'
     },
@@ -1129,7 +1129,7 @@ function AccountManagementView({ currentUser, initialShowCreate = false }) {
                             .ilike('email', previousEmail)
                             .select('id');
                         if (vRows && vRows.length > 0) {
-                            vendorSyncNote = ' The matching Operations vendor entry was updated too.';
+                            vendorSyncNote = ' The matching Operations installation team entry was updated too.';
                         }
                     } catch (vErr) {
                         console.warn('Vendor directory email sync warning:', vErr);

@@ -2316,7 +2316,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                     </h5>
                                     <div className="divide-y divide-stone-200/50 text-xs">
                                         <div className="flex items-center justify-between py-2">
-                                            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Vendor Allotment</span>
+                                            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Installation Team Allotment</span>
                                             <span className="font-semibold text-stone-900">{selectedCust.vendor || '–'}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-2">
@@ -2364,8 +2364,8 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                             <span className="font-semibold text-stone-900">{selectedCust.installation_date || '–'}</span>
                                         </div>
                                         <div className="flex items-center justify-between py-2">
-                                            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Installed By (Allotted Vendor)</span>
-                                            <span className="font-semibold text-stone-900">{selectedCust.vendor || 'No vendor allotted'}</span>
+                                            <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Installed By (Allotted Installation team)</span>
+                                            <span className="font-semibold text-stone-900">{selectedCust.vendor || 'No installation team allotted'}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -2744,7 +2744,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                         </h5>
                                         <div className="divide-y divide-stone-200/50 text-xs">
                                             <div className="flex items-center justify-between py-2">
-                                                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Vendor Allotment</span>
+                                                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Installation Team Allotment</span>
                                                 <span className="font-semibold text-stone-900">{selectedCust.vendor || '–'}</span>
                                             </div>
                                             <div className="flex items-center justify-between py-2">
@@ -2777,8 +2777,8 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                                                 <span className="font-semibold text-stone-900">{selectedCust.installation_date || '–'}</span>
                                             </div>
                                             <div className="flex items-center justify-between py-2">
-                                                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Installed By (Allotted Vendor)</span>
-                                                <span className="font-semibold text-stone-900">{selectedCust.vendor || 'No vendor allotted'}</span>
+                                                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Installed By (Allotted Installation team)</span>
+                                                <span className="font-semibold text-stone-900">{selectedCust.vendor || 'No installation team allotted'}</span>
                                             </div>
                                             <div className="flex items-center justify-between py-2">
                                                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wide">Geo Tag Photo</span>

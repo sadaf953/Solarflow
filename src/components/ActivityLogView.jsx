@@ -14,13 +14,13 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { Activity, RefreshCw } from 'lucide-react';
-import { ACTION_COLORS } from '../constants';
+import { ACTION_COLORS, readableLogText } from '../constants';
 
 const ACTION_FILTER_OPTIONS = [
     { value: 'all', label: 'All activities' },
     { value: 'attendance', label: 'Staff Attendance' },
     { value: 'operations', label: 'Operations & Directory' },
-    { value: 'vendor', label: 'Vendor Availability' },
+    { value: 'vendor', label: 'Installation Team Availability' },
     { value: 'payment', label: 'Installation Payments' },
     { value: 'dispatch', label: 'Delivery & Dispatch' },
     { value: 'stage_change', label: 'Stage Transitions' },
@@ -255,8 +255,8 @@ export default function ActivityLogView() {
                         );
                     })()}
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm text-stone-800">{log.message}</p>
-                        {log.new_value && <p className="text-xs text-stone-500 mt-0.5">{log.new_value}</p>}
+                        <p className="text-sm text-stone-800">{readableLogText(log.message)}</p>
+                        {log.new_value && <p className="text-xs text-stone-500 mt-0.5">{readableLogText(log.new_value)}</p>}
                         <p className="text-[10px] text-stone-400 mt-1 font-bold uppercase">
                             {actorNames.get(log.user_id) || (log.user_id ? 'Unknown' : 'System')} • {new Date(log.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
                         </p>

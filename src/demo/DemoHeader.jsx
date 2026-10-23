@@ -7,7 +7,7 @@ import { quickTour, workflowTour, workflowChapters } from './tourSteps';
 import RolePicker from './RolePicker';
 import QuoteOnWhatsApp from './QuoteOnWhatsApp';
 import { quoteWhatsAppLink } from './whatsapp';
-const roleLabels={admin:'Admin',sales:'Office',agent:'Channel Partner',agent2:'Dealer',vendor:'Vendor',stamp:'Stamp Maker',channel_partner_office:'Channel Partner Office',office2:'Manager'};
+const roleLabels={admin:'Admin',sales:'Office',agent:'Channel Partner',agent2:'Dealer',vendor:'Installation team',stamp:'Stamp Maker',channel_partner_office:'Channel Partner Office',office2:'Manager'};
 export default function DemoHeader({user,onTourRoleSwitch,children}){
  const [rolePickerOpen,setRolePickerOpen]=useState(false);
  const [tourMode,setTourMode]=useState('quick');const [menuOpen,setMenuOpen]=useState(false);

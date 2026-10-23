@@ -41,23 +41,23 @@ export const PACKAGES = [
     ],
   },
   {
-    id: 'pro', name: 'Pro', price: 65000, range: [60000, 80000], tagline: 'Godown, delivery and installers',
+    id: 'pro', name: 'Pro', price: 65000, range: [60000, 80000], tagline: 'Godown, delivery and installation teams',
     logins: 'Up to 50 users', maxUsers: 50,
-    who: 'Admin, Staff, Dealer, Installer, Godown', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
+    who: 'Admin, Staff, Dealer, Installation team, Godown', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
     highlights: ['Everything in Growth', 'Delivery bundle – delivery batches, BOM, challan, gate pass, truck loading sheet', 'Inventory (godown)', 'Installation bundle + installation team commissions · 90 days support'],
     includes: [
       'Everything in Growth',
       'Stage-by-stage customer card – a tab for every stage',
       'Godown stock, BOM & material checklist',
       'Delivery challan, truck loading sheet & gate pass',
-      'Installer logins with job assignment',
+      'Installation team logins with job assignment',
       'Setup + training call, WhatsApp support for 90 days',
     ],
   },
   {
     id: 'complete', name: 'Complete', price: 80000, range: [80000, null], tagline: 'Branches and the full operation',
     logins: 'Unlimited users', maxUsers: null,
-    who: 'Admin, Staff, Dealer, Installer, Godown, Branch', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
+    who: 'Admin, Staff, Dealer, Installation team, Godown, Branch', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
     highlights: ['Everything in Pro', 'Branch office logins', 'Attendance and calendar', 'Commercial projects – launching soon', 'Unlimited users · priority support'],
     includes: [
       'Everything in Pro',
@@ -122,9 +122,9 @@ export const STAGE_CARD = {
     { id: 'Cash', who: 'Accounts', skip: true, fields: [['Total Amount', '–'], ['Payments', '–'], ['Total Received', '–'], ['Balance Remaining', '–']], needs: ['Payment Type'] },
     { id: 'Material Order', who: 'Store / purchase', fields: [['Roof / Shed', 'Roof'], ['DC Cable', '30 m'], ['AC Cable', '15 m'], ['Front Leg Height', '1 ft'], ['Rear Leg Height', '3 ft'], ['Invoice Value', '₹1,80,000'], ['Notes / Instructions', 'Deliver before 10 Oct']], needs: ['Roof / Shed', 'Invoice Value'] },
     { id: 'Material Integration', who: 'Store', fields: [['Inverter Make', 'DemoVolt'], ['Inverter Serial No.', 'INV-0001'], ['Panel Serial Numbers', 'PNL-0001 … PNL-0006'], ['Integration By', 'Demo Store']], needs: ['Inverter Make', 'Inverter Serial Number'] },
-    { id: 'Material Delivery', who: 'Store / driver', fields: [['Vendor', 'Demo Installers'], ['Invoice No.', 'INV-2026-044'], ['Delivery Date', '12 Oct 2026'], ['Vehicle / Truck No.', 'XX 00 AB 0001'], ['Driver Name', 'Demo Driver'], ['Driver Phone Number', '90000 00002'], ['Delivery Status', 'Out for delivery']], needs: ['Vendor Allotment', 'Delivery Date'] },
-    { id: 'Installation Status', who: 'Installer', fields: [['Installation Status', '–'], ['Installation Date', '–'], ['Assigned Vendor', 'Demo Installers'], ['Installation Note', '–']], needs: ['Installation Status must be Installed'] },
-    { id: 'Geo Tag Photo', who: 'Installer', fields: [['Geo Tag Status', '–'], ['Geo Tag Image', '–']], needs: ['Geo Tag Status must be Proceed'] },
+    { id: 'Material Delivery', who: 'Store / driver', fields: [['Installation team', 'Demo Installation Team'], ['Invoice No.', 'INV-2026-044'], ['Delivery Date', '12 Oct 2026'], ['Vehicle / Truck No.', 'XX 00 AB 0001'], ['Driver Name', 'Demo Driver'], ['Driver Phone Number', '90000 00002'], ['Delivery Status', 'Out for delivery']], needs: ['Installation Team Allotment', 'Delivery Date'] },
+    { id: 'Installation Status', who: 'Installation team', fields: [['Installation Status', '–'], ['Installation Date', '–'], ['Assigned Installation team', 'Demo Installation Team'], ['Installation Note', '–']], needs: ['Installation Status must be Installed'] },
+    { id: 'Geo Tag Photo', who: 'Installation team', fields: [['Geo Tag Status', '–'], ['Geo Tag Image', '–']], needs: ['Geo Tag Status must be Proceed'] },
     { id: 'DISCOM Submission', who: 'Office / DISCOM', fields: [['Submitted By', '–'], ['Submission Date', '–'], ['First Party', '–'], ['Second Party', '–'], ['Stamp Value', '–'], ['Agreement Execution Date', '–']], needs: ['Submitted By and Date'] },
     { id: 'Meter Installation', who: 'DISCOM', fields: [['Meter Installation', '–'], ['Meter Installation Date', '–'], ['Meter Installation Photo', '–']], needs: ['Meter Installation must be Yes', 'Installation Date'] },
     { id: 'DISCOM Inspection', who: 'DISCOM', fields: [['DISCOM Inspection', '–']], needs: ['DISCOM Inspection must be Yes'] },
@@ -142,7 +142,7 @@ export const SIMPLE_CARD = {
   tags: ['Subsidy Redeem Pending', 'Subsidy Disbursement Pending', '2nd Payment', '3rd Payment', 'Pending Cheque', 'Received Cheque'],
   overview: [
     { title: 'Customer Info', icon: 'User', fields: [['Phone', '90000 00001'], ['Email', 'demo.customer@example.com'], ['Aadhar', 'XXXX XXXX 0001'], ['POC', 'Demo Sales'], ['Branch', 'Head Office'], ['Location', 'Demo Village']] },
-    { title: 'Project & Technical', icon: 'Zap', fields: [['Capacity (kWp)', '3.6'], ['Type', 'On-Grid'], ['Vendor', 'Demo Installers'], ['Meter Cat', 'LT-1 Domestic'], ['EB Number', 'DEMO-244001'], ['DTR Code', 'DTR-0001'], ['Sanctioned Load', '5 kW'], ['DISCOM Div', 'Demo Division']] },
+    { title: 'Project & Technical', icon: 'Zap', fields: [['Capacity (kWp)', '3.6'], ['Type', 'On-Grid'], ['Installation team', 'Demo Installation Team'], ['Meter Cat', 'LT-1 Domestic'], ['EB Number', 'DEMO-244001'], ['DTR Code', 'DTR-0001'], ['Sanctioned Load', '5 kW'], ['DISCOM Div', 'Demo Division']] },
     { title: 'Application Links', icon: 'FolderOpen', fields: [['Google Docs Link', 'drive.google.com/…'], ['Location Link', 'maps.google.com/…']] },
   ],
   finance: [
@@ -188,7 +188,7 @@ export const LOGIN_TYPES = [
   { id: 'admin', label: 'Admin', from: 'starter' },
   { id: 'staff', label: 'Staff', from: 'starter' },
   { id: 'dealer', label: 'Dealer', from: 'starter', dealers: true },
-  { id: 'installer', label: 'Installer', from: 'pro', stock: true },
+  { id: 'installer', label: 'Installation team', from: 'pro', stock: true },
   { id: 'godown', label: 'Godown', from: 'pro', stock: true },
   { id: 'branch', label: 'Branch', from: 'complete', branches: true },
 ];
@@ -304,11 +304,11 @@ export const ADDONS = [
   { id: 'delivery', group: 'Bundles', label: 'Delivery bundle', price: 7000, from: 'pro',
     example: 'Delivery batches page, BOM maker, delivery challan, gate pass and truck loading sheet.', docs: ['bom', 'truck', 'gatepass'] },
   { id: 'installation', group: 'Bundles', label: 'Installation bundle', price: 5000, from: 'pro',
-    example: 'Installer logins with job assignment, installation view, geo-tag photos and installer payments.' },
+    example: 'Installation team logins with job assignment, installation view, geo-tag photos and installation team payments.' },
 
   { id: 'godown', group: 'Stand-alone', label: 'Inventory (godown)', price: 5500, from: 'pro', example: 'Stock on hand, movements and daily godown report.' },
   { id: 'attendance', group: 'Stand-alone', label: 'Attendance', price: 4000, from: 'complete', example: 'Daily check-in for office and site staff.' },
-  { id: 'calendar', group: 'Stand-alone', label: 'Calendar', price: 2000, from: 'complete', example: 'Team and installer calendar.' },
+  { id: 'calendar', group: 'Stand-alone', label: 'Calendar', price: 2000, from: 'complete', example: 'Team and installation team calendar.' },
 
   { id: 'commission_dealer', group: 'Commissions', label: 'For dealers', price: 4000, from: 'growth', exclusive: 'commission' },
   { id: 'commission_install', group: 'Commissions', label: 'For installation team', price: 3500, from: 'pro', exclusive: 'commission' },

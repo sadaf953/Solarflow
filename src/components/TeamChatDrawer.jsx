@@ -58,7 +58,7 @@ const getInitialMessages = () => {
         {
             id: 'msg-4',
             senderName: 'Site Installation Lead',
-            senderRole: 'Vendor',
+            senderRole: 'Installation team',
             userType: 'vendor',
             text: 'Completed rooftop mounting structure and inverter wiring for consumer Ramesh Patel. Geo-tag photos submitted.',
             tag: 'Installation',
@@ -92,7 +92,7 @@ const ROLE_BADGES = {
     office2: { label: 'CPO Manager', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' },
     agent: { label: 'Dealer', color: 'bg-amber-100 text-amber-900 border-amber-300' },
     agent2: { label: 'Dealer', color: 'bg-amber-100 text-amber-900 border-amber-300' },
-    vendor: { label: 'Vendor', color: 'bg-orange-100 text-orange-900 border-orange-300' },
+    vendor: { label: 'Installation team', color: 'bg-orange-100 text-orange-900 border-orange-300' },
     stamp: { label: 'Stamp Maker', color: 'bg-yellow-100 text-yellow-900 border-yellow-300' },
     sales: { label: 'Staff', color: 'bg-stone-100 text-stone-800 border-stone-200' }
 };
@@ -361,7 +361,7 @@ export default function TeamChatDrawer({ currentUser }) {
                                     </span>
                                 </div>
                                 <p className="text-[10px] text-stone-400">
-                                    Shared bulletin: Admin, Partners, Vendors & Stamp Maker
+                                    Shared bulletin: Admin, Partners, Installation teams & Stamp Maker
                                 </p>
                             </div>
                         </div>

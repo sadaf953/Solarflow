@@ -74,9 +74,9 @@ export default function InstallationStatusTab({
         
         let logMsg = `${customer.customer_name}: Updated Installation Status to ${editData.installation_status || 'None'}`;
         if (editData.installation_status === 'Installed') {
-            logMsg += ` (Date: ${editData.installation_date || 'N/A'}, Installed By Vendor: ${editData.vendor || 'N/A'})`;
+            logMsg += ` (Date: ${editData.installation_date || 'N/A'}, Installed By Installation team: ${editData.vendor || 'N/A'})`;
         } else if (editData.installation_status === 'Giveup') {
-            logMsg += ` (Vendor Give Up - Allotted Vendor: ${editData.vendor || 'None'})`;
+            logMsg += ` (Installation Team Give Up - Allotted Installation team: ${editData.vendor || 'None'})`;
         }
         if (editData.installation_note) {
             logMsg += ` [Note: ${editData.installation_note}]`;
@@ -144,7 +144,7 @@ export default function InstallationStatusTab({
                 <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
                     <div>
                         <h4 className="text-xs font-bold text-stone-700 uppercase tracking-widest">Installation Status <span className="text-red-500">*</span></h4>
-                        <p className="text-[11px] text-stone-500 font-medium mt-0.5">Track current physical installation state & vendor assignment.</p>
+                        <p className="text-[11px] text-stone-500 font-medium mt-0.5">Track current physical installation state & installation team assignment.</p>
                     </div>
                     {isEditable && (
                         (editData.installation_status !== customer.installation_status) ||
@@ -225,9 +225,9 @@ export default function InstallationStatusTab({
                                 <div className="flex items-start gap-2">
                                     <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
                                     <div>
-                                        <h5 className="text-xs font-bold text-rose-900">Vendor Give Up Request</h5>
+                                        <h5 className="text-xs font-bold text-rose-900">Installation Team Give Up Request</h5>
                                         <p className="text-[11px] text-rose-700 font-medium">
-                                            Vendor <b>{customer.vendor || editData.vendor || 'Assigned Vendor'}</b> has requested to give up this installation.
+                                            Installation team <b>{customer.vendor || editData.vendor || 'Assigned Installation team'}</b> has requested to give up this installation.
                                         </p>
                                     </div>
                                 </div>
@@ -245,14 +245,14 @@ export default function InstallationStatusTab({
                             {/* Vendor Note / Reason (Viewable and Editable by Admin) */}
                             <div className="space-y-1 bg-white p-3 rounded-xl border border-rose-200/70 shadow-xs">
                                 <label className="text-[9px] font-bold text-rose-800 uppercase tracking-wider block">
-                                    Vendor Give Up Reason / Note
+                                    Installation Team Give Up Reason / Note
                                 </label>
                                 {isEditable && !(editData.vendor_give_up_approved || customer.vendor_give_up_approved) ? (
                                     <textarea
                                         rows={2}
                                         value={editData.vendor_note || ''}
                                         onChange={e => setEditData(prev => ({ ...prev, vendor_note: e.target.value }))}
-                                        placeholder="Vendor reason or remarks..."
+                                        placeholder="Installation team reason or remarks..."
                                         className="w-full bg-rose-50/30 border border-rose-200 rounded-lg p-2 text-xs text-rose-950 font-medium focus:outline-none focus:ring-1 focus:ring-rose-400 placeholder:text-rose-300"
                                     />
                                 ) : (
@@ -282,7 +282,7 @@ export default function InstallationStatusTab({
                                                 await logActivity(
                                                     user.id,
                                                     'update',
-                                                    `${customer.customer_name}: Approved vendor give up request (${customer.vendor || editData.vendor})`,
+                                                    `${customer.customer_name}: Approved installation team give up request (${customer.vendor || editData.vendor})`,
                                                     '',
                                                     customer.id
                                                 );
@@ -294,7 +294,7 @@ export default function InstallationStatusTab({
                                         </button>
                                     ) : (
                                         <span className="text-xs text-emerald-800 font-bold flex items-center gap-1">
-                                            <CheckCircle2 size={14} className="text-emerald-600" /> Give up approved. Assign a new vendor below.
+                                            <CheckCircle2 size={14} className="text-emerald-600" /> Give up approved. Assign a new installation team below.
                                         </span>
                                     )}
                                 </div>
@@ -307,7 +307,7 @@ export default function InstallationStatusTab({
                                 <div className="flex-1 min-w-[200px]">
                                     <div className="flex items-center gap-1.5 mb-1">
                                         <Building2 size={13} className="text-amber-500" />
-                                        <p className="text-[10px] text-stone-700 uppercase tracking-wide font-bold">Assign New Vendor</p>
+                                        <p className="text-[10px] text-stone-700 uppercase tracking-wide font-bold">Assign New Installation team</p>
                                     </div>
                                     <select
                                         disabled={!isEditable}
@@ -327,7 +327,7 @@ export default function InstallationStatusTab({
                                                     logActivity(
                                                         user.id,
                                                         'update',
-                                                        `${customer.customer_name}: Removed assigned vendor`,
+                                                        `${customer.customer_name}: Removed assigned installation team`,
                                                         '',
                                                         customer.id
                                                     ).then(fetchLogs);
@@ -336,7 +336,7 @@ export default function InstallationStatusTab({
                                         }}
                                         className="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-300 font-semibold text-stone-700 disabled:bg-stone-100 disabled:text-stone-500"
                                     >
-                                        <option value="">Select New Vendor...</option>
+                                        <option value="">Select New Installation team...</option>
                                         {vendors.map(v => (
                                             <option key={v} value={v}>{v}</option>
                                         ))}
@@ -361,7 +361,7 @@ export default function InstallationStatusTab({
                                                     await logActivity(
                                                         user.id,
                                                         'email',
-                                                        `Vendor notification triggered for new vendor ${editData.vendor} (${res.recipient || 'no email found'})`,
+                                                        `Installation team notification triggered for new installation team ${editData.vendor} (${res.recipient || 'no email found'})`,
                                                         '',
                                                         customer.id
                                                     );
@@ -380,7 +380,7 @@ export default function InstallationStatusTab({
                                             }`}
                                         >
                                             <Mail className="w-3.5 h-3.5" />
-                                            {sendingInfo ? 'Sending...' : 'Resend Info to New Vendor'}
+                                            {sendingInfo ? 'Sending...' : 'Resend Info to New Installation team'}
                                         </button>
                                         {infoSentStatus === 'sent' && (
                                             <p className="text-[8px] font-bold text-emerald-600 mt-0.5 animate-in fade-in duration-200">
@@ -416,11 +416,11 @@ export default function InstallationStatusTab({
                         </div>
                         <div>
                             <label className="text-[9px] font-bold text-stone-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
-                                <User size={11} /> Installed By (Allotted Vendor)
+                                <User size={11} /> Installed By (Allotted Installation team)
                             </label>
                             <div className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs font-bold text-stone-800 flex items-center gap-2 min-h-[38px]">
                                 <Building2 size={13} className="text-amber-600 flex-shrink-0" />
-                                <span>{currentVendor || 'No vendor allotted yet'}</span>
+                                <span>{currentVendor || 'No installation team allotted yet'}</span>
                             </div>
                         </div>
                     </div>
@@ -448,7 +448,7 @@ export default function InstallationStatusTab({
                         <div className="bg-stone-50 border-b border-stone-100 p-4">
                             <h3 className="font-bold text-stone-800 text-sm flex items-center gap-2">
                                 <Building2 size={16} className="text-blue-500" />
-                                Confirm Vendor Assignment
+                                Confirm Installation Team Assignment
                             </h3>
                         </div>
                         <div className="p-5 space-y-4">
@@ -483,7 +483,7 @@ export default function InstallationStatusTab({
                                     await logActivity(
                                         user.id,
                                         'update',
-                                        `${customer.customer_name}: Assigned vendor to ${selectedVal}`,
+                                        `${customer.customer_name}: Assigned installation team to ${selectedVal}`,
                                         '',
                                         customer.id
                                     );
@@ -500,7 +500,7 @@ export default function InstallationStatusTab({
                                         await logActivity(
                                             user.id,
                                             'email',
-                                            `Vendor notification triggered for ${selectedVal} (${res.recipient || 'no email found'})`,
+                                            `Installation team notification triggered for ${selectedVal} (${res.recipient || 'no email found'})`,
                                             '',
                                             customer.id
                                         );
