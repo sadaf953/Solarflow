@@ -4,6 +4,7 @@ import { Users, Plus, Award, Trash2, Tag, ShieldCheck, BarChart2, X, Check, Edit
 import { logActivity, runWrite } from '../utils';
 import { useGlobalPopup } from './GlobalPopup';
 import { downloadCsv, exportDate, fetchAllPages, PARTNER_COLUMNS } from '../utils/exportCsv';
+import { defaultCommission } from '../constants';
 
 const normalizeDirectoryLabel = (value) => String(value || '').trim().toLocaleLowerCase();
 
@@ -758,6 +759,7 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
                 ['Payment type', r => r.payment_type],
                 ['System (kWp)', r => r.system_capacity_kwp],
                 ['Project value (₹)', r => r.invoice_value],
+                ['Commission (₹)', r => defaultCommission(r.system_capacity_kwp)],
                 ['Registration date', r => r.registration_date],
                 ['Installation status', r => r.installation_status],
                 ['Installation date', r => r.installation_date],

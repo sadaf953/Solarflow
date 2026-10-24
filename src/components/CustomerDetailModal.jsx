@@ -17,7 +17,7 @@ import {
     LayoutDashboard, History, Plus, ShieldCheck, Lock, Unlock, ClipboardList, Banknote, Tag, Mail, PauseCircle, Check, CheckCircle2,
     Eye, Search, Image as ImageIcon, MessageSquare, Calendar, Phone, Clock, HardDrive, ExternalLink
 } from 'lucide-react';
-import { PRIMARY_STAGES, STAGE_IDS, SUBSIDY_TAGS, SUBSIDY_TAG_COLORS, LOAN_TAGS, LOAN_TAG_COLORS, ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE, DOC_TYPE_LABELS, DOC_TYPE_FLAG_COLUMN, logFieldLabel } from '../constants';
+import { PRIMARY_STAGES, STAGE_IDS, SUBSIDY_TAGS, SUBSIDY_TAG_COLORS, LOAN_TAGS, LOAN_TAG_COLORS, ROOF_BOM_TEMPLATE, SHED_BOM_TEMPLATE, DOC_TYPE_LABELS, DOC_TYPE_FLAG_COLUMN, logFieldLabel, skipsStage, nextStageFor } from '../constants';
 import { logActivity, formatDateToDDMMYYYY, formatINR, parseIndianNumber, fetchAgent2SubAgents, normalizeMeterInstallation, sanitizePhoneNumber, getTelephoneHref } from '../utils';
 import { supabase } from '../supabase';
 import HistoryEntryEditor from './HistoryEntryEditor';
@@ -893,52 +893,9 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
         return result;
     };
 
-    const hasNextStage = (() => {
-        const currentIdx = PRIMARY_STAGES.findIndex(s => s.id === editData.stage);
-        if (currentIdx === -1) return false;
-        if (editData.stage === STAGE_IDS.COMPLETED || editData.stage === STAGE_IDS.LOST_PROJECT) return false;
-
-        let nextIdx = currentIdx + 1;
-        if (nextIdx >= PRIMARY_STAGES.length) return false;
-
-        let nextStage = PRIMARY_STAGES[nextIdx];
-        if (nextStage.id === STAGE_IDS.LOAN && editData.payment_type?.trim().toLowerCase() === 'cash') {
-            nextIdx++;
-        }
-        if (nextStage.id === STAGE_IDS.CASH && editData.payment_type?.trim().toLowerCase() === 'loan') {
-            nextIdx++;
-        }
-        if (nextIdx < PRIMARY_STAGES.length && (PRIMARY_STAGES[nextIdx].id === STAGE_IDS.LOST_PROJECT)) {
-            nextIdx++;
-        }
-
-        return nextIdx < PRIMARY_STAGES.length && PRIMARY_STAGES[nextIdx].id !== STAGE_IDS.LOST_PROJECT;
-    })();
-
-    const nextStageId = (() => {
-        const currentIdx = PRIMARY_STAGES.findIndex(s => s.id === editData.stage);
-        if (currentIdx === -1) return null;
-        if (editData.stage === STAGE_IDS.COMPLETED || editData.stage === STAGE_IDS.LOST_PROJECT) return null;
-
-        let nextIdx = currentIdx + 1;
-        if (nextIdx >= PRIMARY_STAGES.length) return null;
-
-        let nextStage = PRIMARY_STAGES[nextIdx];
-        if (nextStage.id === STAGE_IDS.LOAN && editData.payment_type?.trim().toLowerCase() === 'cash') {
-            nextIdx++;
-        }
-        if (nextStage.id === STAGE_IDS.CASH && editData.payment_type?.trim().toLowerCase() === 'loan') {
-            nextIdx++;
-        }
-        if (nextIdx < PRIMARY_STAGES.length && (PRIMARY_STAGES[nextIdx].id === STAGE_IDS.LOST_PROJECT)) {
-            nextIdx++;
-        }
-
-        if (nextIdx < PRIMARY_STAGES.length && PRIMARY_STAGES[nextIdx].id !== STAGE_IDS.LOST_PROJECT) {
-            return PRIMARY_STAGES[nextIdx].id;
-        }
-        return null;
-    })();
+    // Cash customers skip Loan, loan customers skip Cash, commercial customers skip Subsidy Status.
+    const nextStageId = nextStageFor(editData.stage, editData);
+    const hasNextStage = Boolean(nextStageId);
 
     const nextStageLabel = nextStageId ? PRIMARY_STAGES.find(s => s.id === nextStageId)?.label : '';
 
@@ -1724,8 +1681,7 @@ export default function CustomerDetailModal({ customer, onClose, onUpdate, onDel
                     <div className="flex gap-6 overflow-x-auto scrollbar-none whitespace-nowrap px-4 sm:px-6 scroll-smooth">
                         {[
                             ...PRIMARY_STAGES.filter(s => {
-                                if (s.id === STAGE_IDS.LOAN && editData.payment_type?.trim().toLowerCase() === 'cash') return false;
-                                if (s.id === STAGE_IDS.CASH && editData.payment_type?.trim().toLowerCase() === 'loan') return false;
+                                if (skipsStage(s.id, editData)) return false;
                                 if (s.id === STAGE_IDS.COMPLETED || s.id === STAGE_IDS.LOST_PROJECT) return false;
                                 return true;
                             }).map(s => ({ id: s.id, label: s.label, icon: s.icon })),

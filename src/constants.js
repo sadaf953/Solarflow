@@ -8,6 +8,11 @@ import {
     Clock, AlertTriangle, Banknote, Tag, ShoppingBag
 } from 'lucide-react';
 
+// Commission when none is saved: installers and channel partners are both
+// shown at this rate per kWp (3.5 kWp assumed when the capacity is blank).
+export const COMMISSION_PER_KWP = 2200;
+export const defaultCommission = kwp => Math.round((Number(kwp) || 3.5) * COMMISSION_PER_KWP);
+
 // A customer is a home or a business; quotations use the same two values.
 export const PROJECT_TYPES = ['Residential', 'Commercial'];
 
@@ -33,6 +38,23 @@ export const PRIMARY_STAGES = [
 export const STAGE_IDS = Object.fromEntries(
     PRIMARY_STAGES.map(s => [s.id.replace(/ /g, "_"), s.id])
 );
+
+// Stages a customer never passes through: Loan for cash customers, Cash for loan
+// customers, and Subsidy Status for commercial ones (PM Surya Ghar covers homes only).
+export const skipsStage = (stageId, record = {}) => {
+    const payment = String(record?.payment_type || '').trim().toLowerCase();
+    if (stageId === STAGE_IDS.LOAN && payment === 'cash') return true;
+    if (stageId === STAGE_IDS.CASH && payment === 'loan') return true;
+    return stageId === STAGE_IDS.SUBSIDY_STATUS && record?.project_type === 'Commercial';
+};
+
+// The stage after `stageId` for this customer, or null at the end of the workflow.
+export const nextStageFor = (stageId, record = {}) => {
+    const index = PRIMARY_STAGES.findIndex(s => s.id === stageId);
+    if (index === -1 || stageId === STAGE_IDS.COMPLETED || stageId === STAGE_IDS.LOST_PROJECT) return null;
+    const next = PRIMARY_STAGES.slice(index + 1).find(s => s.id !== STAGE_IDS.LOST_PROJECT && !skipsStage(s.id, record));
+    return next ? next.id : null;
+};
 
 // `isFinal: true` marks the terminal value for a tag - reaching it locks the
 // record. Order here is the order shown in the UI.

@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { supabase } from '../supabase';
 import { logActivity, toIndianCommas, normalizeInstallationStatus, runWrite, getTelephoneHref } from '../utils';
-import { CUSTOMER_CARD_COLUMNS } from '../constants';
+import { CUSTOMER_CARD_COLUMNS, defaultCommission } from '../constants';
 import { 
     Search, CreditCard, CheckCircle2, AlertCircle, Calendar, 
     Building2, Users, Check, Loader2, RefreshCw, Phone, Download 
@@ -123,10 +123,9 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
             }
 
             // Commission / vendor quote: If missing or 0, calculate realistic commission (₹2,200/kWp)
-            const cap = Number(c.system_capacity_kwp) || 3.5;
             const quote = (c.vendor_quote !== undefined && c.vendor_quote !== null && Number(c.vendor_quote) > 0) 
                 ? Number(c.vendor_quote) 
-                : Math.round(cap * 2200);
+                : defaultCommission(c.system_capacity_kwp);
 
             // Payment status: if unset, historical (2025 or early 2026) are Paid, recent ones are Pending
             const isHistorical = baseDate.startsWith('2025') || (baseDate.startsWith('2026') && Number(baseDate.split('-')[1]) < 7);

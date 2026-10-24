@@ -14,7 +14,7 @@ import {
 import ToolboxView from './ToolboxView';
 import { logActivity, toIndianCommas, formatInputValue, parseIndianNumber, uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, updateDocumentRemark, sanitizeAdminUpdate, normalizeMeterInstallation, downloadFileWithSaveAs, downloadDocumentsAsPdf } from '../utils';
 import { DEFAULT_LEAD_FORM } from '../models';
-import { PRIMARY_STAGES, STAGE_IDS, ADMIN_NUMERIC_COLUMNS } from '../constants';
+import { PRIMARY_STAGES, STAGE_IDS, ADMIN_NUMERIC_COLUMNS, skipsStage, nextStageFor } from '../constants';
 import AddLeadModal from './AddLeadModal';
 import QuotationModule, { openQuotations } from '../quotations/QuotationModule';
 import { quotationRepository } from '../quotations/client';
@@ -911,6 +911,8 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
 
     const handleSaveDiscomInspection = async (moveToNextStage = false) => {
         if (!selectedCust) return false;
+        // Commercial customers go straight to Final Review: they have no subsidy.
+        const afterInspection = nextStageFor(STAGE_IDS.DISCOM_INSPECTION, selectedCust) || STAGE_IDS.SUBSIDY_STATUS;
         const updates = {
             discom_inspection: editData.discom_inspection ?? selectedCust.discom_inspection ?? '',
         };
@@ -918,16 +920,16 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
         if (moveToNextStage) {
             if (updates.discom_inspection !== 'Yes') {
                 setValidationIssues(['Discom Inspection must be Yes']);
-                setValidationNextStage('Subsidy Status');
+                setValidationNextStage(PRIMARY_STAGES.find(s => s.id === afterInspection)?.label || 'Subsidy Status');
                 setShowValidationModal(true);
                 return false;
             }
-            updates.stage = STAGE_IDS.SUBSIDY_STATUS;
+            updates.stage = afterInspection;
         }
 
         const didSave = await handleUpdateCustomer(selectedCust.id, updates);
         if (didSave && moveToNextStage) {
-            await logStageMove(selectedCust.stage, STAGE_IDS.SUBSIDY_STATUS);
+            await logStageMove(selectedCust.stage, afterInspection);
             // This is the last Stage Operations task, so return to its filtered list.
             setSelectedCust(null);
             setActiveCustomerStage(null);
@@ -1508,9 +1510,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                         <div className="customer-stage-tabs shrink-0 border-b border-stone-150 bg-white px-4 py-3.5 overflow-x-auto">
                             <div className="flex min-w-max gap-2">
                                 {customerStageNavigation.filter(stage => {
-                                    const pType = (selectedCust?.payment_type || '').trim().toLowerCase();
-                                    if (stage.id === STAGE_IDS.LOAN && pType === 'cash') return false;
-                                    if (stage.id === STAGE_IDS.CASH && pType === 'loan') return false;
+                                    if (skipsStage(stage.id, selectedCust)) return false;
                                     if (stage.id === STAGE_IDS.COMPLETED || stage.id === STAGE_IDS.LOST_PROJECT) return false;
                                     return true;
                                 }).concat([
