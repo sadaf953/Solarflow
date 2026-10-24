@@ -394,6 +394,30 @@ export const readableLogText = text => typeof text !== 'string' ? text : text
     .replace(/\bAssigned vendor to\b/g, 'Assigned installation team to')
     .replace(/\b(?:Demo )?Vendor ([1-3])\b/g, 'Installer $1');
 
+// Older entries logged fields that did not change ("MODULE WP: 580 → 580"); new
+// saves no longer do. Drops those parts, or returns null when nothing is left.
+const FIELD_CHANGE = /([A-Z][A-Z0-9 /&()-]*): (.*) → (.*)$/;
+const sameValue = (a, b) => {
+    const clean = v => v.trim().replace(/,/g, '');
+    const x = clean(a), y = clean(b);
+    return x === y || (x !== '' && y !== '' && !Number.isNaN(Number(x)) && Number(x) === Number(y));
+};
+export const withoutUnchangedFields = text => {
+    if (typeof text !== 'string' || !text.includes('→')) return text;
+    const parts = text.split(' | ');
+    const kept = parts.filter(part => { const m = FIELD_CHANGE.exec(part); return !m || !sameValue(m[2], m[3]); });
+    if (kept.length === parts.length) return text;
+    if (!kept.length) return null;
+    // The first part carries the customer name ("Ketan Sharma: MODULE WP: …").
+    const prefix = kept[0] === parts[0] ? '' : (/^[^:]+: (?=[A-Z][A-Z0-9 /&()-]*: )/.exec(parts[0])?.[0] || '');
+    return prefix + kept.join(' | ');
+};
+
+// What a log entry shows: installation-team wording, no unchanged fields.
+export const logEntryText = text => withoutUnchangedFields(readableLogText(text));
+// new_value holds details such as "Stage: LOAN → MATERIAL ORDER"; older rows kept the customer id there.
+export const logDetailText = value => (typeof value !== 'string' || /^[0-9a-f-]{36}$/i.test(value.trim())) ? '' : logEntryText(value) || '';
+
 // ════════════════════════════════════════════════════════════
 // CHECKLIST FIELDS
 // ════════════════════════════════════════════════════════════

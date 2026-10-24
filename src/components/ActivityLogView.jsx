@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../supabase';
 import { Activity, RefreshCw } from 'lucide-react';
-import { ACTION_COLORS, readableLogText } from '../constants';
+import { ACTION_COLORS, logEntryText, logDetailText } from '../constants';
 import { isOtherVisitor } from '../demo/visitors';
 
 const ACTION_FILTER_OPTIONS = [
@@ -246,7 +246,7 @@ export default function ActivityLogView({ currentUser }) {
                         </p>
                     )}
                 </div>
-            ) : logs.map(log => (
+            ) : logs.filter(log => logEntryText(log.message) !== null).map(log => (
                 <div key={log.id} className="bg-white rounded-xl p-4 border border-stone-100 shadow-sm flex items-start gap-3">
                     {(() => {
                         const c = ACTION_COLORS[log.action] || { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200' };
@@ -258,8 +258,8 @@ export default function ActivityLogView({ currentUser }) {
                         );
                     })()}
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm text-stone-800">{readableLogText(log.message)}</p>
-                        {log.new_value && <p className="text-xs text-stone-500 mt-0.5">{readableLogText(log.new_value)}</p>}
+                        <p className="text-sm text-stone-800">{logEntryText(log.message)}</p>
+                        {logDetailText(log.new_value) && <p className="text-xs text-stone-500 mt-0.5">{logDetailText(log.new_value)}</p>}
                         <p className="text-[10px] text-stone-400 mt-1 font-bold uppercase">
                             {actorNames.get(log.user_id) || (log.user_id ? 'Unknown' : 'System')} • {new Date(log.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
                         </p>

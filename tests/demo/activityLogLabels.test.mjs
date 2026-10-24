@@ -20,3 +20,14 @@ test('official terms and other text stay as they are',()=>{
  assert.equal(readableLogText('Uploaded Vendor Feasibility'),'Uploaded Vendor Feasibility');
  assert.equal(readableLogText(null),null);
 });
+
+test('unchanged fields in older entries are hidden',async()=>{
+ const {withoutUnchangedFields,logDetailText}=await import('../../src/constants.js');
+ assert.equal(withoutUnchangedFields('Ketan Sharma: MODULE WP: 580 → 580 | NO OF MODULES: 5 → 5'),null);
+ assert.equal(withoutUnchangedFields('Ketan Sharma: MODULE WP: 580 → 580 | DC CABLE: None → 40'),'Ketan Sharma: DC CABLE: None → 40');
+ assert.equal(withoutUnchangedFields('Ketan Sharma: INVOICE VALUE: 2,29,000 → 229000'),null);
+ assert.equal(withoutUnchangedFields('Ketan Sharma: AC CABLE: None → 20 | DC CABLE: None → 40'),'Ketan Sharma: AC CABLE: None → 20 | DC CABLE: None → 40');
+ assert.equal(withoutUnchangedFields('Ketan Sharma: Stage changed'),'Ketan Sharma: Stage changed');
+ assert.equal(logDetailText('Stage: LOAN → MATERIAL ORDER'),'Stage: LOAN → MATERIAL ORDER');
+ assert.equal(logDetailText('8b161de7-e6a7-46e3-9df3-5794e2ee5377'),'');
+});
