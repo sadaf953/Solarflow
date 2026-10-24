@@ -86,8 +86,35 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
         const timer = setTimeout(() => { if (navigator.onLine) void saveRef.current().catch(() => {}); },900);
         return () => clearTimeout(timer);
     },[form,template,recovery]);
-    const fillTestValues = () => {
-        const testData = {
+    // A business rooftop: larger system, commercial tariff and no PM Surya Ghar subsidy.
+    const COMMERCIAL_SAMPLE = {
+        customer_name: 'Sample Textiles Pvt Ltd',
+        customer_phone: '0000000001',
+        customer_email: 'accounts@sampletextiles.example',
+        full_address: 'Plot 12, Demo Industrial Estate',
+        village: 'Demo District',
+        taluka: 'Demo District',
+        district: 'Demo District',
+        pincode: '384265',
+        capacity_kw: '29.00',
+        project_type: 'Commercial',
+        solar_panel_make: 'SolarFlow 580',
+        solar_panel_qty: '50',
+        panel_wattage: '580',
+        inverter_option: 'Option 1',
+        inverter_brand: 'DemoVolt',
+        geb_geda_charge: 'Including',
+        monthly_units: '4200',
+        tariff: '9',
+        options: [
+            { brandName: 'SolarFlow Essential', baseValue: '1160000', discount: '20000', subsidy: '0' },
+            { brandName: 'SolarFlow Plus', baseValue: '1218000', discount: '20000', subsidy: '0' },
+            { brandName: 'SolarFlow Premium', baseValue: '1276000', discount: '20000', subsidy: '0' },
+        ],
+        custom_notes: ['Accelerated depreciation benefit as per your tax advisor', 'Net-metering under the commercial category'],
+    };
+    const fillTestValues = (sample) => {
+        const testData = sample || {
             customer_name: 'Test Customer',
             customer_phone: '0000000000',
             customer_email: 'test.customer@example.com',
@@ -117,7 +144,8 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
         markDirty();
         writeRecovery(user.id, id, { form: next, template: templateRef.current, base_updated_at: rowRef.current?.updated_at || null });
     };
-    const totals = calculate(form.options);
+    const commercial = form.project_type === 'Commercial';
+    const totals = calculate(commercial ? form.options.map(o => ({ ...o, subsidy: 0 })) : form.options);
     const autoCalcCapacity = () => {
         const kwp = calculateSystemCapacityKwp(form.panel_wattage, form.solar_panel_qty);
         if (kwp == null) {
@@ -163,7 +191,10 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
         <div className="q-panel">
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
                 <p className="q-eyebrow" style={{margin:0}}>STEP {step + 1} OF 4</p>
-                <button type="button" onClick={fillTestValues} style={{background:'#fef3c7',borderColor:'#f59e0b',color:'#92400e',fontSize:12,padding:'4px 10px',minHeight:32}}>Use sample details</button>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                    <button type="button" onClick={() => fillTestValues()} style={{background:'#fef3c7',borderColor:'#f59e0b',color:'#92400e',fontSize:12,padding:'4px 10px',minHeight:32}}>Use sample details</button>
+                    <button type="button" onClick={() => fillTestValues(COMMERCIAL_SAMPLE)} style={{background:'#fef3c7',borderColor:'#f59e0b',color:'#92400e',fontSize:12,padding:'4px 10px',minHeight:32}}>Commercial sample</button>
+                </div>
             </div>
             <h2>{STEPS[step]}</h2>
             {step === 0 && <div className="q-grid">{customerFields.map(([key,label,type,maxLength,readOnly]) => <Field key={key} label={label} type={type} maxLength={maxLength} readOnly={readOnly} value={form[key]} onChange={value => update(key,value)} />)}</div>}
@@ -178,9 +209,10 @@ export default function QuotationForm({ id,initialRow,user,onDirty,onSaved,onPre
                 <p className="q-muted">Module Wp × No of Modules ÷ 1000 = {form.capacity_kw || '—'} kWp</p>
             </div>}
             {step === 2 && <div className="q-price-options">{form.options.map((option,i) => <section className="q-option" key={i}><h3>Panel option {i + 1}</h3>
-                <div className="q-grid">{[['brandName','Solar panel brand','text'],['baseValue','Base value (₹)','number'],['discount','Discount (₹)','number'],['subsidy','Subsidy (₹)','number']].map(([key,label,type]) => <Field key={key} label={label} type={type} maxLength={80} value={option[key]} onChange={value => update('options',form.options.map((o,index) => index === i ? {...o,[key]:value} : o))} />)}</div>
-                <dl><div><dt>Net payable</dt><dd>{money(totals[i].netPayableAmount)}</dd></div><div><dt>After subsidy</dt><dd>{money(totals[i].netPriceAfterSubsidy)}</dd></div></dl>
-                {i === 0 && <div className="q-actions"><button onClick={() => update('options',form.options.map(o => ({...o,discount:option.discount})))}>Apply discount to all</button><button onClick={() => update('options',form.options.map(o => ({...o,subsidy:option.subsidy})))}>Apply subsidy to all</button></div>}
+                {/* PM Surya Ghar covers homes only, so commercial quotes have no subsidy field. */}
+                <div className="q-grid">{[['brandName','Solar panel brand','text'],['baseValue','Base value (₹)','number'],['discount','Discount (₹)','number'],...(commercial ? [] : [['subsidy','Subsidy (₹)','number']])].map(([key,label,type]) => <Field key={key} label={label} type={type} maxLength={80} value={option[key]} onChange={value => update('options',form.options.map((o,index) => index === i ? {...o,[key]:value} : o))} />)}</div>
+                <dl><div><dt>Net payable</dt><dd>{money(totals[i].netPayableAmount)}</dd></div>{!commercial && <div><dt>After subsidy</dt><dd>{money(totals[i].netPriceAfterSubsidy)}</dd></div>}</dl>
+                {i === 0 && <div className="q-actions"><button onClick={() => update('options',form.options.map(o => ({...o,discount:option.discount})))}>Apply discount to all</button>{!commercial && <button onClick={() => update('options',form.options.map(o => ({...o,subsidy:option.subsidy})))}>Apply subsidy to all</button>}</div>}
             </section>)}</div>}
             {step === 2 && <section className="q-option q-proposal-fields"><h3>Proposal</h3>
                 <fieldset className="q-choice"><legend>Price the proposal on</legend>{totals.map((option,i) => <label key={i}><input type="radio" name="proposal_option" checked={proposalOptionIndex(form) === i} onChange={() => update('proposal_option',i)} /> {option.brandName || `Option ${i + 1}`} · {money(option.netPayableAmount)}</label>)}</fieldset>

@@ -11,7 +11,7 @@ const date = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0'
 export const leadMapping = {
     customer_name: 'customer_name', customer_phone: 'phone_number', customer_email: 'email_address',
     full_address: 'full_address', village: 'villages', taluka: 'sub_divisions', district: 'district',
-    pincode: 'pincode', capacity_kw: 'system_capacity_kwp', solar_panel_make: 'module_brand',
+    pincode: 'pincode', project_type: 'project_type', capacity_kw: 'system_capacity_kwp', solar_panel_make: 'module_brand',
     solar_panel_qty: 'no_of_modules', panel_wattage: 'module_wp',
 };
 export function newForm(user = {}) {

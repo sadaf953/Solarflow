@@ -20,6 +20,8 @@ export const PROPOSAL_DEFAULTS = {
     gstRate: 8.9,
     gstNote: 'GST is included: 70% of the system value at 5% (HSN 8541) and 30% at 18% (HSN 9954).',
     tariff: 6.5,
+    // Commercial connections pay a higher indicative tariff than homes.
+    commercialTariff: 9,
     escalationPct: 3,
     exportRate: 2.25,
     degradationPct: 0.5,
@@ -33,7 +35,7 @@ export const PROPOSAL_DEFAULTS = {
     ],
 };
 
-const termsFor = (company) => [
+const termsFor = (company, residential = true) => [
     'Validity: This proposal is valid until {validTill}. Prices may change after that date due to market changes.',
     'Payment: As per the payment schedule in this proposal.',
     'Delivery: Material delivery within 10–15 working days from receipt of the advance payment.',
@@ -41,7 +43,7 @@ const termsFor = (company) => [
     'Rooftop area: About 10 sq m of shadow-free roof per kWp is to be provided by the customer.',
     'Operation & maintenance: Free operation and maintenance for 5 years. Regular panel cleaning is done by the customer.',
     `Warranty: Product warranties are from the respective manufacturers. ${company} will facilitate all claims.`,
-    "Subsidy: The PM Surya Ghar subsidy is paid by the Government directly into the customer's bank account. It depends on DISCOM approval and on the name on the electricity bill matching the bank account name.",
+    ...(residential ? ["Subsidy: The PM Surya Ghar subsidy is paid by the Government directly into the customer's bank account. It depends on DISCOM approval and on the name on the electricity bill matching the bank account name."] : []),
     'Extra work: Any extra or additional material or work is billed at actual cost.',
     `Cancellation: If the order is cancelled after DISCOM registration, the advance is refunded after deducting the DISCOM registration charges, with a statement of account.`,
     `Force majeure: ${company} is not liable for delays due to natural calamities, strikes, government orders or supply disruptions.`,
@@ -103,15 +105,17 @@ export function proposalSnapshot(row) {
     const createdAt = localIso(form.quotation_date) || new Date().toISOString();
     const validTill = localIso(form.valid_until);
     const customNotes = (form.custom_notes || []).map(note => String(note || '').trim()).filter(Boolean);
+    // PM Surya Ghar covers homes only, so a commercial proposal carries no subsidy.
+    const residential = form.project_type !== 'Commercial';
     const inputs = {
         kwp,
         price,
-        subsidy: number(chosen.subsidy),
+        subsidy: residential ? number(chosen.subsidy) : 0,
         gstRate: PROPOSAL_DEFAULTS.gstRate,
         gstNote: PROPOSAL_DEFAULTS.gstNote,
         consumptionMode: 'units',
         monthlyUnits: number(form.monthly_units) > 0 ? number(form.monthly_units) : Math.round(kwp * PROPOSAL_DEFAULTS.unitsPerKwMonth),
-        tariff: number(form.tariff) > 0 ? number(form.tariff) : PROPOSAL_DEFAULTS.tariff,
+        tariff: number(form.tariff) > 0 ? number(form.tariff) : residential ? PROPOSAL_DEFAULTS.tariff : PROPOSAL_DEFAULTS.commercialTariff,
         escalationPct: PROPOSAL_DEFAULTS.escalationPct,
         exportRate: PROPOSAL_DEFAULTS.exportRate,
         degradationPct: PROPOSAL_DEFAULTS.degradationPct,
@@ -131,7 +135,7 @@ export function proposalSnapshot(row) {
         structure: PROPOSAL_DEFAULTS.structure,
         warranties: { ...PROPOSAL_DEFAULTS.warranties },
         milestones: PROPOSAL_DEFAULTS.milestones.map(step => ({ ...step })),
-        terms: [...termsFor(company.name), ...customNotes].join('\n'),
+        terms: [...termsFor(company.name, residential), ...customNotes].join('\n'),
         validityDays: validTill ? days(createdAt, validTill) : 15,
         validTill,
         projectType: form.project_type || 'Residential',

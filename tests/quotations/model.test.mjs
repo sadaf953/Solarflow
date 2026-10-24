@@ -111,3 +111,14 @@ test('cards show the price of the option the proposal is priced on',async()=>{
  assert.equal(quotedPrice({quoted_options:[{baseValue:0,netPayableAmount:0}],starting_price:null}),null);
  assert.equal(quotedPrice({starting_price:169000}),169000);
 });
+
+test('a commercial proposal carries no PM Surya Ghar subsidy and uses the commercial tariff',()=>{
+    const form={...newForm({name:'Agent'}),customer_name:'Sample Textiles',customer_phone:'0000000001',capacity_kw:29,solar_panel_qty:50,panel_wattage:580,project_type:'Commercial',options:[{brandName:'A',baseValue:1160000,discount:20000,subsidy:78000}]};
+    const snap=proposalSnapshot({...payload(form,freshTemplate()),quotation_no:9});
+    assert.equal(snap.inputs.subsidy,0);
+    assert.equal(snap.inputs.tariff,9);
+    assert.equal(snap.inputs.terms.includes('PM Surya Ghar'),false);
+    const home=proposalSnapshot({...payload({...form,project_type:'Residential'},freshTemplate()),quotation_no:10});
+    assert.equal(home.inputs.subsidy,78000);
+    assert.equal(home.inputs.terms.includes('PM Surya Ghar'),true);
+});

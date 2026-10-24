@@ -3,6 +3,7 @@ import { User, ClipboardList, Edit3, X } from 'lucide-react';
 import { SectionHeader, EditableDetailItem, CheckboxRemarkItem, ChecklistModeToggle } from './shared';
 import { useGlobalPopup } from '../GlobalPopup';
 import { calculateSystemCapacityKwp } from '../../utils/capacity';
+import { PROJECT_TYPES } from '../../constants';
 
 export default function LeadsTab({
     editData,
@@ -83,6 +84,7 @@ export default function LeadsTab({
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     <EditableDetailItem label="Customer Name *" field="customer_name" value={editData.customer_name} onChange={handleChange} isEditing={editingSection === 'cus'} />
                     <EditableDetailItem label="Phone Number *" field="phone_number" value={editData.phone_number} onChange={handleChange} type="number" isEditing={editingSection === 'cus'} />
+                    <EditableDetailItem label="Customer Type" field="project_type" value={editData.project_type || 'Residential'} onChange={handleChange} options={PROJECT_TYPES} isEditing={editingSection === 'cus'} />
                     <EditableDetailItem label="Email Address" field="email_address" value={editData.email_address || editData.email_address} onChange={handleChange} isEditing={editingSection === 'cus'} />
                     <EditableDetailItem label="Consumer No" field="consumer_no" value={editData.consumer_no} onChange={handleChange} type="number" isEditing={editingSection === 'cus'} />
                     <EditableDetailItem label="Villages" field="villages" value={editData.villages} onChange={handleChange} isEditing={editingSection === 'cus'} />

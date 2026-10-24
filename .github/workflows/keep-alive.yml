@@ -1,0 +1,28 @@
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # every day, 8:30 AM IST
+  workflow_dispatch:         # manual trigger for testing
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      # demo_roles is readable without signing in; the customer table is not.
+      - name: Ping Supabase to prevent the project pausing
+        run: |
+          echo "Pinging Supabase at $(date -u)..."
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/demo_roles?select=user_type&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          echo "Supabase ping status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Supabase ping returned $STATUS - check your secrets or project status."
+            exit 1
+          fi
+          echo "Supabase is alive ✅"
+
+

@@ -1,4 +1,5 @@
-// The A4 pages of the residential on-grid proposal, fed by proposalSnapshot().
+// The A4 pages of the on-grid proposal (residential, or commercial without the
+// PM Surya Ghar subsidy), fed by proposalSnapshot().
 // One snapshot drives the preview, the PDF and the customer's signing page,
 // so all three always show the same document.
 // Page order: cover, overview, how it works, BOM & warranty, generation, savings,
@@ -157,7 +158,7 @@ export function ProposalPages({ snap, accepted = null, idPrefix = 'prp-page-' })
       <h3>At a Glance</h3>
       <div className="pp-metrics">
         {[
-          ['System capacity', kw], ['Price (incl. GST)', inr(m.price)], ['Govt. subsidy (est.)', inr(m.subsidy)], ['Effective cost', inr(m.effectiveCost)],
+          ['System capacity', kw], ['Price (incl. GST)', inr(m.price)], ...(residential ? [['Govt. subsidy (est.)', inr(m.subsidy)], ['Effective cost', inr(m.effectiveCost)]] : [['Price per kWp', inr(m.kwp ? m.price / m.kwp : 0)], ['Tariff used', `₹${num(inp.tariff, 2)} per unit`]]),
           ['Annual generation', `${num(m.genAnnual1)} units`], ['Savings in year 1', inr(m.year1.savings)], [`Savings over ${m.years} years`, inr(m.lifetimeSavings)], ['Payback', m.payback === null ? `> ${m.years} years` : `${num(m.payback, 1)} years`],
         ].map(([k, v], i) => <div key={k} className={'pp-metric' + (i < 2 ? ' hi' : '')}><span>{k}</span><b>{v}</b></div>)}
       </div>
@@ -274,7 +275,7 @@ export function ProposalPages({ snap, accepted = null, idPrefix = 'prp-page-' })
         <div><span>Return on investment</span><b>{pct(m.roi, 0)}</b></div>
         <div><span>Internal rate of return</span><b>{pct(m.irr, 1)}</b></div>
       </div>
-      <p className="pp-small">Returns are worked out on the effective cost of {inr(m.effectiveCost)} (price less the expected subsidy), before any loan.</p>
+      <p className="pp-small">{residential ? `Returns are worked out on the effective cost of ${inr(m.effectiveCost)} (price less the expected subsidy), before any loan.` : `Returns are worked out on the full price of ${inr(m.price)}, before any loan.`}</p>
       <h3>Environmental Impact ({m.years} years)</h3>
       <div className="pp-metrics three">
         <div className="pp-metric"><span>CO₂ avoided</span><b>{num(m.env.co2Tonnes, 1)} tonnes</b></div>
@@ -305,13 +306,13 @@ export function ProposalPages({ snap, accepted = null, idPrefix = 'prp-page-' })
         </table>
         <h3>Breakeven Table</h3>
         <table className="pp-table pp-dense">
-          <thead><tr><th className="c">Year</th><th className="r">Savings</th><th className="r">Subsidy received</th><th className="r">Loan paid</th><th className="r">Net cash-flow</th><th className="r">Cumulative</th></tr></thead>
+          <thead><tr><th className="c">Year</th><th className="r">Savings</th>{residential && <th className="r">Subsidy received</th>}<th className="r">Loan paid</th><th className="r">Net cash-flow</th><th className="r">Cumulative</th></tr></thead>
           <tbody>
             <tr><td className="c">0</td><td className="r">—</td><td className="r">—</td><td className="r">—</td><td className="r">{inr(-L.down)}</td><td className="r">{inr(-L.down)}</td></tr>
-            {L.flows.map((f) => <tr key={f.year} className={L.breakevenYear === f.year ? 'pp-hl' : ''}><td className="c">{f.year}</td><td className="r">{inr(f.savings)}</td><td className="r">{f.subsidy ? inr(f.subsidy) : '—'}</td><td className="r">{f.loanPaid ? inr(f.loanPaid) : '—'}</td><td className="r">{inr(f.net)}</td><td className="r">{inr(f.cumulative)}</td></tr>)}
+            {L.flows.map((f) => <tr key={f.year} className={L.breakevenYear === f.year ? 'pp-hl' : ''}><td className="c">{f.year}</td><td className="r">{inr(f.savings)}</td>{residential && <td className="r">{f.subsidy ? inr(f.subsidy) : '—'}</td>}<td className="r">{f.loanPaid ? inr(f.loanPaid) : '—'}</td><td className="r">{inr(f.net)}</td><td className="r">{inr(f.cumulative)}</td></tr>)}
           </tbody>
         </table>
-        <p className="pp-small">{L.breakevenYear ? `You are ahead (savings + subsidy have covered your down payment and EMIs) from year ${L.breakevenYear}.` : `Breakeven is not reached within ${m.years} years on these figures.`} Assumes the subsidy is credited in year 1. Loan terms are indicative; the lender's sanction letter is final.</p>
+        <p className="pp-small">{L.breakevenYear ? `You are ahead (${residential ? 'savings + subsidy have' : 'savings have'} covered your down payment and EMIs) from year ${L.breakevenYear}.` : `Breakeven is not reached within ${m.years} years on these figures.`} Assumes the subsidy is credited in year 1. Loan terms are indicative; the lender's sanction letter is final.</p>
       </>
     )));
   }
@@ -329,9 +330,9 @@ export function ProposalPages({ snap, accepted = null, idPrefix = 'prp-page-' })
       {options.length > 1 && <>
         <h3>Panel Options</h3>
         <table className="pp-table pp-options">
-          <thead><tr><th>Panel brand</th><th className="r">Base value</th><th className="r">Discount</th><th className="r">Net payable</th><th className="r">Subsidy</th><th className="r">After subsidy</th></tr></thead>
+          <thead><tr><th>Panel brand</th><th className="r">Base value</th><th className="r">Discount</th><th className="r">Net payable</th>{residential && <><th className="r">Subsidy</th><th className="r">After subsidy</th></>}</tr></thead>
           <tbody>{options.map((o, i) => (
-            <tr key={i} className={i === inp.selectedOption ? 'pp-picked' : ''}><td>{o.brandName}{i === inp.selectedOption && <em> · priced in this proposal</em>}</td><td className="r">{inr(o.baseValue)}</td><td className="r">{inr(o.discount)}</td><td className="r">{inr(o.netPayableAmount)}</td><td className="r">{inr(o.subsidy)}</td><td className="r">{inr(o.netPriceAfterSubsidy)}</td></tr>
+            <tr key={i} className={i === inp.selectedOption ? 'pp-picked' : ''}><td>{o.brandName}{i === inp.selectedOption && <em> · priced in this proposal</em>}</td><td className="r">{inr(o.baseValue)}</td><td className="r">{inr(o.discount)}</td><td className="r">{inr(o.netPayableAmount)}</td>{residential && <><td className="r">{inr(o.subsidy)}</td><td className="r">{inr(o.netPriceAfterSubsidy)}</td></>}</tr>
           ))}</tbody>
         </table>
       </>}
@@ -348,10 +349,12 @@ export function ProposalPages({ snap, accepted = null, idPrefix = 'prp-page-' })
       <p className="pp-small"><b>Amount in words:</b> {m.words}. {inp.gstNote} GEB / GEDA charges: {inp.gebGedaCharge}.</p>
       <div className="pp-strip">
         <div><span>Total price</span><b>{inr(m.price)}</b><em>incl. GST, paid to {company.name}</em></div>
-        <div><span>{residential ? 'PM Surya Ghar subsidy' : 'Subsidy'}</span><b>− {inr(m.subsidy)}</b><em>credited to your bank account by the Government</em></div>
-        <div className="net"><span>Effective cost to you</span><b>{inr(m.effectiveCost)}</b><em>after the subsidy is received</em></div>
+        {residential && <>
+          <div><span>PM Surya Ghar subsidy</span><b>− {inr(m.subsidy)}</b><em>credited to your bank account by the Government</em></div>
+          <div className="net"><span>Effective cost to you</span><b>{inr(m.effectiveCost)}</b><em>after the subsidy is received</em></div>
+        </>}
       </div>
-      <div className="pp-note warn"><b>About the subsidy</b><p>{subsidyNote}</p></div>
+      {residential && <div className="pp-note warn"><b>About the subsidy</b><p>{subsidyNote}</p></div>}
       <h3>Payment Schedule</h3>
       <div className="pp-pay">{ms.map((x, i) => (
         <div key={i} className="pp-pay-step"><span>{i + 1}</span><div><b>{x.label} ({num(x.pct)}%)</b><em>{inr((m.price * x.pct) / 100)}</em><p>{x.note}</p></div></div>
@@ -367,7 +370,7 @@ export function ProposalPages({ snap, accepted = null, idPrefix = 'prp-page-' })
   pages.push(P({ title: 'Terms & Conditions', sub: 'Scope, responsibilities and general terms' }, (
     <>
       <div className="pp-two">
-        <div className="pp-card"><div className="pp-card-h">Scope of work</div><div className="pp-card-b"><ul className="pp-check">{SCOPE.map((s) => <li key={s}>{s}</li>)}</ul></div></div>
+        <div className="pp-card"><div className="pp-card-h">Scope of work</div><div className="pp-card-b"><ul className="pp-check">{SCOPE.filter((s) => residential || !s.startsWith('PM Surya Ghar')).map((s) => <li key={s}>{s}</li>)}</ul></div></div>
         <div className="pp-card ex"><div className="pp-card-h">Exclusions</div><div className="pp-card-b"><ul className="pp-check x">{EXCLUSIONS.map((s) => <li key={s}>{s}</li>)}</ul></div></div>
       </div>
       <h3>Customer Responsibilities</h3>
@@ -383,10 +386,10 @@ export function ProposalPages({ snap, accepted = null, idPrefix = 'prp-page-' })
     <>
       <KV rows={[
         ['Proposal no.', snap.number], ['Customer', c.name], ['System', `${kw} On-Grid rooftop solar`], ['Panels', inp.moduleMake],
-        ['Total price (incl. GST)', inr(m.price)], ['Expected subsidy', `${inr(m.subsidy)} (credited to the customer's bank account)`], ['Effective cost', inr(m.effectiveCost)],
+        ['Total price (incl. GST)', inr(m.price)], ...(residential ? [['Expected subsidy', `${inr(m.subsidy)} (credited to the customer's bank account)`], ['Effective cost', inr(m.effectiveCost)]] : []),
         ['Payment method', inp.paymentMethod + (loan ? ` · EMI ${inr(m.loan.emi)} × ${m.loan.months}` : '')], ['Valid till', longDate(validTill)],
       ]} />
-      <p className="pp-declare">I / We have read this proposal, including the Bill of Materials, the commercial offer, the payment schedule and the terms &amp; conditions, and accept it. I / We understand that the PM Surya Ghar subsidy is paid by the Government, depends on DISCOM approval and requires the name on the electricity bill to match the bank account name.</p>
+      <p className="pp-declare">I / We have read this proposal, including the Bill of Materials, the commercial offer, the payment schedule and the terms &amp; conditions, and accept it.{residential && ' I / We understand that the PM Surya Ghar subsidy is paid by the Government, depends on DISCOM approval and requires the name on the electricity bill to match the bank account name.'}</p>
       <div className="pp-sign">
         <div className="pp-signbox">
           <div className="pp-sign-h">Customer</div>

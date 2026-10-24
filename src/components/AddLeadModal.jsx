@@ -9,6 +9,7 @@ import {
     HardDrive, MapPin, Sparkles
 } from 'lucide-react';
 import { DEFAULT_LEAD_FORM } from '../models';
+import { PROJECT_TYPES } from '../constants';
 import { FilePreviewModal } from './modal-tabs/shared';
 import { toIndianCommas, fetchAgent2SubAgents, sanitizePhoneNumber, downloadFileWithSaveAs } from '../utils';
 import { useGlobalPopup } from './GlobalPopup';
@@ -643,6 +644,24 @@ export default function AddLeadModal({ isOpen, onClose, onSave, meta = {}, chann
                                     placeholder="0000000000 or +910000000000"
 
                                 />
+                            </div>
+
+                            {/* Customer Type */}
+                            <div className="space-y-1">
+                                <span className="text-xs text-stone-600 font-bold block">Customer Type</span>
+                                <div className="flex gap-2" role="group" aria-label="Customer type">
+                                    {PROJECT_TYPES.map(type => (
+                                        <button
+                                            key={type}
+                                            type="button"
+                                            aria-pressed={(formData.project_type || 'Residential') === type}
+                                            onClick={() => handleChange('project_type', type)}
+                                            className={`flex-1 rounded-xl border px-3.5 py-2.5 text-xs font-bold transition-all ${(formData.project_type || 'Residential') === type ? 'bg-stone-900 border-stone-900 text-white' : 'bg-white border-stone-200 text-stone-600 hover:border-amber-400'}`}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                         </div>

@@ -6,6 +6,7 @@ export const DEFAULT_LEAD_FORM = {
     phone_number: '',
     email_address: '',
     payment_type: '',
+    project_type: 'Residential',
     bank_name: '',
     bank_branch: '',
     villages: '',

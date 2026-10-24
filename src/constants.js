@@ -8,6 +8,9 @@ import {
     Clock, AlertTriangle, Banknote, Tag, ShoppingBag
 } from 'lucide-react';
 
+// A customer is a home or a business; quotations use the same two values.
+export const PROJECT_TYPES = ['Residential', 'Commercial'];
+
 export const PRIMARY_STAGES = [
     { id: 'LEADS', label: 'Leads', icon: Users },
     { id: 'REGISTRATION', label: 'Registration', icon: ClipboardList },
@@ -478,6 +481,7 @@ export const ADMIN_COLUMNS = new Set([
     'panel',
     'panel_serial_no',
     'payment_type',
+    'project_type',
     'plant_commissioning_report',
     'phone_number',
     'pincode',

@@ -47,7 +47,10 @@ function scan(dir) {
   }
 }
 for (const dir of ['src', 'public', 'dist']) scan(dir);
-if (existsSync('.github/workflows') && readdirSync('.github/workflows').some(n => /\.ya?ml$/.test(n))) failures.push('GitHub automation is not allowed in this demo');
+// Only the nightly database backup and the keep-alive ping may run on GitHub.
+// Neither deploys anything; any other workflow still fails the check.
+const allowedWorkflows = new Set(['daily-backup.yml', 'keep-alive.yml']);
+if (existsSync('.github/workflows') && readdirSync('.github/workflows').some(n => /\.ya?ml$/.test(n) && !allowedWorkflows.has(n))) failures.push('GitHub automation is not allowed in this demo');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 try {
   const remotes = execFileSync('git', ['remote'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean);
@@ -66,4 +69,4 @@ if (failures.length) {
   console.error('Demo isolation check failed:\n' + failures.join('\n'));
   process.exit(1);
 }
-console.log('Demo isolation checks passed: only the approved new project public configuration is permitted; no deployment automation; Git may point only to the new Solarflow repository.');
+console.log('Demo isolation checks passed: only the approved new project public configuration is permitted; no deployment automation (backup and keep-alive only); Git may point only to the new Solarflow repository.');

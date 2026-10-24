@@ -1,0 +1,152 @@
+name: Daily Supabase Backup
+
+# Copied from the WaterSun CRM backup (Oct 2026) for the SolarFlow demo project.
+#  - scripts/backup/export_tables.py pages through every table 1,000 rows at a time
+#    and checks the count against the server, so no table is cut off at 1,000 rows.
+#  - Any error or short table FAILS the job and nothing is committed.
+#  - Optional full database dump (structure + data) when SUPABASE_DB_URL is set.
+#  - Optional copy of uploaded files when the storage secrets are set.
+#  - Optional alert on failure when ALERT_WEBHOOK_URL is set.
+#
+# Layout in the backup repo:
+#   YYYY/MM/DD/HH-MM/   one folder per run, India time; nothing is ever overwritten.
+#     summary.csv       rows saved vs rows on the server, per table
+#     <table>.csv       one file per table with every row
+#     db/               full database dump (only when SUPABASE_DB_URL is set)
+#
+# Secrets (required):  BACKUP_PAT, BACKUP_REPO, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# Secrets (optional):  SUPABASE_DB_URL, ALERT_WEBHOOK_URL,
+#                      STORAGE_S3_ENDPOINT, STORAGE_S3_REGION, STORAGE_S3_KEY_ID, STORAGE_S3_SECRET,
+#                      OFFSITE_S3_ENDPOINT, OFFSITE_S3_KEY_ID, OFFSITE_S3_SECRET, OFFSITE_S3_BUCKET
+
+on:
+  schedule:
+    - cron: '30 20 * * *'  # 8:30 PM UTC = 2:00 AM IST
+  workflow_dispatch:         # manual trigger for testing
+
+concurrency:
+  group: daily-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out this repo (for the export script)
+        uses: actions/checkout@v4
+
+      - name: Clone private backup repo
+        run: |
+          echo "Starting backup at $(date -u)..."
+          git clone "https://x-access-token:${{ secrets.BACKUP_PAT }}@github.com/${{ secrets.BACKUP_REPO }}.git" backup-repo
+
+      # Year/month/day/time folder (India time), e.g. 2026/10/02/19-08
+      - name: Set folder path
+        run: echo "FOLDER=$(TZ=Asia/Kolkata date +%Y/%m/%d/%H-%M)" >> $GITHUB_ENV
+
+      - name: Export every table (paged and verified)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Export into a temporary folder first; it is moved into the backup repo
+          # only if the whole export succeeded, so a failed run saves nothing.
+          # One CSV per table: lift the script's 500 KB-per-file split so every
+          # table is written as a single <table>.csv.
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0, 'scripts/backup')
+          import export_tables
+          export_tables.MAX_PART_BYTES = 10 ** 12   # effectively no split
+          sys.argv = ['export_tables.py', 'export-tmp']
+          export_tables.main()
+          PY
+          mkdir -p "backup-repo/$FOLDER"
+          mv export-tmp/* "backup-repo/$FOLDER/"
+
+      - name: Full database dump (structure + data)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::SUPABASE_DB_URL is not set - skipping the full database dump (tables were still exported above)."
+            exit 0
+          fi
+          # pg_dump must be at least as new as the server; v17 dumps Postgres 15 and 17.
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+          mkdir -p "backup-repo/$FOLDER/db"
+          # Structure: tables, RLS policies, functions, triggers
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --schema=public --schema-only --no-owner --no-privileges \
+            -f "backup-repo/$FOLDER/db"/schema.sql
+          # Data, as plain SQL (one COPY row per line, so git stores only changes)
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --schema=public --data-only --no-owner --no-privileges \
+            -f "backup-repo/$FOLDER/db"/data.sql
+          # Login accounts
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --data-only --table=auth.users --table=auth.identities \
+            --no-owner --no-privileges -f "backup-repo/$FOLDER/db"/auth.sql
+          for f in "backup-repo/$FOLDER"/db/*.sql; do
+            [ -s "$f" ] || { echo "::error::$f is empty"; exit 1; }
+            echo "$(basename "$f"): $(wc -l < "$f") lines"
+          done
+
+      - name: Commit backup
+        run: |
+          cd backup-repo
+          git config user.name  "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          git add "$FOLDER"
+          git commit -m "Backup $(TZ=Asia/Kolkata date +'%d %b %Y, %H:%M IST')" || echo "Nothing to commit"
+          git push
+          echo "Backup complete ✅"
+          cat "$FOLDER/summary.csv"
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: |
+          MSG="⚠️ SolarFlow CRM daily backup FAILED on $(date -u +'%d %b %Y'). Open: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "::error::$MSG"
+          if [ -n "$ALERT_WEBHOOK_URL" ]; then
+            # Works with Slack and Discord-style incoming webhooks.
+            curl -sS -X POST -H 'Content-Type: application/json' \
+              -d "{\"text\": \"$MSG\", \"content\": \"$MSG\"}" "$ALERT_WEBHOOK_URL" || true
+          fi
+
+  # Uploaded files (PDFs, photos) are several GB - too large for a git repo.
+  # This job copies only new or changed files from Supabase Storage to separate
+  # cloud storage (e.g. Cloudflare R2 or Backblaze B2). It does nothing until
+  # the storage secrets are added.
+  storage-files:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Copy uploaded files to off-site storage
+        env:
+          SRC_ENDPOINT: ${{ secrets.STORAGE_S3_ENDPOINT }}
+          SRC_REGION: ${{ secrets.STORAGE_S3_REGION }}
+          SRC_KEY_ID: ${{ secrets.STORAGE_S3_KEY_ID }}
+          SRC_SECRET: ${{ secrets.STORAGE_S3_SECRET }}
+          DST_ENDPOINT: ${{ secrets.OFFSITE_S3_ENDPOINT }}
+          DST_KEY_ID: ${{ secrets.OFFSITE_S3_KEY_ID }}
+          DST_SECRET: ${{ secrets.OFFSITE_S3_SECRET }}
+          DST_BUCKET: ${{ secrets.OFFSITE_S3_BUCKET }}
+        run: |
+          if [ -z "$SRC_ENDPOINT" ] || [ -z "$DST_ENDPOINT" ]; then
+            echo "::warning::Storage backup secrets are not set - uploaded files are NOT being backed up."
+            exit 0
+          fi
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+          export RCLONE_CONFIG_SUPA_TYPE=s3 RCLONE_CONFIG_SUPA_PROVIDER=Other \
+                 RCLONE_CONFIG_SUPA_ENDPOINT="$SRC_ENDPOINT" RCLONE_CONFIG_SUPA_REGION="$SRC_REGION" \
+                 RCLONE_CONFIG_SUPA_ACCESS_KEY_ID="$SRC_KEY_ID" RCLONE_CONFIG_SUPA_SECRET_ACCESS_KEY="$SRC_SECRET"
+          export RCLONE_CONFIG_DEST_TYPE=s3 RCLONE_CONFIG_DEST_PROVIDER=Other \
+                 RCLONE_CONFIG_DEST_ENDPOINT="$DST_ENDPOINT" \
+                 RCLONE_CONFIG_DEST_ACCESS_KEY_ID="$DST_KEY_ID" RCLONE_CONFIG_DEST_SECRET_ACCESS_KEY="$DST_SECRET"
+          # "copy" never deletes from the backup, so a file removed in the CRM is still recoverable.
+          rclone copy supa:customer-documents "dest:$DST_BUCKET/customer-documents" --transfers 8 --checksum --stats-one-line -v
