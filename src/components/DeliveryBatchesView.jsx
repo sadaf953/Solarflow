@@ -5,8 +5,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
     Truck, Plus, Search, Filter, Calendar, User, Phone, MapPin, 
     Zap, Layers, Printer, Edit3, Trash2, CheckCircle2, AlertCircle, 
-    ChevronDown, ChevronUp, Package, X, Check, ArrowRight, ArrowUp, ArrowDown, FileText, Clock, ExternalLink
+    ChevronDown, ChevronUp, Package, X, Check, ArrowRight, ArrowUp, ArrowDown, FileText, Clock, ExternalLink, Download
 } from 'lucide-react';
+import { downloadCsv, exportDate } from '../utils/exportCsv';
 import { supabase } from '../supabase';
 import { PRIMARY_STAGES, DELIVERY_PICKER_COLUMNS } from '../constants';
 import { toIndianCommas, logActivity, formatInputValue, parseIndianNumber, runWrite, getTelephoneHref } from '../utils';
@@ -392,6 +393,34 @@ export default function DeliveryBatchesView({
         setProjectStageFilter('MATERIAL DELIVERY');
         setProjectSearchQuery('');
         setShowCreateModal(true);
+    };
+
+    // One row per project on each trip, so the file reads as a delivery register.
+    const exportBatches = () => {
+        const byId = new Map(customers.map(c => [String(c.id), c]));
+        const rows = batches.flatMap(batch => {
+            const ids = Array.isArray(batch.project_ids) ? batch.project_ids : [];
+            return ids.length ? ids.map(id => ({ batch, customer: byId.get(String(id)) || { id } })) : [{ batch, customer: null }];
+        });
+        return downloadCsv(`delivery-batches-${exportDate()}.csv`, [
+            ['Batch', r => r.batch.batch_no],
+            ['Status', r => r.batch.status],
+            ['Dispatch date', r => r.batch.dispatch_date],
+            ['Vehicle', r => r.batch.vehicle_number],
+            ['Driver', r => r.batch.driver_name],
+            ['Driver phone', r => r.batch.driver_phone],
+            ['Installation team', r => r.batch.vendor],
+            ['Added by', r => r.batch.created_by_name],
+            ['Trip started', r => r.batch.started_at],
+            ['Loaded by', r => r.batch.loaded_by_name],
+            ['Loaded at', r => r.batch.loaded_at],
+            ['Customer', r => r.customer ? (r.customer.customer_name || r.customer.id) : ''],
+            ['Phone', r => r.customer?.phone_number],
+            ['Consumer No', r => r.customer?.consumer_no],
+            ['System (kWp)', r => r.customer?.system_capacity_kwp],
+            ['Village', r => r.customer?.villages],
+            ['Delivery status', r => r.customer?.delivery_status],
+        ], rows);
     };
 
     // Open Edit Modal
@@ -824,6 +853,16 @@ export default function DeliveryBatchesView({
                     </div>
                 </div>
 
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                <button
+                    type="button"
+                    onClick={exportBatches}
+                    disabled={loading || loadError || batches.length === 0}
+                    className="px-4 py-2.5 bg-white hover:bg-stone-50 border border-stone-200 text-stone-700 rounded-2xl text-xs font-bold transition flex items-center gap-2 disabled:opacity-50"
+                    title="Download every batch and its projects as a CSV for Excel"
+                >
+                    <Download size={16} /> Export
+                </button>
                 <button
                     onClick={event => { batchTriggerRef.current = event.currentTarget; handleOpenCreateModal(); }}
                     disabled={loading || loadError || saving}
@@ -831,6 +870,7 @@ export default function DeliveryBatchesView({
                 >
                     <Plus size={16} /> Create Delivery Batch
                 </button>
+                </div>
             </div>
 
             {/* 4 Metric Stats Cards */}

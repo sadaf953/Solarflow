@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Wrench, Search, RefreshCw, ChevronDown } from 'lucide-react';
+import { Wrench, Search, RefreshCw, ChevronDown, Download } from 'lucide-react';
 import { normalizeInstallationStatus } from '../utils';
 import { INSTALLATION_TAGS, INSTALLATION_TAG_COLORS, CUSTOMER_CARD_COLUMNS, getCustomerCardColumns, STAGE_IDS } from '../constants';
 import { supabase } from '../supabase';
+import { downloadCsv, exportDate, fetchAllPages } from '../utils/exportCsv';
 
 export { normalizeInstallationStatus };
 
@@ -100,12 +101,8 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
         }
     }, [isChannelPartnerOffice, partnerName, channelPartnerFilter, dealerFilter]);
 
-    // Fetch Paginated Customer Records with Backend Search
-    const fetchCustomers = useCallback(async (pageNum = 0, isAppend = false) => {
-        if (pageNum === 0) setLoading(true);
-        else setLoadingMore(true);
-
-        try {
+    // The list and its export use the same filters; the list adds a page range.
+    const buildQuery = useCallback(() => {
             const targetPartner = isChannelPartnerOffice ? null : (channelPartnerFilter?.trim() || null);
 
             let query = supabase
@@ -117,7 +114,7 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
                 .is('deleted_at', null)
                 .neq('stage', STAGE_IDS.COMPLETED)
                 .order('created_at', { ascending: false })
-                .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
+                .order('id', { ascending: true });
 
             if (targetPartner) {
                 query = query.ilike('channel_partner', `%${targetPartner}%`);
@@ -137,8 +134,16 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
             if (debouncedSearch) {
                 query = query.or(`customer_name.ilike.%${debouncedSearch}%,phone_number.ilike.%${debouncedSearch}%,consumer_no.ilike.%${debouncedSearch}%`);
             }
+            return query;
+    }, [activeFilter, debouncedSearch, isChannelPartnerOffice, channelPartnerFilter, dealerFilter]);
 
-            const { data, error } = await query;
+    // Fetch Paginated Customer Records with Backend Search
+    const fetchCustomers = useCallback(async (pageNum = 0, isAppend = false) => {
+        if (pageNum === 0) setLoading(true);
+        else setLoadingMore(true);
+
+        try {
+            const { data, error } = await buildQuery().range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
             // The error used to be discarded here. When the search failed
             // (42883: ilike on the numeric phone_number column) the list simply
             // did not update, so the box looked like it had found nothing -
@@ -174,7 +179,35 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
             setLoadingMore(false);
             if (pageNum === 0) void fetchCounts();
         }
-    }, [activeFilter, debouncedSearch, isChannelPartnerOffice, partnerName, channelPartnerFilter, dealerFilter, fetchCounts]);
+    }, [buildQuery, fetchCounts]);
+
+    // Every installation matching the current tab, search and partner filter, not just the loaded page.
+    const [exporting, setExporting] = useState(false);
+    const exportInstallations = async () => {
+        setExporting(true);
+        try {
+            const rows = await fetchAllPages(buildQuery);
+            await downloadCsv(`installations-${exportDate()}.csv`, [
+                ['Customer', r => r.customer_name],
+                ['Phone', r => r.phone_number],
+                ['Consumer No', r => r.consumer_no],
+                ['Stage', r => r.stage],
+                ['Installation status', r => normalizeInstallationStatus(r.installation_status) || r.installation_status],
+                ['Installation team', r => r.vendor],
+                ['System (kWp)', r => r.system_capacity_kwp],
+                ['Channel partner', r => r.channel_partner],
+                ['Dealer', r => r.sub_channel_partner],
+                ['Village', r => r.villages],
+                ['District', r => r.district],
+                ['Delivery date', r => r.material_delivery_date],
+                ['Installation date', r => r.installation_date],
+            ], rows);
+        } catch (err) {
+            setLoadError(`Export failed: ${err.message || err}`);
+        } finally {
+            setExporting(false);
+        }
+    };
 
     useEffect(() => {
         setPage(0);
@@ -225,6 +258,15 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
                         title="Refresh counts"
                     >
                         <RefreshCw size={14} className={loading ? "animate-spin text-amber-500" : ""} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={exportInstallations}
+                        disabled={exporting || loading}
+                        className="flex items-center gap-1.5 px-3 py-2.5 bg-white hover:bg-stone-50 border border-stone-200 rounded-xl text-xs font-bold text-stone-600 transition-colors shadow-2xs disabled:opacity-50"
+                        title="Download every installation matching this view as a CSV for Excel"
+                    >
+                        <Download size={14} /> {exporting ? 'Exporting…' : 'Export'}
                     </button>
                     <span className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-2 rounded-xl">
                         Total: <span className="text-stone-900 font-extrabold">{totalCount.toLocaleString('en-IN')}</span> Installations

@@ -4,9 +4,10 @@ import { logActivity, toIndianCommas, normalizeInstallationStatus, runWrite, get
 import { CUSTOMER_CARD_COLUMNS } from '../constants';
 import { 
     Search, CreditCard, CheckCircle2, AlertCircle, Calendar, 
-    Building2, Users, Check, Loader2, RefreshCw, Phone 
+    Building2, Users, Check, Loader2, RefreshCw, Phone, Download 
 } from 'lucide-react';
 import { useGlobalPopup } from './GlobalPopup';
+import { downloadCsv, exportDate, fetchAllPages } from '../utils/exportCsv';
 
 export default function InstallationPaymentsView({ onSelectCustomer, currentUser }) {
     const { showAlert } = useGlobalPopup();
@@ -50,17 +51,21 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
     const fetchInstallations = useCallback(async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('admin')
-                // Only the columns this ledger renders. It was select('*'), pulling
-                // ~90 columns for every installed customer - now 3,278 rows since
-                // the installation_status filter was fixed.
-                .select('id, customer_name, phone_number, consumer_no, system_capacity_kwp, vendor, vendor_quote, vendor_payment_status, vendor_paid_date, material_delivery_date, installation_date, installation_status, created_at, registration_date')
-                .is('deleted_at', null)
-                .not('vendor', 'is', null)
-                .neq('vendor', '')
-                .or('installation_status.ilike.%yes%,installation_status.ilike.%installed%')
-                .order('created_at', { ascending: false });
+            // Paged: one request returns at most 1,000 rows, so a larger ledger
+            // (and its export) was silently cut off.
+            let data = null, error = null;
+            try {
+                data = await fetchAllPages(() => supabase
+                    .from('admin')
+                    // Only the columns this ledger renders.
+                    .select('id, customer_name, phone_number, consumer_no, system_capacity_kwp, vendor, vendor_quote, vendor_payment_status, vendor_paid_date, material_delivery_date, installation_date, installation_status, created_at, registration_date')
+                    .is('deleted_at', null)
+                    .not('vendor', 'is', null)
+                    .neq('vendor', '')
+                    .or('installation_status.ilike.%yes%,installation_status.ilike.%installed%')
+                    .order('created_at', { ascending: false })
+                    .order('id', { ascending: true }));
+            } catch (err) { error = err; }
 
             if (!error && data) {
                 setInstallations(data);
@@ -340,6 +345,21 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
         }
     };
 
+    // Exactly the rows on screen: the installer, status and month filters apply.
+    const exportLedger = () => downloadCsv(`installation-commissions-${exportDate()}.csv`, [
+        ['Customer', r => r.customer_name],
+        ['Phone', r => r.phone_number],
+        ['Consumer No', r => r.consumer_no],
+        ['Installation team', r => r.vendor],
+        ['System (kWp)', r => r.system_capacity_kwp],
+        ['Commission (₹)', r => r.vendor_quote],
+        ['Payment status', r => r.vendor_payment_status],
+        ['Paid on', r => r.vendor_paid_date],
+        ['Payout month', r => r.payoutMonthLabel],
+        ['Delivery date', r => r.material_delivery_date],
+        ['Installation date', r => r.installation_date],
+    ], filteredRecords);
+
     return (
         <div className="p-4 lg:p-6 space-y-6 max-w-7xl mx-auto animate-in fade-in duration-300">
             {/* Header section */}
@@ -353,6 +373,15 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                             title="Refresh Ledger"
                         >
                             <RefreshCw size={13} className={loading ? "animate-spin text-amber-500" : ""} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={exportLedger}
+                            disabled={loading || filteredRecords.length === 0}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-stone-200 text-[11px] font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-40"
+                            title="Download the rows shown, with the current filters, as a CSV for Excel"
+                        >
+                            <Download size={12} /> Export
                         </button>
                     </div>
                     <p className="text-xs text-stone-500 font-medium mt-0.5 max-w-xl">
