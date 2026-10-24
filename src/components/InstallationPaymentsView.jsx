@@ -7,7 +7,7 @@ import {
     Building2, Users, Check, Loader2, RefreshCw, Phone, Download 
 } from 'lucide-react';
 import { useGlobalPopup } from './GlobalPopup';
-import { downloadCsv, exportDate, fetchAllPages } from '../utils/exportCsv';
+import { downloadCsv, exportDate, fetchAllPages, PARTNER_COLUMNS } from '../utils/exportCsv';
 
 export default function InstallationPaymentsView({ onSelectCustomer, currentUser }) {
     const { showAlert } = useGlobalPopup();
@@ -58,7 +58,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                 data = await fetchAllPages(() => supabase
                     .from('admin')
                     // Only the columns this ledger renders.
-                    .select('id, customer_name, phone_number, consumer_no, system_capacity_kwp, vendor, vendor_quote, vendor_payment_status, vendor_paid_date, material_delivery_date, installation_date, installation_status, created_at, registration_date')
+                    .select('id, customer_name, phone_number, consumer_no, channel_partner, sub_channel_partner, system_capacity_kwp, vendor, vendor_quote, vendor_payment_status, vendor_paid_date, material_delivery_date, installation_date, installation_status, created_at, registration_date')
                     .is('deleted_at', null)
                     .not('vendor', 'is', null)
                     .neq('vendor', '')
@@ -74,7 +74,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
                 // Fallback: try fetching where installation_status is not null and filter in memory
                 const { data: allData } = await supabase
                     .from('admin')
-                    .select('id, customer_name, phone_number, consumer_no, system_capacity_kwp, vendor, vendor_quote, vendor_payment_status, vendor_paid_date, material_delivery_date, installation_date, installation_status, created_at, registration_date')
+                    .select('id, customer_name, phone_number, consumer_no, channel_partner, sub_channel_partner, system_capacity_kwp, vendor, vendor_quote, vendor_payment_status, vendor_paid_date, material_delivery_date, installation_date, installation_status, created_at, registration_date')
                     .is('deleted_at', null)
                     .not('vendor', 'is', null)
                     .neq('vendor', '')
@@ -350,6 +350,7 @@ export default function InstallationPaymentsView({ onSelectCustomer, currentUser
         ['Customer', r => r.customer_name],
         ['Phone', r => r.phone_number],
         ['Consumer No', r => r.consumer_no],
+        ...PARTNER_COLUMNS,
         ['Installation team', r => r.vendor],
         ['System (kWp)', r => r.system_capacity_kwp],
         ['Commission (₹)', r => r.vendor_quote],

@@ -34,3 +34,8 @@ export async function fetchAllPages(makeQuery, pageSize = 1000) {
 }
 
 export const exportDate = () => new Date().toISOString().slice(0, 10);
+
+// Who brought the project in: the channel partner (or CPO).
+export const PARTNER_COLUMNS = [
+    ['Channel partner', row => row.channel_partner],
+];

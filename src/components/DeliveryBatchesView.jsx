@@ -7,7 +7,7 @@ import {
     Zap, Layers, Printer, Edit3, Trash2, CheckCircle2, AlertCircle, 
     ChevronDown, ChevronUp, Package, X, Check, ArrowRight, ArrowUp, ArrowDown, FileText, Clock, ExternalLink, Download
 } from 'lucide-react';
-import { downloadCsv, exportDate } from '../utils/exportCsv';
+import { downloadCsv, exportDate, PARTNER_COLUMNS } from '../utils/exportCsv';
 import { supabase } from '../supabase';
 import { PRIMARY_STAGES, DELIVERY_PICKER_COLUMNS } from '../constants';
 import { toIndianCommas, logActivity, formatInputValue, parseIndianNumber, runWrite, getTelephoneHref } from '../utils';
@@ -417,6 +417,7 @@ export default function DeliveryBatchesView({
             ['Customer', r => r.customer ? (r.customer.customer_name || r.customer.id) : ''],
             ['Phone', r => r.customer?.phone_number],
             ['Consumer No', r => r.customer?.consumer_no],
+            ...PARTNER_COLUMNS.map(([header, read]) => [header, r => r.customer ? read(r.customer) : '']),
             ['System (kWp)', r => r.customer?.system_capacity_kwp],
             ['Village', r => r.customer?.villages],
             ['Delivery status', r => r.customer?.delivery_status],

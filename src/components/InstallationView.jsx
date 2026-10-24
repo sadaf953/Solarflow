@@ -3,7 +3,7 @@ import { Wrench, Search, RefreshCw, ChevronDown, Download } from 'lucide-react';
 import { normalizeInstallationStatus } from '../utils';
 import { INSTALLATION_TAGS, INSTALLATION_TAG_COLORS, CUSTOMER_CARD_COLUMNS, getCustomerCardColumns, STAGE_IDS } from '../constants';
 import { supabase } from '../supabase';
-import { downloadCsv, exportDate, fetchAllPages } from '../utils/exportCsv';
+import { downloadCsv, exportDate, fetchAllPages, PARTNER_COLUMNS } from '../utils/exportCsv';
 
 export { normalizeInstallationStatus };
 
@@ -191,12 +191,11 @@ export default function InstallationView({ onSelectCustomer, isChannelPartnerOff
                 ['Customer', r => r.customer_name],
                 ['Phone', r => r.phone_number],
                 ['Consumer No', r => r.consumer_no],
+                ...PARTNER_COLUMNS,
                 ['Stage', r => r.stage],
                 ['Installation status', r => normalizeInstallationStatus(r.installation_status) || r.installation_status],
                 ['Installation team', r => r.vendor],
                 ['System (kWp)', r => r.system_capacity_kwp],
-                ['Channel partner', r => r.channel_partner],
-                ['Dealer', r => r.sub_channel_partner],
                 ['Village', r => r.villages],
                 ['District', r => r.district],
                 ['Delivery date', r => r.material_delivery_date],

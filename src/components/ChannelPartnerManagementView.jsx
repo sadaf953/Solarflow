@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
-import { Users, Plus, Award, Trash2, Tag, ShieldCheck, BarChart2, X, Check, Edit3, UserCheck, Zap, Building2, ChevronRight, ChevronDown, UserPlus, Phone, Mail, Truck, Stamp, IndianRupee, Search } from 'lucide-react';
+import { Users, Plus, Award, Trash2, Tag, ShieldCheck, BarChart2, X, Check, Edit3, UserCheck, Zap, Building2, ChevronRight, ChevronDown, UserPlus, Phone, Mail, Truck, Stamp, IndianRupee, Search, Download } from 'lucide-react';
 import { logActivity, runWrite } from '../utils';
 import { useGlobalPopup } from './GlobalPopup';
+import { downloadCsv, exportDate, fetchAllPages, PARTNER_COLUMNS } from '../utils/exportCsv';
 
 const normalizeDirectoryLabel = (value) => String(value || '').trim().toLocaleLowerCase();
 
@@ -734,15 +735,59 @@ export default function ChannelPartnerManagementView({ customers = [], currentUs
         }
     };
 
+    // Every project that came through a channel partner, one row each, paged past
+    // the 1,000-row API limit.
+    const [exportingPartners, setExportingPartners] = useState(false);
+    const exportPartnerProjects = async () => {
+        setExportingPartners(true);
+        try {
+            const rows = await fetchAllPages(() => supabase
+                .from('admin')
+                .select('id, customer_name, phone_number, consumer_no, channel_partner, stage, payment_type, system_capacity_kwp, invoice_value, registration_date, installation_status, installation_date, vendor')
+                .is('deleted_at', null)
+                .not('channel_partner', 'is', null)
+                .neq('channel_partner', '')
+                .order('channel_partner', { ascending: true })
+                .order('id', { ascending: true }));
+            await downloadCsv(`channel-partner-projects-${exportDate()}.csv`, [
+                ...PARTNER_COLUMNS,
+                ['Customer', r => r.customer_name],
+                ['Phone', r => r.phone_number],
+                ['Consumer No', r => r.consumer_no],
+                ['Stage', r => r.stage],
+                ['Payment type', r => r.payment_type],
+                ['System (kWp)', r => r.system_capacity_kwp],
+                ['Project value (₹)', r => r.invoice_value],
+                ['Registration date', r => r.registration_date],
+                ['Installation status', r => r.installation_status],
+                ['Installation date', r => r.installation_date],
+                ['Installation team', r => r.vendor],
+            ], rows);
+        } catch (err) {
+            showAlert(`The export failed: ${err.message || err}`, { type: 'error' });
+        } finally {
+            setExportingPartners(false);
+        }
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-700 max-w-7xl mx-auto">
             {/* Header info */}
-            <div className="flex items-center gap-3 bg-stone-900 text-white p-6 rounded-[32px] shadow-sm">
+            <div className="flex flex-wrap items-center gap-3 bg-stone-900 text-white p-6 rounded-[32px] shadow-sm">
                 <ShieldCheck className="w-8 h-8 text-amber-400" />
-                <div>
+                <div className="flex-1 min-w-0">
                     <h2 className="text-lg font-black tracking-tight">Operations</h2>
                     <p className="text-xs text-stone-400">Admin Control Panel • Configure active directory listings and view top sales performance</p>
                 </div>
+                <button
+                    type="button"
+                    onClick={exportPartnerProjects}
+                    disabled={exportingPartners}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/15 text-xs font-bold disabled:opacity-50"
+                    title="Download every project with its channel partner as a CSV for Excel"
+                >
+                    <Download size={15} /> {exportingPartners ? 'Exporting…' : 'Export channel partner projects'}
+                </button>
             </div>
 
             {loading ? (
