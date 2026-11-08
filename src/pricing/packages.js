@@ -1,4 +1,4 @@
-// SolarFlow packages – fixed one-time prices so a client can say yes fast.
+// SolarFlow packages – one-time prices shown as ranges; the final price is set after a call.
 // Edit prices / contents here only. The quote builder reads everything from this file.
 
 // ── Launch offer ──
@@ -9,53 +9,55 @@ export const LAUNCH_OFFER = 0; // off – packages at full price
 export const offer = n => (n == null ? n : Math.round(n * (1 - LAUNCH_OFFER) / 500) * 500);
 
 // Plain words only for login types: Admin, Staff, Dealer, Installer, Godown, Branch.
+// Four tiers, shown as ranges (the final price is set per client after a call).
+// Lite is the simple 4-tab CRM; Standard, Pro and Complete are SolarFlow's stage-by-stage system.
+// `price` = typical internal price, `range` = what the client sees, `floor` = never go below.
+export const CARE_PLAN = { range: [12000, 18000], label: '₹12k – ₹18k a year from year 2 (hosting, backups, fixes, small changes)' };
 export const PACKAGES = [
   {
-    id: 'starter', name: 'Starter', price: 40000, range: [null, 40000], tagline: 'For a small rooftop team with one office',
+    id: 'starter', name: 'Lite', price: 38000, range: [30000, 45000], floor: 28000, tagline: 'The simple 4-tab CRM for a smaller team',
     logins: 'Up to 10 users', maxUsers: 10,
-    who: '2–3 login types: Admin + Staff, or Admin + Staff + Dealer', cards: ['simple', 'stage'], docs: ['quotation', 'discom', 'feasibility'],
-    highlights: ['Choose your card – Simple (4 tabs) or Stage-by-stage (13 stages)', 'Quotation maker in your format', 'DISCOM agreement + feasibility report', 'Checklists, Google Drive links, Excel export · 30 days support'],
+    who: 'Admin + Staff, or Admin + Staff + Dealer', cards: ['simple'], docs: ['quotation', 'discom', 'feasibility'],
+    highlights: ['Simple customer card – 4 tabs, 11 stages, payment and subsidy tags', 'Quotation maker in your format', 'DISCOM agreement + feasibility report', 'Checklists, Google Drive links, Excel export', 'Year 1 hosting and support included'],
     includes: [
-      'Choose your customer card – Simple (4 tabs: Overview · Finance & Bank · Checklist · Notes & History) or Stage-by-stage (a tab for each of 13 stages)',
+      'Simple customer card – 4 tabs: Overview · Finance & Bank · Checklist · Notes & History',
       'Quotation maker in your format',
       'Every customer’s stage, next follow-up and pending work on one dashboard',
       'DISCOM agreement and bank feasibility report – filled from the customer card',
       'Checklists per customer and a Google Drive link on every customer',
       'Your logo, your stage names, your fields · Excel export any time',
-      'Setup + training call, WhatsApp support for 30 days',
+      'Setup + training call · year 1 hosting and WhatsApp support included',
     ],
   },
   {
-    id: 'growth', name: 'Growth', price: 52000, range: [40000, 60000], tagline: 'More staff and dealers, money tracked', popular: true,
+    id: 'growth', name: 'Standard', price: 58000, range: [50000, 65000], floor: 48000, tagline: 'Every stage, dealers and money tracked', popular: true,
     logins: 'Up to 25 users', maxUsers: 25,
-    who: 'Admin, Staff, Dealer', cards: ['simple', 'stage'], docs: ['quotation', 'discom', 'feasibility'],
-    highlights: ['Everything in Starter', 'Dealer logins – each dealer sees only their own leads', 'Finance bundle – invoice maker, payments, loan & subsidy tracking', 'Dealer commissions · staff management · 60 days support'],
+    who: 'Admin, Staff, Dealer', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility'],
+    highlights: ['Stage-by-stage customer card – 13 stages, lead to subsidy', 'Dealer logins – each dealer sees only their own leads', 'Finance bundle – invoice maker, payments, loan & subsidy tracking', 'Dealer commissions · staff management', 'Year 1 hosting and support included'],
     includes: [
-      'Everything in Starter',
-      'Choose your card – Simple (4 tabs) or Stage-by-stage (13 tabs)',
+      'Stage-by-stage customer card – a tab for every stage, each filled by the person who does it',
       'Dealer logins – each dealer sees only their own leads',
       'Dealer commission tracking',
       'Payment & loan tracking with pending-amount view',
       'Staff management – add, deactivate, see who did what',
-      'Setup + training call, WhatsApp support for 60 days',
+      'Setup + training · year 1 hosting and WhatsApp support included',
     ],
   },
   {
-    id: 'pro', name: 'Pro', price: 65000, range: [60000, 80000], tagline: 'Godown, delivery and installation teams',
+    id: 'pro', name: 'Pro', price: 75000, range: [65000, 85000], floor: 62000, tagline: 'Godown, delivery and installation teams',
     logins: 'Up to 50 users', maxUsers: 50,
     who: 'Admin, Staff, Dealer, Installation team, Godown', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
-    highlights: ['Everything in Growth', 'Delivery bundle – delivery batches, BOM, challan, gate pass, truck loading sheet', 'Inventory (godown)', 'Installation bundle + installation team commissions · 90 days support'],
+    highlights: ['Everything in Standard', 'Delivery bundle – delivery batches, BOM, challan, gate pass, truck loading sheet', 'Inventory (godown)', 'Installation team logins, jobs and payments', 'Year 1 hosting and support included'],
     includes: [
-      'Everything in Growth',
-      'Stage-by-stage customer card – a tab for every stage',
+      'Everything in Standard',
       'Godown stock, BOM & material checklist',
       'Delivery challan, truck loading sheet & gate pass',
-      'Installation team logins with job assignment',
-      'Setup + training call, WhatsApp support for 90 days',
+      'Installation team logins with job assignment and payments',
+      'Setup + training · year 1 hosting and WhatsApp support included',
     ],
   },
   {
-    id: 'complete', name: 'Complete', price: 80000, range: [80000, null], tagline: 'Branches and the full operation',
+    id: 'complete', name: 'Complete', price: 105000, range: [90000, 130000], floor: 85000, tagline: 'Branches, commercial projects and the full operation',
     logins: 'Unlimited users', maxUsers: null,
     who: 'Admin, Staff, Dealer, Installation team, Godown, Branch', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
     highlights: ['Everything in Pro', 'Branch office logins', 'Attendance and calendar', 'Commercial projects – launching soon', 'Unlimited users · priority support'],
@@ -64,7 +66,7 @@ export const PACKAGES = [
       'Branch office logins',
       'Staff attendance',
       'Calendar and reports',
-      'Unlimited users · priority support for 90 days',
+      'Unlimited users · priority support · year 1 hosting included',
     ],
   },
 ];
@@ -81,21 +83,20 @@ export const moveDataPrice = customers => offer(MOVE_PRICE[customers] ?? 10000);
 export const TEAM_SIZES = ['1–3', '4–6', '7–10', '11–25', '26–50', '50+'];
 export const LIVE_COUNTS = ['Under 50', '50 – 200', '200 – 500', '500+'];
 
-// The two customer cards. "simple" = the original SolarFlow card (old version),
-// "stage" = the current stage-by-stage card. Starter and Growth let the client choose
-// (same price); Pro and Complete use the stage card.
+// The two customer cards. "simple" = the Lite product (4 tabs),
+// "stage" = SolarFlow's stage-by-stage card (Standard, Pro and Complete).
 export const CARDS = [
   {
     id: 'simple', name: 'Simple card', sub: 'Original version · 4 tabs',
     tabs: ['Overview', 'Finance & Bank', 'Checklist', 'Notes & History'],
     bestFor: 'Fewer things to track · one office person updates everything',
-    packages: ['starter', 'growth'],
+    packages: ['starter'],
   },
   {
     id: 'stage', name: 'Stage-by-stage card', sub: 'New version · 13 stages',
     tabs: ['Lead', 'Registration', 'Loan / Cash', 'Material order', 'Integration', 'Delivery', 'Installation', 'Geo-tag photo', 'DISCOM submission', 'Meter', 'Inspection', 'Subsidy', 'Final review'],
     bestFor: 'Many things to track, different people per stage · any team size',
-    packages: ['starter', 'growth', 'pro', 'complete'],
+    packages: ['growth', 'pro', 'complete'],
   },
 ];
 
@@ -178,9 +179,8 @@ export function recommendCard({ track, team, live, operations, stock, branches }
 export function recommendFor(a) {
   const card = recommendCard(a);
   const base = recommend(a);
-  if (BIG.includes(a.team)) return base; // 26–50 → Pro, 50+ → Complete (no Simple card)
-  if (card === 'simple') return ['pro', 'complete'].includes(base) ? 'growth' : base;
-  return base === 'starter' ? 'growth' : base;
+  if (card === 'simple') return base;    // Lite if the answers fit it
+  return base === 'starter' ? 'growth' : base; // the stage card starts at Standard
 }
 
 // ── Business questions (sub-tabs in step 1) ──
@@ -263,11 +263,11 @@ export function itemsRank({ team, logins = [], docs = [] }) {
 }
 export function computePackage({ team, card, logins, docs }) {
   let r = itemsRank({ team, logins, docs });
-  void card; // both cards are available from Starter, same price
+  if (card === 'stage') r = Math.max(r, RANK.growth); // the stage card starts at Standard
   return BY_RANK[r];
 }
-// The Simple card exists only in Starter and Growth.
-export const simpleAllowed = sel => itemsRank(sel) <= RANK.growth;
+// The Simple card is the Lite product only.
+export const simpleAllowed = sel => itemsRank(sel) <= RANK.starter;
 export const packageFor = itemId => {
   const it = LOGIN_TYPES.find(t => t.id === itemId) || SAMPLE_DOCS.find(d => d.id === itemId);
   return it?.from;
@@ -320,13 +320,15 @@ export const approx = n => `≈ ₹${(Math.round(n / 500) * 500 / 1000).toString
 // Add-ons the chosen package doesn't already include.
 const has = (a, pkgId) => a.from && RANK_OF[a.from] <= RANK_OF[pkgId];
 export const addonsFor = pkgId => {
+  // Lite is the simple product as it is: anything more means Standard.
+  if (pkgId === 'starter') return [];
   const out = ADDONS.filter(a => !has(a, pkgId) && !a.soon);
   // "Both" only makes sense when neither commission is already included.
   return has(ADDONS.find(a => a.id === 'commission_dealer'), pkgId) ? out.filter(a => a.id !== 'commission_both') : out;
 };
 export const comingSoon = () => ADDONS.filter(a => a.soon);
 export const includedFeatures = pkgId => ADDONS.filter(a => has(a, pkgId) && !a.hideIncluded);
-const RANK_OF = { starter: 0, growth: 1, pro: 2, complete: 3 };
+const RANK_OF = RANK;
 // Apply the launch offer once, keeping the full price for the struck-through display.
 for (const p of PACKAGES) { p.fullPrice = p.price; p.fullRange = p.range; p.price = offer(p.price); p.range = p.range.map(offer); }
 // If the picked add-ons from a higher package cost at least the jump to it, suggest that package.
@@ -352,11 +354,12 @@ export const FREE_CUSTOMISATION = [
 export function recommend({ team, dealers, operations, stock, branches }) {
   if (branches === 'Yes' || team === '50+') return 'complete';
   if (stock === 'Yes' || operations === 'Yes' || team === '26–50') return 'pro';
-  if (dealers === 'Yes' || team === '11–25') return 'growth';
+  void dealers; // dealer logins are in Lite (a 1–10 team with dealers stays in Lite)
+  if (team === '11–25') return 'growth';
   return 'starter';
 }
 
-// User limits: Starter up to 10, Growth up to 25, Complete for more.
+// User limits: Lite up to 10, Standard up to 25, Pro up to 50, Complete for more.
 const TEAM_MAX = { '1–10': 10, '1–3': 3, '4–6': 6, '7–10': 10, '11–25': 25, '26–50': 50, '50+': Infinity, '25+': Infinity };
 export function fitsTeam(pkgId, team) {
   const p = PACKAGES.find(x => x.id === pkgId);
@@ -368,7 +371,7 @@ const fmt = n => n >= 100000 ? `₹${(n / 100000).toFixed(2).replace(/\.?0+$/, '
 export const money = n => '₹' + Number(n).toLocaleString('en-IN');
 
 // Clients see a price band, not the exact list price (that stays internal).
-const k = n => `₹${Math.round(n / 1000)}k`;
+const k = n => (n >= 100000 ? `₹${(n / 100000).toFixed(2).replace(/\.?0+$/, '')}L` : `₹${Math.round(n / 1000)}k`);
 export function rangeLabel([lo, hi], add = 0) {
   if (lo == null) return `Under ${k(hi + add)}`;
   if (hi == null) return `${k(lo + add)}+`;
@@ -397,14 +400,14 @@ export function quote({ pkg, data, customers, addons, card }) {
 // ── 2-tap helper on the package screen ──
 export const HELP_TEAM = ['1–10', '11–25', '26–50', '50+'];
 // "Besides customers, you also manage" – pick one or more (Just customers clears the rest).
-// Team size sets the package (1–10 Starter, 11–25 Growth, 26–50 Pro, 50+ Complete).
-// Dealers: dealer logins are already in Starter, so no change.
-// Godown & delivery: added as extras (Inventory + Delivery bundle) on top of the package.
+// Team size sets the package (1–10 Lite, 11–25 Standard, 26–50 Pro, 50+ Complete).
+// Dealers: dealer logins are already in Lite, so no change.
+// Godown & delivery: part of Pro.
 // Branches: branch logins exist only in Complete.
 export const HELP_MANAGE = [
   { id: 'customers', label: 'Just customers' },
   { id: 'dealers', label: 'Dealers' },
-  { id: 'stock', label: 'Godown & delivery', addons: ['godown', 'delivery'] },
+  { id: 'stock', label: 'Godown & delivery', pkg: 'pro' },
   { id: 'branches', label: 'Branches', pkg: 'complete' },
 ];
 export function helpPick(team, manage = []) {

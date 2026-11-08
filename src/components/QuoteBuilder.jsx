@@ -5,7 +5,7 @@ import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
 import {
   PACKAGES, ADDONS, CUSTOMER_COUNTS, LIVE_COUNTS, CARDS, CARD_COMPARISON,
   STORAGE_OPTIONS, STORAGE_GUIDE, STORAGE_PRICES_CHECKED, SAMPLE_DOCS, FIELD_SETUP, AFTER_CONFIRMATION, HELP_TEAM, HELP_MANAGE,
-  fitsTeam, quote, money, helpPick, helpAddons, packageRange, fullPackageRange, addonsFor, includedFeatures, comingSoon, ADDON_GROUPS, LAUNCH_OFFER,
+  CARE_PLAN, fitsTeam, quote, money, helpPick, helpAddons, packageRange, fullPackageRange, addonsFor, includedFeatures, comingSoon, ADDON_GROUPS, LAUNCH_OFFER,
 } from '../pricing/packages';
 import { SALES_WHATSAPP } from '../demo/whatsapp';
 import SimpleCardPreview from './SimpleCardPreview';
@@ -33,6 +33,7 @@ const SOURCES = ['Excel / Google Sheets', 'Tally', 'Odoo', 'Zoho', 'Other'];
 const sample = (file, ext) => `${import.meta.env.BASE_URL}samples/${file}.${ext}`;
 const STEPS = ['Package', 'Your setup', 'Send'];
 const PKG_IDS = PACKAGES.map(p => p.id);
+const knownPkg = id => (PKG_IDS.includes(id) ? id : '');
 
 const pill = on => `rounded-2xl border-2 px-3 py-2.5 text-sm min-h-11 text-left ${on ? 'border-orange-500 bg-orange-50 font-bold text-stone-900' : 'border-stone-200 bg-white text-stone-700 hover:border-orange-300'}`;
 
@@ -76,7 +77,7 @@ function Choice({ value, onPick, options, cols = 'grid-cols-2 sm:grid-cols-4' })
         const l = typeof o === 'string' ? o : o.label;
         return (
           <button key={v} type="button" role="radio" aria-checked={value === v} onClick={() => onPick(v)} className={pill(value === v)}>
-            {l}{o.sub && <span className="block text-[11px] font-normal text-stone-500">{o.sub}</span>}
+            {l}{typeof o !== 'string' && o.sub && <span className="block text-[11px] font-normal text-stone-500">{o.sub}</span>}
           </button>
         );
       })}
@@ -96,14 +97,14 @@ function ViewBtn({ onClick }) {
 export default function QuoteBuilder() {
   const [draft] = useState(readDraft);
   const d = draft || {};
-  const [linkPkg] = useState(() => (PKG_IDS.includes(urlParam('pkg')) ? urlParam('pkg') : ''));
+  const [linkPkg] = useState(() => knownPkg(urlParam('pkg')));
   const [ref] = useState(() => urlParam('ref'));
   // A personal link (name / phone filled in by us) first asks the client to confirm their details.
   const [fromLink] = useState(() => !!(urlParam('name') || urlParam('phone') || urlParam('ref')));
   const [confirmed, setConfirmed] = useState(!!d.confirmed);
   const [step, setStep] = useState(() => (fromLink && !d.confirmed ? 0 : 1));
   const [help, setHelp] = useState(d.help || { team: '', manage: [] });
-  const [pkg, setPkg] = useState(d.pkg || '');
+  const [pkg, setPkg] = useState(knownPkg(d.pkg || ''));
   const [card, setCard] = useState(d.card || 'simple');
   const [s, setS] = useState({ data: '', customers: '', source: '', sourceOther: '', website: '', websiteUrl: '', storage: '', live: '', ...(d.s || {}) });
   const [addons, setAddons] = useState(new Set(d.addons || []));
@@ -169,7 +170,7 @@ export default function QuoteBuilder() {
     ...(note.trim() ? [`Notes: ${note.trim()}`] : []),
     `${q.publicLines[0].label}: ${q.publicLines[0].amount}`,
     ...(q.publicLines.length > 1 ? [`Extras: ${q.publicLines.slice(1).map(l => l.label + (l.amount === 'price after a call' ? ' (price after a call)' : '')).join(', ')}`] : []),
-    `Estimated total: ${q.range}`,
+    `Estimated total: ${q.range} (one-time, year 1 hosting and support included)`,
     ...(LAUNCH_OFFER > 0 ? [`Launch offer: ${Math.round(LAUNCH_OFFER * 100)}% off included`] : []),
   ];
   const waHref = () => {
@@ -334,7 +335,7 @@ export default function QuoteBuilder() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-black text-stone-900">Two customer cards</p>
-              <p className="text-xs text-stone-500">Starter and Growth: pick either, same price. Simple = everything on 4 tabs. Stage-by-stage = 13 stages, lead to subsidy, each filled by the person who does it.</p>
+              <p className="text-xs text-stone-500">Lite uses the Simple card: everything on 4 tabs. Standard, Pro and Complete use Stage-by-stage: 13 stages, lead to subsidy, each filled by the person who does it.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setPreview('simple')} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-800 hover:border-orange-400"><Eye size={14}/> See the Simple card</button>
@@ -482,7 +483,7 @@ export default function QuoteBuilder() {
             <dl className="mt-3 space-y-1.5 text-sm">
               {rows.map(([k, v]) => <div key={k} className="grid grid-cols-[96px_1fr] gap-2"><dt className="font-bold text-stone-500">{k}</dt><dd className="text-stone-800">{v}</dd></div>)}
             </dl>
-            <p className="mt-3 text-[11px] text-stone-500">File storage is paid to the provider and is not part of this estimate. We confirm the final price on WhatsApp.</p>
+            <p className="mt-3 text-[11px] text-stone-500">Year 1 hosting and support included; after that an optional care plan, {CARE_PLAN.label}. File storage is paid to the provider and is not part of this estimate. We confirm the final price after a short call.</p>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <label className="block text-xs font-bold text-stone-700">Your name *<input className="sf-input mt-1" value={name} onChange={e => setName(e.target.value)} autoComplete="name" required/></label>

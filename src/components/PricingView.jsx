@@ -34,7 +34,7 @@ export default function PricingView() {
                 <p className="sf-kicker">SolarFlow for your team</p>
                 {LAUNCH_OFFER > 0 && <p className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Launch offer: {Math.round(LAUNCH_OFFER * 100)}% off every package</p>}
                 <h1 className="text-3xl md:text-4xl font-black text-stone-900">Pick your package. See your estimate in 1 minute.</h1>
-                <p className="text-sm leading-relaxed text-stone-600">Four packages, one-time payment, no monthly fee. Pick one, answer a few taps, and send it to us on WhatsApp – we reply with your final quotation.</p>
+                <p className="text-sm leading-relaxed text-stone-600">Four packages, one-time payment, no monthly fee. Year 1 hosting and support included. Pick one, answer a few taps, and send it to us on WhatsApp – we reply with your final quotation after a short call.</p>
                 <p className="text-sm text-stone-600">Rather just talk? <QuoteOnWhatsApp variant="link" label="Ask for a quotation on WhatsApp" context="pricing page"/></p>
             </header>}
             <QuoteBuilder/>
