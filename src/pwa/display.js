@@ -75,3 +75,19 @@ export function safeRemove(key) {
         // storage unavailable — nothing to remove
     }
 }
+
+/** Safari on a Mac (not iPad). Safari 17+ installs web apps via File → Add to Dock. */
+export function isMacSafari() {
+    if (!hasWindow || isIos()) return false;
+    const ua = window.navigator?.userAgent || '';
+    return /Macintosh/i.test(ua) && /Version\/(\d+)/i.test(ua) && /Safari\//i.test(ua)
+        && !/Chrome|Chromium|CriOS|Edg\/|OPR\//i.test(ua);
+}
+
+/** Chrome or Edge on a laptop/desktop, which can install the app from the browser menu. */
+export function isDesktopChromium() {
+    if (!hasWindow || isIos()) return false;
+    const ua = window.navigator?.userAgent || '';
+    if (/Android|Mobile/i.test(ua)) return false;
+    return /Chrome\/|Edg\//i.test(ua) && !/OPR\/|SamsungBrowser/i.test(ua);
+}

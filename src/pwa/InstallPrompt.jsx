@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { Share, Sun, X } from 'lucide-react';
-import { isIosSafari, isStandalone, safeGet, safeSet } from './display';
+import { isDesktopChromium, isIosSafari, isMacSafari, isStandalone, safeGet, safeSet } from './display';
 import { getInstallEvent, promptInstall, subscribeInstall } from './installState';
 
 const DISMISS_KEY = 'sf_install_dismissed_at';
@@ -30,6 +30,8 @@ export default function InstallPrompt() {
     const [ready, setReady] = useState(false);
     const [dismissed, setDismissed] = useState(() => isStandalone() || recentlyDismissed());
     const [iosSafari] = useState(() => isIosSafari());
+    const [macSafari] = useState(() => isMacSafari());
+    const [desktopChromium] = useState(() => isDesktopChromium());
     const [blockedByModal, setBlockedByModal] = useState(() => modalOpen());
 
     useEffect(() => subscribeInstall(setInstallEvent), []);
@@ -56,7 +58,7 @@ export default function InstallPrompt() {
         return () => media.removeEventListener?.('change', onChange);
     }, []);
 
-    const mode = installEvent ? 'prompt' : iosSafari ? 'ios' : null;
+    const mode = installEvent ? 'prompt' : iosSafari ? 'ios' : macSafari ? 'mac' : desktopChromium ? 'desktop' : null;
     if (!ready || dismissed || blockedByModal || !mode) return null;
 
     const dismiss = () => {
@@ -71,7 +73,7 @@ export default function InstallPrompt() {
         setDismissed(true);
     };
 
-    const title = mode === 'ios' ? 'Add SolarFlow to your Home Screen' : 'Install SolarFlow';
+    const title = 'Add SolarFlow to your home screen';
 
     return (
         <section
@@ -86,17 +88,14 @@ export default function InstallPrompt() {
                 </div>
                 <div className="min-w-0 flex-1">
                     <h2 id="sf-install-title" className="text-sm font-bold leading-snug">{title}</h2>
-                    {mode === 'ios' ? (
-                        <p id="sf-install-text" className="mt-0.5 text-xs leading-relaxed text-stone-600">
-                            Tap the Share button{' '}
+                    <p id="sf-install-text" className="mt-0.5 text-xs leading-relaxed text-stone-600">
+                        {mode === 'ios' && <>Tap the Share button{' '}
                             <Share size={14} className="inline -mt-0.5 text-stone-800" aria-label="Share" role="img" />{' '}
-                            then &lsquo;Add to Home Screen&rsquo;.
-                        </p>
-                    ) : (
-                        <p id="sf-install-text" className="mt-0.5 text-xs leading-relaxed text-stone-600">
-                            Add it to your home screen for one-tap access.
-                        </p>
-                    )}
+                            then &lsquo;Add to Home Screen&rsquo;.</>}
+                        {mode === 'mac' && <>In the menu bar choose File &rarr; &lsquo;Add to Dock&rsquo;. SolarFlow then opens like an app.</>}
+                        {mode === 'desktop' && <>Click the install icon at the right end of the address bar, or open the &#8942; menu &rarr; &lsquo;Cast, save and share&rsquo; &rarr; &lsquo;Install page as app&rsquo;.</>}
+                        {mode === 'prompt' && <>Open it in one click, like an app, without the browser bar.</>}
+                    </p>
                     {mode === 'prompt' && (
                         <div className="mt-3 flex items-center gap-2">
                             <button
@@ -104,7 +103,7 @@ export default function InstallPrompt() {
                                 onClick={install}
                                 className="rounded-lg bg-amber-500 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-amber-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
                             >
-                                Install
+                                Add to home screen
                             </button>
                             <button
                                 type="button"
