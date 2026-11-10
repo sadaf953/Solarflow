@@ -535,7 +535,7 @@ export default function QuoteBuilder() {
 // Price + navigation. Fixed to the bottom on phones so Continue is always under the thumb.
 function PriceBar({ q, back, next, disabled, hint }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 bg-stone-900 p-3 text-white shadow-lg sm:sticky sm:bottom-3 sm:mt-6 sm:rounded-2xl sm:p-4" aria-live="polite">
+    <div className="fixed inset-x-0 bottom-0 z-40 bg-stone-900 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-white shadow-lg sm:sticky sm:bottom-3 sm:mt-6 sm:rounded-2xl sm:p-4" aria-live="polite">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-2">
         <div className="min-w-0">
           <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-300">Estimated total · one-time</span>

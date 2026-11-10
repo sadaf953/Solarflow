@@ -1387,7 +1387,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
             {sidebarOpen && <div className="fixed inset-0 bg-black/40 z-40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
             {/* ── Sidebar ── */}
-            <aside ref={navigationDialogRef} role={sidebarOpen ? "dialog" : undefined} aria-modal={sidebarOpen || undefined} aria-label="Main navigation" className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-stone-100 flex flex-col h-screen max-h-screen overflow-hidden transform transition-transform duration-300 ${sidebarOpen ? 'flex' : 'hidden'} md:flex`}>
+            <aside ref={navigationDialogRef} role={sidebarOpen ? "dialog" : undefined} aria-modal={sidebarOpen || undefined} aria-label="Main navigation" className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-stone-100 flex flex-col h-screen pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] max-h-screen overflow-hidden transform transition-transform duration-300 ${sidebarOpen ? 'flex' : 'hidden'} md:flex`}>
                 <div className="p-5 border-b border-stone-100 flex justify-between items-center shrink-0">
                     <BrandMark size="md" />
                     <button aria-label="Close navigation" className="md:hidden text-stone-400" onClick={() => setSidebarOpen(false)}><X className="w-5 h-5" /></button>
