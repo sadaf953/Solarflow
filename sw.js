@@ -14,7 +14,7 @@
  *   so the UI can show a "New version available" prompt.
  */
 
-const VERSION = "ead02e973bbc"
+const VERSION = "cbf015249673"
 const PRECACHE = [
   "./",
   "./index.html",
@@ -25,7 +25,7 @@ const PRECACHE = [
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
   "./apple-touch-icon.png",
-  "./assets/index-0tX7IXfx.js",
+  "./assets/index-CDkQ8MKU.js",
   "./assets/index-Cw3MBCwR.css"
 ]
 
