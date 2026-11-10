@@ -1407,7 +1407,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                 {/* MOBILE FLOATING ACTION BUTTON */}
                 <button
                     onClick={() => setShowAddLead(true)}
-                    className="sm:hidden fixed bottom-6 right-4 z-40 bg-emerald-600 text-white w-12 h-12 rounded-full shadow-lg shadow-emerald-500/40 flex items-center justify-center active:scale-95 transition-transform"
+                    className="sm:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 z-40 bg-emerald-600 text-white w-12 h-12 rounded-full shadow-lg shadow-emerald-500/40 flex items-center justify-center active:scale-95 transition-transform"
                 >
                     <Plus size={22} />
                 </button>
