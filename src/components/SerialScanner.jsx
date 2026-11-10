@@ -33,32 +33,24 @@ export default function SerialScanner({ customerName, initialTarget = 'module', 
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
             setCameraError('Camera scanning needs HTTPS and a browser with camera access. You can enter the serial below.');
         } else {
-            import('@zxing/browser').then(async ({ BrowserMultiFormatReader }) => {
-                if (cancelled || !activeRef.current || !videoRef.current) return;
-                const reader = new BrowserMultiFormatReader();
-                const controls = await reader.decodeFromConstraints(
-                    { audio: false, video: { facingMode: { ideal: 'environment' } } },
-                    videoRef.current,
-                    result => {
-                        if (!result || !activeRef.current || busyRef.current) return;
-                        const value = result.getText();
-                        if (value === lastSeenRef.current.value && Date.now() - lastSeenRef.current.at < 3500) return;
-                        void saveValue(value);
-                    }
-                );
-                if (cancelled || !activeRef.current) controls.stop();
-                else {
-                    controlsRef.current = controls;
-                    setCameraReady(true);
-                    setCameraWaitingLong(false);
-                    setCameraError('');
-                }
+            startCamera(() => cancelled || !activeRef.current).then(controls => {
+                if (!controls) return;
+                if (cancelled || !activeRef.current) { controls.stop(); return; }
+                controlsRef.current = controls;
+                setCameraReady(true);
+                setCameraWaitingLong(false);
+                setCameraError('');
             }).catch(error => {
                 if (cancelled || !activeRef.current) return;
-                const denied = error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError';
-                setCameraError(denied
+                console.error('Serial scanner camera failed:', error);
+                const name = error?.name;
+                setCameraError(name === 'NotAllowedError' || name === 'PermissionDeniedError'
                     ? 'Camera access was denied. Allow camera permission for this site, or enter the serial below.'
-                    : 'Could not start the camera. You can still enter the serial below.');
+                    : name === 'NotReadableError' || name === 'TrackStartError'
+                        ? 'The camera is being used by another app. Close it and reopen the scanner, or enter the serial below.'
+                        : name === 'NotFoundError' || name === 'OverconstrainedError'
+                            ? 'No camera was found on this device. You can enter the serial below.'
+                            : 'Could not start the camera. You can still enter the serial below.');
             });
         }
 
@@ -74,6 +66,123 @@ export default function SerialScanner({ customerName, initialTarget = 'module', 
     // The refs above keep scan callbacks current without restarting the stream.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    function handleDecoded(value) {
+        if (!value || !activeRef.current || busyRef.current) return;
+        if (value === lastSeenRef.current.value && Date.now() - lastSeenRef.current.at < 3500) return;
+        void saveValue(value);
+    }
+
+    // Runs our own camera + decode loop. The old zxing decodeFromConstraints
+    // loop stopped for good on the first frame that threw anything other than
+    // "not found" (and the error was ignored), and it asked for the default
+    // 640x480 stream, which is too coarse for the dense Code 128 labels on
+    // panels and inverters. This loop never dies on a bad frame.
+    async function startCamera(isStopped) {
+        const video = videoRef.current;
+        if (!video) return null;
+        let stream;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+            });
+        } catch (error) {
+            if (error?.name !== 'OverconstrainedError') throw error;
+            stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+        }
+        const stopStream = () => stream.getTracks().forEach(track => track.stop());
+        if (isStopped()) { stopStream(); return null; }
+
+        const [track] = stream.getVideoTracks();
+        try {
+            const caps = track?.getCapabilities?.() || {};
+            if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+                await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+            }
+        } catch { /* Focus control is optional. */ }
+
+        video.srcObject = stream;
+        video.setAttribute('playsinline', 'true');
+        try { await video.play(); } catch { /* autoPlay + muted usually covers this. */ }
+        if (!video.videoWidth) {
+            await new Promise(resolve => {
+                const done = () => { video.removeEventListener('loadedmetadata', done); resolve(); };
+                video.addEventListener('loadedmetadata', done);
+                setTimeout(done, 4000);
+            });
+        }
+        if (isStopped()) { stopStream(); video.srcObject = null; return null; }
+
+        const decode = await createDecoder();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        let stopped = false;
+        let timer = 0;
+        const loop = async () => {
+            if (stopped) return;
+            try {
+                const w = video.videoWidth;
+                const h = video.videoHeight;
+                if (w && h && video.readyState >= 2 && !busyRef.current) {
+                    const scale = Math.min(1, 1600 / Math.max(w, h));
+                    canvas.width = Math.round(w * scale);
+                    canvas.height = Math.round(h * scale);
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const value = await decode(canvas);
+                    if (!stopped && value) handleDecoded(value);
+                }
+            } catch (error) {
+                console.debug('Serial scan frame skipped:', error);
+            }
+            if (!stopped) timer = window.setTimeout(loop, 150);
+        };
+        loop();
+        return {
+            stop() {
+                stopped = true;
+                window.clearTimeout(timer);
+                stopStream();
+                video.srcObject = null;
+            },
+        };
+    }
+
+    async function createDecoder() {
+        const nativeFormats = ['code_128', 'code_39', 'code_93', 'ean_13', 'ean_8', 'upc_a', 'itf', 'qr_code', 'data_matrix', 'pdf417'];
+        if ('BarcodeDetector' in window) {
+            try {
+                const supported = await window.BarcodeDetector.getSupportedFormats();
+                const formats = nativeFormats.filter(format => supported.includes(format));
+                if (formats.includes('code_128')) {
+                    const detector = new window.BarcodeDetector({ formats });
+                    return async canvas => {
+                        const found = await detector.detect(canvas);
+                        return found.find(code => code.rawValue)?.rawValue || '';
+                    };
+                }
+            } catch { /* Fall back to zxing below. */ }
+        }
+        const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType, NotFoundException, ChecksumException, FormatException }] = await Promise.all([
+            import('@zxing/browser'), import('@zxing/library'),
+        ]);
+        const hints = new Map();
+        hints.set(DecodeHintType.TRY_HARDER, true);
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.CODE_93, BarcodeFormat.EAN_13,
+            BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.ITF, BarcodeFormat.QR_CODE,
+            BarcodeFormat.DATA_MATRIX, BarcodeFormat.PDF_417,
+        ]);
+        const reader = new BrowserMultiFormatReader(hints);
+        return async canvas => {
+            try {
+                return reader.decodeFromCanvas(canvas).getText();
+            } catch (error) {
+                if (error instanceof NotFoundException || error instanceof ChecksumException || error instanceof FormatException) return '';
+                throw error;
+            }
+        };
+    }
 
     async function saveValue(value) {
         if (busyRef.current) return false;
