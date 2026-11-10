@@ -40,6 +40,7 @@ const QuotationModule = lazyWithRetry(() => import('../quotations/QuotationModul
 const openQuotations = () => { window.location.hash = '/quotations'; };
 import { quotationRepository } from '../quotations/client';
 import { summarizeSolarEquipment } from '../dashboard/solarStats';
+import { loadDashboardMetrics } from '../dashboard/metrics';
 
 const ViewLoader = () => <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-stone-900 border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -350,13 +351,8 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
     const PAGE_SIZE = 50;
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
-    const [metrics, setMetrics] = useState(() => {
-        try {
-            if (typeof window === 'undefined') return null;
-            const cached = window.sessionStorage.getItem('solarflow_cached_metrics') || window.localStorage.getItem('solarflow_cached_metrics');
-            return cached ? JSON.parse(cached) : null;
-        } catch { return null; }
-    });
+    // Never restore company-wide totals into a different visitor/role's dashboard.
+    const [metrics, setMetrics] = useState(null);
     const [trashCount, setTrashCount] = useState(0);
     const isChannelPartnerOffice = user?.userType === 'channel_partner_office' || user?.userType === 'office2';
     // Delivery Batches is a head-office function: Admin and Office only. Neither
@@ -462,6 +458,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
         }
 
         supabase.from(isChannelPartnerOffice ? 'cpo_leads' : 'admin').select('id', { count: 'exact', head: true }).not('deleted_at', 'is', null).then(trashRes => {
+            if (requestId !== metricsRequestRef.current) return;
             if (!trashRes.error && typeof trashRes.count === 'number') {
                 setTrashCount(trashRes.count);
             }
@@ -469,29 +466,24 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
 
         if (canSeeDeliveryBatches) {
             supabase.from('delivery_batches').select('id', { count: 'exact', head: true }).neq('status', 'DELIVERED').then(batchesRes => {
+                if (requestId !== metricsRequestRef.current) return;
                 if (!batchesRes.error && typeof batchesRes.count === 'number') {
                     setMetrics(prev => prev ? { ...prev, deliveryBatchesCount: batchesRes.count } : prev);
                 }
             }).catch(() => {});
         }
 
-        let metricsRes = await supabase.rpc(isChannelPartnerOffice ? 'get_cpo_dashboard_metrics' : 'get_dashboard_metrics_scoped', {
-            ...(!isChannelPartnerOffice ? {p_channel_partner:targetPartner} : {}),
-            p_dealer: dealerFilter?.trim() || null
+        const metricsRes = await loadDashboardMetrics(supabase, {
+            restricted: isChannelPartnerOffice,
+            partner: targetPartner,
+            dealer: dealerFilter?.trim() || null,
         });
-
-        // Deployment-safe fallback: the UI may be published before the additive
-        // dealer-aware RPC migration is run. Keep the existing counts visible
-        // instead of replacing the entire sidebar with zeroes. Once the new RPC
-        // exists, dealer-filtered metrics are used automatically.
-        if (metricsRes.error && !isChannelPartnerOffice) {
-            console.warn('Scoped metrics unavailable; using existing dashboard metrics:', metricsRes.error.message);
-            metricsRes = await supabase.rpc('get_dashboard_metrics', {
-                p_channel_partner: targetPartner
-            });
-        }
-
-        setScopeError(isChannelPartnerOffice && metricsRes.error ? 'CPO ownership setup is required. Run 09_cpo_lead_scope.sql, then switch role again.' : '');
+        if (requestId !== metricsRequestRef.current) return;
+        setScopeError(metricsRes.error
+            ? (isChannelPartnerOffice
+                ? 'Your office summary is unavailable. Ask your administrator to check the office and manager assignments.'
+                : 'The project summary could not be loaded. Please try again.')
+            : '');
         let finalMetrics = {
             totalProjects: 0, completedCount: 0, liveProjects: 0, loanCount: 0, cashCount: 0, stageCounts: {}, deliveryBatchesCount: 0,
             installationTagCount: 0, subsidyTagCount: 0, loanTagCount: 0
@@ -512,11 +504,8 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                 ...finalMetrics,
                 deliveryBatchesCount: prev?.deliveryBatchesCount ?? finalMetrics.deliveryBatchesCount
             }));
-            try {
-                window.sessionStorage.setItem('solarflow_cached_metrics', JSON.stringify(finalMetrics));
-                window.localStorage.setItem('solarflow_cached_metrics', JSON.stringify(finalMetrics));
-            } catch { /* cached metrics are optional */ }
         } else {
+            setMetrics(null);
             console.error('Metrics fetch error:', metricsRes.error);
         }
     };
@@ -610,7 +599,10 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
 
     useEffect(() => {
         setPage(0);
+        setMetrics(null);
+        setScopeError('');
         fetchMetricsAndMeta();
+        return () => { metricsRequestRef.current += 1; };
     }, [channelPartnerFilter, dealerFilter, leadMonthFilter, registrationMonthFilter, yearFilter, isChannelPartnerOffice, partnerName]);
 
     useEffect(() => {
@@ -1683,7 +1675,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     <Suspense fallback={<ViewLoader />}>
                     {currentView === 'inventory' && ['admin','sales'].includes(user.userType) && <InventoryView currentUser={user} />}
                     {currentView === 'dashboard' && user.userType === 'admin' && onStartDemoTour && <section className="demo-start-here" aria-labelledby="demo-start-heading"><div><span className="demo-start-eyebrow">START HERE</span><h2 id="demo-start-heading">See how a solar project comes together</h2><p>Explore quotations, a sample customer, materials, installation and subsidy in six short steps.</p></div><div className="demo-start-buttons"><button type="button" onClick={()=>onStartDemoTour('quick')}>Start the 6-step tour</button><button type="button" onClick={()=>onStartDemoTour('quick',2)}>Open a sample customer</button><button type="button" onClick={()=>onStartDemoTour('full')}>Full walkthrough</button></div></section>}
-                    {currentView === 'dashboard' && <DashboardView metrics={metrics} loading={loading} scoped={isChannelPartnerOffice} />}
+                    {currentView === 'dashboard' && !scopeError && <DashboardView metrics={metrics} loading={loading} scoped={isChannelPartnerOffice} />}
                     {currentView === 'delivery_batches' && canSeeDeliveryBatches && (
                         <DeliveryBatchesView 
                              currentUser={user} 
