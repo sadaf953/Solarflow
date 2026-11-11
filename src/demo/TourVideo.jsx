@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { logLinkEvent } from './linkTracking';
 
 // 2-minute product tour. Phones get the vertical cut, laptops the wide one.
 // Nothing downloads until the visitor presses play (preload="none").
@@ -33,6 +34,7 @@ export default function TourVideo() {
      controls
      playsInline
      preload="none"
+     onPlay={() => logLinkEvent('video_play', 'tour')}
      poster={`${base}video/solarflow-tour-${name}.jpg`}
      width={phone ? 720 : 1600}
      height={phone ? 1280 : 900}

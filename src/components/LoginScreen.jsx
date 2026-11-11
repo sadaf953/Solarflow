@@ -13,6 +13,7 @@ import QuoteBuilder from './QuoteBuilder';
 import BrandMark from './BrandMark';
 import QuoteOnWhatsApp from '../demo/QuoteOnWhatsApp';
 import { rememberVisitor } from '../demo/whatsapp';
+import { logLinkEvent } from '../demo/linkTracking';
 import '../demo/demo.css';
 import TourVideo from '../demo/TourVideo';
 const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handshake,Users,Truck,Stamp];
@@ -225,6 +226,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
    if(nameToUse){
     try { localStorage.setItem('solarflow_visitor_name', nameToUse); } catch { /* storage may be unavailable */ }
    }
+   logLinkEvent('demo_enter','demo');
    onLogin({...data,userType:data.user_type || data.userType,isDemo:true});
    if(['admin','sales'].includes(data.user_type)){
     Promise.allSettled([

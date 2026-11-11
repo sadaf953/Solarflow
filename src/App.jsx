@@ -2,6 +2,7 @@ import {ensureGroupedDemoBatches} from './demo/deliveryBatches';
 import {ensureThreeDemoDrivers} from './demo/drivers';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { supabase } from './supabase';
+import { logLinkEvent } from './demo/linkTracking';
 import { readPreparedBriefId } from './enquiries/brief';
 import { readSubmittedEnquiryId } from './enquiries/reopen';
 import { readSignToken } from './quotations/sign/links';
@@ -68,10 +69,13 @@ export default function App(){
  const [recoveryMode, setRecoveryMode]=useState(false);
  const [publicView,setPublicView]=useState(()=>typeof window!=='undefined'?routeOf(window.location.hash):null);
  const [clientQuoteLink,setClientQuoteLink]=useState(()=>typeof window!=='undefined'&&Boolean(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)));
+ // Personal link (?c=code): log that this client opened it.
+ useEffect(()=>{logLinkEvent('open',routeOf(window.location.hash)||'home');},[]);
  useEffect(()=>{
   const sync=()=>{
    setClientQuoteLink(Boolean(readPreparedBriefId(window.location.hash)||readSubmittedEnquiryId(window.location.hash)));
    setPublicView(routeOf(window.location.hash));
+   if(/[?&]c=/.test(window.location.hash))logLinkEvent('open',routeOf(window.location.hash)||'home');
   };
   window.addEventListener('hashchange',sync);
   window.addEventListener('popstate',sync);

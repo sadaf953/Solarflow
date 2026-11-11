@@ -66,6 +66,8 @@ self.addEventListener('fetch', (event) => {
   const relPath = url.pathname.startsWith(scopePath) ? url.pathname.slice(scopePath.length) : url.pathname
   // The update checks must always hit the network.
   if (relPath === 'version.json' || relPath === 'sw.js') return
+  // Videos stream with Range requests; iPhones fail to play them through a service worker.
+  if (relPath.startsWith('videos/')) return
 
   if (request.mode === 'navigate') {
     event.respondWith(handleNavigation(request))

@@ -15,8 +15,8 @@ export const offer = n => (n == null ? n : Math.round(n * (1 - LAUNCH_OFFER) / 5
 export const CARE_PLAN = { range: [12000, 18000], label: '₹12k – ₹18k a year from year 2 (hosting, backups, fixes, small changes)' };
 export const PACKAGES = [
   {
-    id: 'starter', name: 'Lite', price: 38000, range: [30000, 45000], floor: 28000, tagline: 'The simple 4-tab CRM for a smaller team',
-    logins: 'Up to 10 users', maxUsers: 10,
+    id: 'starter', name: 'Lite', price: 40000, range: [35000, 45000], floor: 33000, tagline: 'The simple 4-tab CRM for a smaller team',
+    logins: 'Up to 15 users', maxUsers: 15,
     who: 'Admin + Staff, or Admin + Staff + Dealer', cards: ['simple'], docs: ['quotation', 'discom', 'feasibility'],
     highlights: ['Simple customer card – 4 tabs, 11 stages, payment and subsidy tags', 'Quotation maker in your format', 'DISCOM agreement + feasibility report', 'Checklists, Google Drive links, Excel export', 'Year 1 hosting and support included'],
     includes: [
@@ -30,7 +30,7 @@ export const PACKAGES = [
     ],
   },
   {
-    id: 'growth', name: 'Standard', price: 58000, range: [50000, 65000], floor: 48000, tagline: 'Every stage, dealers and money tracked', popular: true,
+    id: 'growth', name: 'Standard', price: 52000, range: [45000, 60000], floor: 43000, tagline: 'Every stage, dealers and money tracked', popular: true,
     logins: 'Up to 25 users', maxUsers: 25,
     who: 'Admin, Staff, Dealer', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility'],
     highlights: ['Stage-by-stage customer card – 13 stages, lead to subsidy', 'Dealer logins – each dealer sees only their own leads', 'Finance bundle – invoice maker, payments, loan & subsidy tracking', 'Dealer commissions · staff management', 'Year 1 hosting and support included'],
@@ -44,7 +44,7 @@ export const PACKAGES = [
     ],
   },
   {
-    id: 'pro', name: 'Pro', price: 75000, range: [65000, 85000], floor: 62000, tagline: 'Godown, delivery and installation teams',
+    id: 'pro', name: 'Pro', price: 67000, range: [60000, 75000], floor: 57000, tagline: 'Godown, delivery and installation teams',
     logins: 'Up to 50 users', maxUsers: 50,
     who: 'Admin, Staff, Dealer, Installation team, Godown', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
     highlights: ['Everything in Standard', 'Delivery bundle – delivery batches, BOM, challan, gate pass, truck loading sheet', 'Inventory (godown)', 'Installation team logins, jobs and payments', 'Year 1 hosting and support included'],
@@ -57,7 +57,7 @@ export const PACKAGES = [
     ],
   },
   {
-    id: 'complete', name: 'Complete', price: 105000, range: [90000, 130000], floor: 85000, tagline: 'Branches, commercial projects and the full operation',
+    id: 'complete', name: 'Complete', price: 82000, range: [75000, 90000], floor: 72000, tagline: 'Branches, commercial projects and the full operation',
     logins: 'Unlimited users', maxUsers: null,
     who: 'Admin, Staff, Dealer, Installation team, Godown, Branch', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
     highlights: ['Everything in Pro', 'Branch office logins', 'Attendance and calendar', 'Commercial projects – launching soon', 'Unlimited users · priority support'],
@@ -203,27 +203,31 @@ export const loginFlags = ids => ({
 export const STORAGE_PRICES_CHECKED = '14 Oct 2026';
 export const STORAGE_OPTIONS = [
   {
+    id: 'supabase', label: 'Inside the CRM', short: 'Inside the CRM (Supabase)', who: 'Paid to Supabase: $25 a month (about ₹2,200)',
+    how: 'Upload and open files right inside SolarFlow, as in the demo. Stored on Supabase.',
+    prices: ['Free – 1 GB (small trial use only)', 'Pro – $25 / month (about ₹2,200), 100 GB included', 'More space – $0.0213 per extra GB / month'],
+    link: 'https://supabase.com/pricing', linkName: 'Supabase', recommended: true,
+    tradeoff: 'Everything in one place, inside the CRM, with backups.',
+  },
+  {
     id: 'gdrive', label: 'Google Drive', short: 'Google Drive', who: 'Paid to Google (Google One)',
     how: 'Files stay in your Google Drive. Add a folder or file link on each customer – an Access button opens it.',
     prices: ['Free – 15 GB (every Google account)', 'Lite 30 GB – ₹59 / month', 'Basic 100 GB – ₹130 / month'],
-    link: 'https://one.google.com/about/plans',
+    link: 'https://one.google.com/about/plans', linkName: 'Google One',
+    tradeoff: 'Cheapest, but the files sit in one person’s Google account.',
   },
   {
     id: 'workspace', label: 'Google Workspace', short: 'Google Workspace', who: 'Paid to Google, per user',
     how: 'Business Google account with company email (you@yourcompany.in) and shared Drive. Same Access button on each customer.',
     prices: ['Base – ₹99 / user / month, 20 GB per user', 'Starter – ₹270 / user / month, 30 GB per user', 'Standard – ₹1,080 / user / month, 2 TB per user'],
-    link: 'https://workspace.google.com/pricing',
-  },
-  {
-    id: 'supabase', label: 'Inside the CRM', short: 'Inside the CRM (Supabase)', who: 'Paid to Supabase, in US dollars',
-    how: 'Upload and open files right inside SolarFlow, as in the demo. Stored on Supabase.',
-    prices: ['Free – 1 GB (small trial use only)', 'Pro – $25 / month (about ₹2,200), 100 GB included', 'More space – $0.0213 per extra GB / month'],
-    link: 'https://supabase.com/pricing',
+    link: 'https://workspace.google.com/pricing', linkName: 'Google Workspace',
+    tradeoff: 'Owned by the company, but you pay for every user.',
   },
   {
     id: 'none', label: 'Not needed', short: 'No file storage', who: 'No extra cost',
     how: 'Only checklists – tick each document when you receive it.',
     prices: ['₹0'],
+    tradeoff: 'No files – only checklists.',
   },
 ];
 // Rough sizing: a solar customer file (Aadhaar, bill, agreement, site photos) ≈ 20 MB.
@@ -245,7 +249,7 @@ export const docIncluded = (doc, pkg) => RANK[pkg] >= RANK[doc.from];
 // ── Package from what the client keeps ticked ──
 // Every login type and document belongs to a package. The client starts with the
 // suggested package's items ticked, can untick / tick, and the package follows.
-const TEAM_RANK = { '1–10': 0, '1–3': 0, '4–6': 0, '7–10': 0, '11–25': 1, '26–50': 2, '50+': 3 };
+const TEAM_RANK = { '1–15': 0, '16–25': 1, '1–10': 0, '1–3': 0, '4–6': 0, '7–10': 0, '11–25': 1, '26–50': 2, '50+': 3 };
 export const teamRank = team => TEAM_RANK[team] ?? 0;
 export function defaultsFor(pkgId) {
   const r = RANK[pkgId] ?? 0;
@@ -293,7 +297,7 @@ export const AFTER_CONFIRMATION = [
 // Features are sold as BUNDLES (things that only make sense together) or STAND-ALONE.
 // `from` = package that already includes it. `price` = estimate, shown as "≈ ₹5k".
 // Commissions: pick dealers, installation team, or both (`exclusive` – one choice at a time).
-export const ADDON_GROUPS = ['Included documents', 'Bundles', 'Stand-alone', 'Commissions', 'Custom'];
+export const ADDON_GROUPS = ['Included documents', 'Bundles', 'Stand-alone', 'Commissions', 'Extras', 'Custom'];
 export const ADDONS = [
   { id: 'quotation_maker', group: 'Included documents', label: 'Quotation maker', from: 'starter', docs: ['quotation'] },
   { id: 'discom_doc', group: 'Included documents', label: 'DISCOM submission document', from: 'starter', docs: ['discom'] },
@@ -314,14 +318,19 @@ export const ADDONS = [
   { id: 'commission_install', group: 'Commissions', label: 'For installation team', price: 3500, from: 'pro', exclusive: 'commission' },
   { id: 'commission_both', group: 'Commissions', label: 'Both', price: 6500, from: 'pro', exclusive: 'commission', hideIncluded: true },
 
+  // Extras for every package, Lite included. `custom: true` = "price after a call" until prices are set.
+  { id: 'otp', group: 'Extras', label: 'OTP login', custom: true, any: true, example: 'Staff and dealers log in with a one-time code sent to their phone. No passwords to share.' },
+  { id: 'gps', group: 'Extras', label: 'GPS check-in for the installation team', custom: true, any: true, example: 'The team checks in at the site from their phone. You see who reached which site, and when.' },
+  { id: 'esign', group: 'Extras', label: 'E-sign', custom: true, any: true, example: 'Customers sign the agreement and other documents on their phone. The signed copy stays on the customer card.' },
+
   { id: 'commercial', group: 'Custom', label: 'Commercial projects', soon: true, example: 'Commercial / industrial rooftop with your own stages.' },
 ];
 export const approx = n => `≈ ₹${(Math.round(n / 500) * 500 / 1000).toString().replace(/\.0$/, '')}k`;
 // Add-ons the chosen package doesn't already include.
 const has = (a, pkgId) => a.from && RANK_OF[a.from] <= RANK_OF[pkgId];
 export const addonsFor = pkgId => {
-  // Lite is the simple product as it is: anything more means Standard.
-  if (pkgId === 'starter') return [];
+  // Lite is the simple product as it is (plus the Extras): anything more means Standard.
+  if (pkgId === 'starter') return ADDONS.filter(a => a.any);
   const out = ADDONS.filter(a => !has(a, pkgId) && !a.soon);
   // "Both" only makes sense when neither commission is already included.
   return has(ADDONS.find(a => a.id === 'commission_dealer'), pkgId) ? out.filter(a => a.id !== 'commission_both') : out;
@@ -355,12 +364,12 @@ export function recommend({ team, dealers, operations, stock, branches }) {
   if (branches === 'Yes' || team === '50+') return 'complete';
   if (stock === 'Yes' || operations === 'Yes' || team === '26–50') return 'pro';
   void dealers; // dealer logins are in Lite (a 1–10 team with dealers stays in Lite)
-  if (team === '11–25') return 'growth';
+  if (team === '11–25' || team === '16–25') return 'growth';
   return 'starter';
 }
 
-// User limits: Lite up to 10, Standard up to 25, Pro up to 50, Complete for more.
-const TEAM_MAX = { '1–10': 10, '1–3': 3, '4–6': 6, '7–10': 10, '11–25': 25, '26–50': 50, '50+': Infinity, '25+': Infinity };
+// User limits: Lite up to 15, Standard up to 25, Pro up to 50, Complete for more.
+const TEAM_MAX = { '1–15': 15, '16–25': 25, '1–10': 10, '1–3': 3, '4–6': 6, '7–10': 10, '11–25': 25, '26–50': 50, '50+': Infinity, '25+': Infinity };
 export function fitsTeam(pkgId, team) {
   const p = PACKAGES.find(x => x.id === pkgId);
   if (!p || !team || p.maxUsers == null) return true;
@@ -398,9 +407,9 @@ export function quote({ pkg, data, customers, addons, card }) {
 }
 
 // ── 2-tap helper on the package screen ──
-export const HELP_TEAM = ['1–10', '11–25', '26–50', '50+'];
+export const HELP_TEAM = ['1–15', '16–25', '26–50', '50+'];
 // "Besides customers, you also manage" – pick one or more (Just customers clears the rest).
-// Team size sets the package (1–10 Lite, 11–25 Standard, 26–50 Pro, 50+ Complete).
+// Team size sets the package (1–15 Lite, 16–25 Standard, 26–50 Pro, 50+ Complete).
 // Dealers: dealer logins are already in Lite, so no change.
 // Godown & delivery: part of Pro.
 // Branches: branch logins exist only in Complete.
@@ -417,3 +426,51 @@ export function helpPick(team, manage = []) {
 }
 // Extras to pre-tick for the chosen package from the helper answers.
 export const helpAddons = (manage = []) => HELP_MANAGE.filter(m => manage.includes(m.id)).flatMap(m => m.addons || []);
+
+// ── Budget question (steers the suggestion, never sets the price) ──
+// pkg = the package that usually fits that budget.
+export const BUDGETS = [
+  { id: 'u40', label: 'Under ₹40k', max: 40000, pkg: 'starter' },
+  { id: '40-60', label: '₹40k – ₹60k', max: 60000, pkg: 'growth' },
+  { id: '60-90', label: '₹60k – ₹90k', max: 90000, pkg: 'pro' },
+  { id: '90+', label: '₹90k+', max: Infinity, pkg: 'complete' },
+];
+// 'fits' | 'over' (the package starts above the budget) | 'room' (budget well above it) | '' (no budget)
+export function budgetFit(pkgId, budgetId) {
+  const b = BUDGETS.find(x => x.id === budgetId), p = PACKAGES.find(x => x.id === pkgId);
+  if (!b || !p) return '';
+  if (p.range[0] >= b.max) return 'over';
+  if (RANK[b.pkg] > RANK[pkgId] && p.range[1] < b.max) return 'room';
+  return 'fits';
+}
+
+// ── Cold-email landing (#/plans?team=small | ?team=big) ──
+// file  = the video on our own site: put the .mp4 in public/videos/ and write its name here.
+// drive = a Google Drive share link ("Anyone with the link") – shown as a backup link, and
+//         played inside the page when there is no file. youtube = optional, same idea.
+// All empty = the video block is hidden.
+export const TEAM_VIDEOS = {
+  small: { file: 'solarflow-1min-vertical.mp4', drive: '', youtube: '', title: 'SolarFlow Lite in 1 minute', team: '1–15', for: 'Up to 15 people' },
+  big: { file: 'solarflow-1min-vertical.mp4', drive: '', youtube: '', title: 'SolarFlow in 1 minute', team: '16–25', for: '15+ people' },
+};
+// youtube.com/shorts/ID, youtu.be/ID, youtube.com/watch?v=ID or a bare ID → embed URL ('' if none).
+export function youtubeEmbed(url) {
+  const m = String(url || '').trim().match(/(?:shorts\/|youtu\.be\/|[?&]v=|embed\/)([\w-]{11})|^([\w-]{11})$/);
+  const id = m && (m[1] || m[2]);
+  return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=0` : '';
+}
+// drive.google.com/file/d/ID/view or open?id=ID → { view, embed } ('' if none).
+export function driveLinks(url) {
+  const m = String(url || '').trim().match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{20,})/);
+  return m ? { view: `https://drive.google.com/file/d/${m[1]}/view`, embed: `https://drive.google.com/file/d/${m[1]}/preview` } : { view: '', embed: '' };
+}
+// What the page plays: our own file first, then Drive, then YouTube. null = no video.
+export function teamVideo(team, base = '/') {
+  const v = TEAM_VIDEOS[team];
+  if (!v) return null;
+  const drive = driveLinks(v.drive);
+  const file = v.file ? `${base}videos/${v.file.replace(/^\/?(videos\/)?/, '')}` : '';
+  const iframe = file ? '' : drive.embed || youtubeEmbed(v.youtube);
+  if (!file && !iframe) return null;
+  return { ...v, src: file, iframe, driveView: drive.view };
+}

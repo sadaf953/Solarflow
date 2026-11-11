@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import CustomizationEnquiryForm from './CustomizationEnquiryForm';
 import QuoteBuilder from './QuoteBuilder';
-import { LAUNCH_OFFER } from '../pricing/packages';
+import { LAUNCH_OFFER, teamVideo } from '../pricing/packages';
 import QuoteOnWhatsApp from '../demo/QuoteOnWhatsApp';
 import { readPreparedBriefId } from '../enquiries/brief';
 import { readSubmittedEnquiryId } from '../enquiries/reopen';
@@ -9,8 +9,12 @@ import { readSubmittedEnquiryId } from '../enquiries/reopen';
 // A personal link we sent (name / phone / ref in it) opens straight on the client's details.
 const isPersonalLink = hash => { const q = new URLSearchParams(hash.split('?')[1] || ''); return !!(q.get('name') || q.get('phone') || q.get('ref')); };
 
+// Cold-email link (#/plans?team=small|big) with its video set: the video is the first thing they see.
+const videoLink = hash => teamVideo(new URLSearchParams(hash.split('?')[1] || '').get('team'));
+
 export default function PricingView() {
     const [personal] = useState(() => isPersonalLink(window.location.hash));
+    const [video] = useState(() => videoLink(window.location.hash));
     const [preparedBriefId, setPreparedBriefId] = useState(() => readPreparedBriefId(window.location.hash));
     const [submittedEnquiryId, setSubmittedEnquiryId] = useState(() => readSubmittedEnquiryId(window.location.hash));
     useEffect(() => {
@@ -29,8 +33,8 @@ export default function PricingView() {
         </main>
     );
     return (
-        <div className={`max-w-7xl mx-auto ${personal ? 'py-4 space-y-3' : 'py-8 md:py-12 space-y-8'}`}>
-            {personal ? <p className="sf-kicker">Your SolarFlow quotation</p> : <header className="max-w-3xl space-y-3">
+        <div className={`max-w-7xl mx-auto ${personal || video ? 'py-4 space-y-3' : 'py-8 md:py-12 space-y-8'}`}>
+            {personal ? <p className="sf-kicker">Your SolarFlow quotation</p> : video ? <p className="sf-kicker">SolarFlow for teams of {video.for.toLowerCase()} · one-time licence, no monthly fee</p> : <header className="max-w-3xl space-y-3">
                 <p className="sf-kicker">SolarFlow for your team</p>
                 {LAUNCH_OFFER > 0 && <p className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Launch offer: {Math.round(LAUNCH_OFFER * 100)}% off every package</p>}
                 <h1 className="text-3xl md:text-4xl font-black text-stone-900">Pick your package. See your estimate in 1 minute.</h1>

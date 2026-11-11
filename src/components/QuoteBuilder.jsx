@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ArrowRight, ArrowLeft, CheckCircle2, MessageCircle, Star, Eye, ExternalLink, Users, FileText, LayoutGrid } from 'lucide-react';
 import { supabase } from '../supabase';
+import { logLinkEvent, readClientCode } from '../demo/linkTracking';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
 import {
   PACKAGES, ADDONS, CUSTOMER_COUNTS, LIVE_COUNTS, CARDS, CARD_COMPARISON,
   STORAGE_OPTIONS, STORAGE_GUIDE, STORAGE_PRICES_CHECKED, SAMPLE_DOCS, FIELD_SETUP, AFTER_CONFIRMATION, HELP_TEAM, HELP_MANAGE,
   CARE_PLAN, fitsTeam, quote, money, helpPick, helpAddons, packageRange, fullPackageRange, addonsFor, includedFeatures, comingSoon, ADDON_GROUPS, LAUNCH_OFFER,
+  BUDGETS, budgetFit, TEAM_VIDEOS, teamVideo,
 } from '../pricing/packages';
 import { SALES_WHATSAPP } from '../demo/whatsapp';
 import SimpleCardPreview from './SimpleCardPreview';
@@ -20,6 +22,8 @@ import DocPreview from './DocPreview';
 //   2 Your setup        – single-choice rows only (data, website, storage).
 //   3 Send              – name / WhatsApp / company pre-filled from the link.
 // Personal links: #/plans?name=…&company=…&phone=…&pkg=growth&ref=…
+// Cold-email links: #/plans?team=small (up to 15 people) | ?team=big (15+) – shows the
+// matching 1-minute video first (TEAM_VIDEOS in pricing/packages.js) and preselects the team.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const stored = key => { try { return localStorage.getItem(key) || ''; } catch { return ''; } };
@@ -86,8 +90,29 @@ function Choice({ value, onPick, options, cols = 'grid-cols-2 sm:grid-cols-4' })
 }
 
 // Answers stay filled in (like a Google Form) – one saved copy per personal link, on the client's device.
-const draftKey = () => `solarflow_quote_${(urlParam('ref') || [urlParam('name'), urlParam('company')].filter(Boolean).join('|') || 'default').toLowerCase()}`;
+const draftKey = () => `solarflow_quote_${(urlParam('ref') || [urlParam('name'), urlParam('company')].filter(Boolean).join('|') || (urlParam('team') ? `team-${urlParam('team')}` : 'default')).toLowerCase()}`;
 const readDraft = () => { try { return JSON.parse(localStorage.getItem(draftKey()) || 'null'); } catch { return null; } };
+
+// 1-minute vertical video for the team size in the email link: our own .mp4 on this site,
+// or a Google Drive / YouTube embed, plus a "watch on Google Drive" backup link.
+function TeamVideo({ team, box }) {
+  const v = teamVideo(team, import.meta.env.BASE_URL);
+  if (!v) return null;
+  return (
+    <div className={box}>
+      <p className="text-[11px] font-bold uppercase tracking-wider text-orange-700">1-minute video · for {v.for}</p>
+      <h2 className="mt-1 text-xl font-black text-stone-900">Watch this first, then see your price</h2>
+      <div className="mx-auto mt-3 w-full max-w-[300px] overflow-hidden rounded-2xl bg-stone-900" style={{ aspectRatio: '9 / 16' }}>
+        {v.src
+          ? <video className="h-full w-full object-contain" src={v.src} controls playsInline preload="metadata" onPlay={() => logLinkEvent('video_play', `plans-${team}`)} aria-label={v.title}/>
+          : <iframe className="h-full w-full" src={v.iframe} title={v.title} loading="lazy" referrerPolicy="strict-origin-when-cross-origin"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen" allowFullScreen/>}
+      </div>
+      {v.driveView && <p className="mt-2 text-center text-xs"><a href={v.driveView} target="_blank" rel="noopener noreferrer" className="font-bold text-orange-800 underline">Video not playing? Watch it on Google Drive</a></p>}
+      <p className="mt-3 text-center text-xs text-stone-500">Then answer a few quick questions below. You’ll see a price range before you talk to us.</p>
+    </div>
+  );
+}
 
 // Small "View" button next to a feature that has sample documents.
 function ViewBtn({ onClick }) {
@@ -103,7 +128,9 @@ export default function QuoteBuilder() {
   const [fromLink] = useState(() => !!(urlParam('name') || urlParam('phone') || urlParam('ref')));
   const [confirmed, setConfirmed] = useState(!!d.confirmed);
   const [step, setStep] = useState(() => (fromLink && !d.confirmed ? 0 : 1));
-  const [help, setHelp] = useState(d.help || { team: '', manage: [] });
+  const [teamLink] = useState(() => (TEAM_VIDEOS[urlParam('team')] ? urlParam('team') : ''));
+  const [help, setHelp] = useState(() => d.help?.team ? d.help : { team: TEAM_VIDEOS[teamLink]?.team || '', manage: d.help?.manage || [] });
+  const [budget, setBudget] = useState(d.budget || '');
   const [pkg, setPkg] = useState(knownPkg(d.pkg || ''));
   const [card, setCard] = useState(d.card || 'simple');
   const [s, setS] = useState({ data: '', customers: '', source: '', sourceOther: '', website: '', websiteUrl: '', storage: '', live: '', ...(d.s || {}) });
@@ -124,14 +151,17 @@ export default function QuoteBuilder() {
   // Keep every answer on this device so the same link opens filled in.
   useEffect(() => {
     try {
-      localStorage.setItem(draftKey(), JSON.stringify({ confirmed, help, pkg, card, s, addons: [...addons], dropped: [...dropped], interested: [...interested], name, company, mobile, note, identity: identity.current, savedAt }));
+      localStorage.setItem(draftKey(), JSON.stringify({ confirmed, help, budget, pkg, card, s, addons: [...addons], dropped: [...dropped], interested: [...interested], name, company, mobile, note, identity: identity.current, savedAt }));
     } catch { /* storage blocked – the form still works */ }
-  }, [confirmed, help, pkg, card, s, addons, dropped, interested, name, company, mobile, note, savedAt]);
+  }, [confirmed, help, budget, pkg, card, s, addons, dropped, interested, name, company, mobile, note, savedAt]);
   const top = useRef(null);
   // Browser tab shows whose quotation this is.
   useEffect(() => { if (fromLink && (company.trim() || name.trim())) document.title = `SolarFlow quotation – ${company.trim() || name.trim()}`; }, [fromLink, company, name]);
 
-  const suggested = help.team ? helpPick(help.team, help.manage) : linkPkg;
+  // Needs (team + what they manage) decide the package; the budget only steers it when there are no answers yet.
+  const suggested = help.team ? helpPick(help.team, help.manage) : (BUDGETS.find(b => b.id === budget)?.pkg || linkPkg);
+  const fit = budgetFit(suggested, budget);
+  const budgetLabel = BUDGETS.find(b => b.id === budget)?.label || '';
   const helpExtras = (pkgId) => helpAddons(help.manage).filter(id => pkgId && addonsFor(pkgId).some(a => a.id === id));
   const P = PACKAGES.find(p => p.id === pkg);
   const usedCard = P ? (P.cards.length === 1 ? P.cards[0] : card) : card;
@@ -160,6 +190,7 @@ export default function QuoteBuilder() {
     ...(ref ? [`Ref: ${ref}`] : []),
     `Package: ${pkgName(pkg)}${suggested && pkg !== suggested ? ` (suggested ${pkgName(suggested)})` : ''}`,
     `Customer card: ${cardName(usedCard)}`,
+    ...(budgetLabel ? [`Budget: ${budgetLabel}`] : []),
     ...(help.team ? [`Team: ${help.team} · Manages: ${HELP_MANAGE.filter(m => help.manage.includes(m.id)).map(m => m.label).join(', ') || 'Just customers'}`] : []),
     `Data: ${s.data === 'move' ? `Transfer existing data (${(s.customers || '?').toLowerCase()} customers, from ${sourceText || '?'})` : s.data === 'fresh' ? 'Start fresh' : 'Not said'}`,
     `Live customers: ${s.live || 'Not said'}`,
@@ -172,6 +203,7 @@ export default function QuoteBuilder() {
     ...(q.publicLines.length > 1 ? [`Extras: ${q.publicLines.slice(1).map(l => l.label + (l.amount === 'price after a call' ? ' (price after a call)' : '')).join(', ')}`] : []),
     `Estimated total: ${q.range} (one-time, year 1 hosting and support included)`,
     ...(LAUNCH_OFFER > 0 ? [`Launch offer: ${Math.round(LAUNCH_OFFER * 100)}% off included`] : []),
+    ...(readClientCode() ? [`Client code: ${readClientCode()}`] : []),
   ];
   const waHref = () => {
     const who = name.trim(), org = company.trim();
@@ -202,6 +234,7 @@ export default function QuoteBuilder() {
       if (first) await saveEnquiryStep(supabase, enquiryPayload({ ...base, remarks: '' }), identity.current, { contactOnly: true });
       await saveEnquiryStep(supabase, enquiryPayload({ ...base, remarks: summaryLines().join('\n') }), identity.current);
       setSaveState('saved'); setSavedAt(new Date().toISOString());
+      logLinkEvent('quote_sent', 'plans');
     } catch { setSaveState('failed'); }
   }
 
@@ -260,6 +293,8 @@ export default function QuoteBuilder() {
         </div>
       )}
 
+      {step === 1 && teamLink && <TeamVideo team={teamLink} box={box}/>}
+
       {step >= 1 && step <= 3 && (
         <div>
           <div className="flex items-baseline justify-between text-xs font-bold text-stone-500">
@@ -280,14 +315,19 @@ export default function QuoteBuilder() {
       {/* ── STEP 1: choose a package ───────────────────────────── */}
       {step === 1 && (<>
         <div className={box}>
-          <p className="text-base font-black text-stone-900">{fromLink && first ? `${first}, not sure which package? Answer two questions.` : 'Not sure which package? Answer two questions.'}</p>
-          <div className="mt-4 grid gap-5 lg:grid-cols-2 lg:gap-8">
+          <p className="text-base font-black text-stone-900">{fromLink && first ? `${first}, not sure which package? Answer three questions.` : 'Not sure which package? Answer three questions.'}</p>
+          <div className="mt-4">
+            <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">1</span> What budget do you have in mind?</p>
+            <Segmented options={BUDGETS} value={budget} onPick={v => setBudget(b => (b === v ? '' : v))} label="Your budget"/>
+            <p className="mt-1.5 text-[11px] text-stone-500">One-time, not monthly. It only helps us suggest a package – it doesn’t change the price.</p>
+          </div>
+          <div className="mt-5 grid gap-5 lg:grid-cols-2 lg:gap-8">
             <div>
-              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">1</span> How many people will use it?</p>
+              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">2</span> How many people will use it?</p>
               <Segmented options={HELP_TEAM.map(t => ({ id: t, label: t }))} value={help.team} onPick={v => setHelp(h => ({ ...h, team: v }))} label="People who will use it"/>
             </div>
             <div>
-              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">2</span> Besides customers, what else do you manage?</p>
+              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">3</span> Besides customers, what else do you manage?</p>
               <Segmented multi options={HELP_MANAGE} value={help.manage} onPick={v => setHelp(h => {
                 const cur = h.manage;
                 if (v === 'customers') return { ...h, manage: cur.includes('customers') ? [] : ['customers'] };
@@ -298,7 +338,10 @@ export default function QuoteBuilder() {
             </div>
           </div>
           {suggested
-            ? <p className="mt-4 rounded-xl bg-orange-50 px-3 py-2 text-sm font-bold text-orange-900"><Star size={14} className="inline -mt-0.5"/> {pkgName(suggested)} fits you best – marked below.{helpExtras(suggested).length > 0 && <span className="block text-xs font-semibold text-orange-800">{helpExtras(suggested).map(id => ADDONS.find(a => a.id === id).label).join(' + ')} will be added as extras – included in the estimate.</span>}</p>
+            ? <p className="mt-4 rounded-xl bg-orange-50 px-3 py-2 text-sm font-bold text-orange-900"><Star size={14} className="inline -mt-0.5"/> {pkgName(suggested)} fits you best ({packageRange(suggested)}) – marked below.{helpExtras(suggested).length > 0 && <span className="block text-xs font-semibold text-orange-800">{helpExtras(suggested).map(id => ADDONS.find(a => a.id === id).label).join(' + ')} will be added as extras – included in the estimate.</span>}
+                {fit === 'fits' && <span className="block text-xs font-semibold text-emerald-800">Inside your budget of {budgetLabel}.</span>}
+                {fit === 'room' && <span className="block text-xs font-semibold text-emerald-800">Inside your budget of {budgetLabel}, with room for extras like OTP login or GPS check-in.</span>}
+                {fit === 'over' && <span className="block text-xs font-semibold text-rose-700">That’s above your budget of {budgetLabel}. Tell us on WhatsApp – we can start with fewer features and add the rest later.</span>}</p>
             : <p className="mt-4 text-xs text-stone-500">Or just pick a package below.</p>}
         </div>
 
@@ -406,15 +449,17 @@ export default function QuoteBuilder() {
           <Row label="Where should customer files go?" hint="(extra cost, paid by you to the provider – not part of the CRM price)" important answered={!!s.storage}>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="File storage">
               {STORAGE_OPTIONS.map(o => { const on = s.storage === o.id; return (
-                <button key={o.id} type="button" role="radio" aria-checked={on} onClick={() => set('storage', o.id)} className={`flex flex-col rounded-2xl border-2 p-3 text-left ${on ? 'border-orange-500 bg-orange-50' : 'border-stone-200 hover:border-orange-300'}`}>
+                <button key={o.id} type="button" role="radio" aria-checked={on} onClick={() => set('storage', o.id)} className={`relative flex flex-col rounded-2xl border-2 p-3 text-left ${on ? 'border-orange-500 bg-orange-50' : o.recommended ? 'border-emerald-400 hover:border-orange-300' : 'border-stone-200 hover:border-orange-300'}`}>
+                  {o.recommended && <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"><Star size={10}/> Recommended</span>}
                   <strong className="text-sm text-stone-900">{o.label}</strong>
+                  {o.tradeoff && <span className="mt-0.5 text-xs font-semibold text-stone-800">{o.tradeoff}</span>}
                   <span className="mt-0.5 text-[11px] font-bold text-orange-800">{o.who}</span>
                   <span className="mt-1.5 text-xs text-stone-600">{o.how}</span>
                   <ul className="mt-2 space-y-0.5 border-t border-stone-200/70 pt-2">{o.prices.map(x => <li key={x} className="text-xs font-semibold text-stone-800">{x}</li>)}</ul>
                 </button>
               ); })}
             </div>
-            <p className="mt-2 text-[11px] text-stone-500">{STORAGE_GUIDE} Prices from {['Google One', 'Google Workspace', 'Supabase'].map((n, i) => <span key={n}>{i ? ', ' : ''}<a className="underline" href={STORAGE_OPTIONS.filter(o => o.link)[i].link} target="_blank" rel="noopener noreferrer">{n}</a></span>)} on {STORAGE_PRICES_CHECKED}; they may change.</p>
+            <p className="mt-2 text-[11px] text-stone-500">{STORAGE_GUIDE} Prices from {STORAGE_OPTIONS.filter(o => o.link).map((o, i) => <span key={o.id}>{i ? ', ' : ''}<a className="underline" href={o.link} target="_blank" rel="noopener noreferrer">{o.linkName}</a></span>)} on {STORAGE_PRICES_CHECKED}; they may change.</p>
           </Row>
 
           <Row label="Features" hint="(green = in your package – tap View to see a sample document, untick what you don’t need · tick more if you want, the estimate goes up a little)">
@@ -453,6 +498,7 @@ export default function QuoteBuilder() {
                       </button>
                     ); })}
                   </div>
+                  {g === 'Extras' && <p className="mt-1.5 text-[11px] text-stone-500">Need something else? Write it under “Anything else?” on the next step – we quote more extras on request.</p>}
                 </div>
               );
             })}
@@ -469,7 +515,7 @@ export default function QuoteBuilder() {
         const rows = [
           ['Package', `${P.name} · ${cardName(usedCard)}`],
           ['Included', keep.map(x => x.group === 'Commissions' ? `Commissions – ${x.label.toLowerCase()}` : x.label).join(', ') || '—'],
-          ...(extras.length ? [['Extras', extras.map(x => x.exclusive ? `Commissions – ${x.label.toLowerCase()}` : x.label).join(', ')]] : []),
+          ...(extras.length ? [['Extras', extras.map(x => (x.exclusive ? `Commissions – ${x.label.toLowerCase()}` : x.label) + (x.custom ? ' (price after a call)' : '')).join(', ')]] : []),
           ...(s.data === 'move' ? [['Data', `Transfer existing data${s.customers ? ` (${s.customers.toLowerCase()} customers)` : ''}`]] : []),
           ...(dropped.size ? [['Not needed', ADDONS.filter(a => dropped.has(a.id)).map(a => a.label).join(', ')]] : []),
           ...(interested.size ? [['Interested', ADDONS.filter(a => interested.has(a.id)).map(a => `${a.label} (launching soon)`).join(', ')]] : []),
