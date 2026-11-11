@@ -12,6 +12,7 @@ import {
     Package, PauseCircle, Truck, Wrench, Camera, Send, Printer, FileText, FolderOpen, Terminal, Calculator
 } from 'lucide-react';
 import ToolboxView from './ToolboxView';
+import { partnerScope } from '../demo/partnerScope';
 import { CommissionCard } from '../commission/CommissionCard';
 import { logActivity, toIndianCommas, formatInputValue, parseIndianNumber, uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, updateDocumentRemark, sanitizeAdminUpdate, normalizeMeterInstallation, downloadFileWithSaveAs, downloadDocumentsAsPdf } from '../utils';
 import { DEFAULT_LEAD_FORM } from '../models';
@@ -73,6 +74,9 @@ function DetailRow({ label, value, children }) {
 }
 
 export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoControls }) {
+    // Whose customers to load: the account's own name, or the demo partner /
+    // dealer for a demo visitor (their typed name matches no customer).
+    const scope = partnerScope(user);
     useDemoTourNavigation(async ({view,stage,action},isCurrent) => {
         if (!['menu','workdesk','quotations'].includes(view)) return;
         setSelectedCust(null); setShowAddLead(false); setView(view); if (stage) setActiveWorkdeskTab(stage);
@@ -80,7 +84,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
         if (action === 'addLead') setShowAddLead(true);
         if(action === 'customer'){
             let query=supabase.from('admin').select('*').is('deleted_at',null).eq('stage',stage);
-            query=user.userType==='agent2' ? query.ilike('sub_channel_partner',user.name).ilike('channel_partner',user.channel_partner || '') : query.ilike('channel_partner',user.name);
+            query=user.userType==='agent2' ? query.ilike('sub_channel_partner',scope.name).ilike('channel_partner',scope.partner) : query.ilike('channel_partner',scope.name);
             const {data,error}=await query.order('created_at').limit(1);
             if(!isCurrent())return;
             if(error)showAlert(error.message,{type:'error'});
@@ -88,11 +92,11 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
         }
         if(action === 'printBom'){
             let query=supabase.from('admin').select('*').is('deleted_at',null).eq('stage',stage || STAGE_IDS.MATERIAL_INTEGRATION);
-            query=user.userType==='agent2' ? query.ilike('sub_channel_partner',user.name).ilike('channel_partner',user.channel_partner || '') : query.ilike('channel_partner',user.name);
+            query=user.userType==='agent2' ? query.ilike('sub_channel_partner',scope.name).ilike('channel_partner',scope.partner) : query.ilike('channel_partner',scope.name);
             let {data,error}=await query.order('created_at').limit(1);
             if (!data?.length) {
                 let fb = supabase.from('admin').select('*').is('deleted_at',null);
-                fb = user.userType==='agent2' ? fb.ilike('sub_channel_partner',user.name).ilike('channel_partner',user.channel_partner || '') : fb.ilike('channel_partner',user.name);
+                fb = user.userType==='agent2' ? fb.ilike('sub_channel_partner',scope.name).ilike('channel_partner',scope.partner) : fb.ilike('channel_partner',scope.name);
                 const res = await fb.order('created_at').limit(1);
                 data = res.data;
             }
@@ -186,7 +190,7 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
     const fetchCustomers = async () => {
         setLoading(true);
         try {
-            const scopeValue = user?.name || '';
+            const scopeValue = scope.name;
             if (!String(scopeValue).trim()) {
                 setCustomers([]);
                 setLoading(false);
@@ -197,12 +201,12 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
             const orValue = value => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
             const buildQuery = () => {
                 let q = supabase.from('admin').select('*').is('deleted_at', null).order('updated_at', { ascending: false }).order('created_at', { ascending: false });
-                const myName = (user?.name || '').trim();
+                const myName = scope.name;
                 const userId = user?.demo_profile_id || user?.id;
 
                 if (isAgent2) {
                     // Dealer: match by permanent profile ID first, or name + registered branch
-                    const myBranch = (user?.channel_partner || '').trim();
+                    const myBranch = scope.partner;
                     if (userId) {
                         q = q.or(`lead_creator_profile_id.eq.${userId},and(sub_channel_partner.ilike.${orValue(myName)},channel_partner.ilike.${orValue(myBranch)})`);
                     } else {
@@ -252,18 +256,20 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
 
         fetchCustomers();
 
-        const myName = (user.name || '').trim().toLowerCase();
-        const partnerName = (user.channel_partner || user.name || '').trim().toLowerCase();
+        const myName = scope.name.toLowerCase();
+        const partnerName = (scope.partner || scope.name).toLowerCase();
         const channel = supabase.channel(`agent_customers_${user.id}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'admin' }, payload => {
                 const record = payload.new;
                 const custCp = (record?.channel_partner || '').trim().toLowerCase();
                 const custSubCp = (record?.sub_channel_partner || '').trim().toLowerCase();
 
+                const ownId = user.demo_profile_id || user.id;
                 const belongsToAgent = record && !record.deleted_at && (
-                    isAgent2
+                    (ownId && record.lead_creator_profile_id === ownId) ||
+                    (isAgent2
                         ? (custSubCp === myName && custCp === partnerName)
-                        : custCp === myName
+                        : custCp === myName)
                 );
 
                 setCustomers(previous => {
