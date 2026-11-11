@@ -12,6 +12,7 @@ import {
     Package, PauseCircle, Truck, Wrench, Camera, Send, Printer, FileText, FolderOpen, Terminal, Calculator
 } from 'lucide-react';
 import ToolboxView from './ToolboxView';
+import { CommissionCard } from '../commission/CommissionCard';
 import { logActivity, toIndianCommas, formatInputValue, parseIndianNumber, uploadDocument, getCustomerDocuments, getDownloadUrl, getViewUrl, updateDocumentRemark, sanitizeAdminUpdate, normalizeMeterInstallation, downloadFileWithSaveAs, downloadDocumentsAsPdf } from '../utils';
 import { DEFAULT_LEAD_FORM } from '../models';
 import { PRIMARY_STAGES, STAGE_IDS, ADMIN_NUMERIC_COLUMNS, skipsStage, nextStageFor } from '../constants';
@@ -1074,6 +1075,8 @@ export default function AgentPortal({ user, onLogout, onOpenDevSwitcher, demoCon
                             </div>
                         </div>
                     </section>
+
+                    <CommissionCard rows={customers} loading={loading} onOpenCustomer={cust => handleSelectCustomerForStage(cust, cust.stage)} />
 
                     <button type="button" onClick={() => { openQuotations(); setView('quotations'); }} className="w-full flex items-center gap-3 rounded-2xl bg-blue-950 text-white p-5 text-left shadow-sm"><FileText size={24} /><span className="flex-1"><strong className="block text-base">Quotation Maker</strong><span className="text-xs text-blue-200">Create, share and follow up on solar quotations</span></span><ChevronRight size={18} /></button>
                     <button type="button" onClick={() => setView('toolbox')} className="w-full flex items-center gap-3 rounded-2xl bg-amber-500 text-stone-950 p-5 text-left shadow-sm mt-3"><Calculator size={24} /><span className="flex-1"><strong className="block text-base font-bold">Solar Toolbox</strong><span className="text-xs text-amber-950/80">EMI &amp; GST calculators, solar savings, payment receipts &amp; warranty cards</span></span><ChevronRight size={18} /></button>

@@ -15,6 +15,7 @@ import { supabase } from '../supabase';
 import { logActivity, uploadDocument, parseIndianNumber, lazyWithRetry, sanitizeAdminUpdate, runWrite } from '../utils';
 import { PRIMARY_STAGES, STAGE_IDS, CUSTOMER_CARD_COLUMNS, getCustomerCardColumns, ADMIN_NUMERIC_COLUMNS } from '../constants';
 import DashboardView from './DashboardView';
+import { PartnerOfficeCommission } from '../commission/CommissionCard';
 import CustomerCard from './CustomerCard';
 
 // Secondary views and modals with auto-retry on new deployments
@@ -1675,6 +1676,7 @@ export default function Dashboard({ user, onLogout, onOpenDevSwitcher, demoContr
                     <Suspense fallback={<ViewLoader />}>
                     {currentView === 'inventory' && ['admin','sales'].includes(user.userType) && <InventoryView currentUser={user} />}
                     {currentView === 'dashboard' && user.userType === 'admin' && onStartDemoTour && <section className="demo-start-here" aria-labelledby="demo-start-heading"><div><span className="demo-start-eyebrow">START HERE</span><h2 id="demo-start-heading">See how a solar project comes together</h2><p>Explore quotations, a sample customer, materials, installation and subsidy in six short steps.</p></div><div className="demo-start-buttons"><button type="button" onClick={()=>onStartDemoTour('quick')}>Start the 6-step tour</button><button type="button" onClick={()=>onStartDemoTour('quick',2)}>Open a sample customer</button><button type="button" onClick={()=>onStartDemoTour('full')}>Full walkthrough</button></div></section>}
+                    {currentView === 'dashboard' && !scopeError && isChannelPartnerOffice && <PartnerOfficeCommission partnerName={partnerName} dealerFilter={dealerFilter || ''} />}
                     {currentView === 'dashboard' && !scopeError && <DashboardView metrics={metrics} loading={loading} scoped={isChannelPartnerOffice} />}
                     {currentView === 'delivery_batches' && canSeeDeliveryBatches && (
                         <DeliveryBatchesView 
