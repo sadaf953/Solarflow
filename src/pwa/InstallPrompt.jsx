@@ -21,6 +21,9 @@ function recentlyDismissed() {
     return Number.isFinite(at) && at > 0 && Date.now() - at < DISMISS_FOR_MS;
 }
 
+// Client quotation pages (#/plans, #/quote) never show the install card.
+const onQuotePage = () => typeof window !== 'undefined' && /^#\/(plans|quote)(\?|\/|$)/.test(window.location.hash || '');
+
 function modalOpen() {
     return typeof document !== 'undefined' && Boolean(document.querySelector(MODAL_SELECTOR));
 }
@@ -33,6 +36,13 @@ export default function InstallPrompt() {
     const [macSafari] = useState(() => isMacSafari());
     const [desktopChromium] = useState(() => isDesktopChromium());
     const [blockedByModal, setBlockedByModal] = useState(() => modalOpen());
+    const [quotePage, setQuotePage] = useState(onQuotePage);
+
+    useEffect(() => {
+        const onHash = () => setQuotePage(onQuotePage());
+        window.addEventListener('hashchange', onHash);
+        return () => window.removeEventListener('hashchange', onHash);
+    }, []);
 
     useEffect(() => subscribeInstall(setInstallEvent), []);
 
@@ -59,7 +69,7 @@ export default function InstallPrompt() {
     }, []);
 
     const mode = installEvent ? 'prompt' : iosSafari ? 'ios' : macSafari ? 'mac' : desktopChromium ? 'desktop' : null;
-    if (!ready || dismissed || blockedByModal || !mode) return null;
+    if (!ready || dismissed || blockedByModal || quotePage || !mode) return null;
 
     const dismiss = () => {
         safeSet(DISMISS_KEY, Date.now());

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, MessageCircle, Phone, X } from 'lucide-react';
+import { Bell, MessageCircle, Pencil, Phone, X } from 'lucide-react';
 import { supabase } from '../supabase';
 import { listAdminEnquiries } from '../enquiries/reopen';
 
@@ -21,7 +21,7 @@ const estimate = notes => (notes || '').match(/Estimated total: ([^\n;]+)/)?.[1]
 const refOf = notes => (notes || '').match(/Ref:? (SF-[A-Z0-9-]+)/i)?.[1] || '';
 const pkgOf = notes => (notes || '').match(/Selected option: Quote: (\w+)/)?.[1] || '';
 
-export default function QuoteRequestAlerts({ adminCode, onLocked, refreshKey = 0 }) {
+export default function QuoteRequestAlerts({ adminCode, onLocked, refreshKey = 0, onEdit }) {
   const code = adminCode;
   const [on, setOn] = useState(false);
   const [items, setItems] = useState([]);
@@ -97,6 +97,7 @@ export default function QuoteRequestAlerts({ adminCode, onLocked, refreshKey = 0
                     <div className="mb-2 flex flex-wrap gap-2">
                       {x.mobile && <a href={`tel:+91${x.mobile}`} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-stone-300 bg-white px-3 text-xs font-bold"><Phone size={13}/> {x.mobile}</a>}
                       {x.mobile && <a href={`https://wa.me/91${x.mobile}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-[#25D366] px-3 text-xs font-bold text-[#073B1C]"><MessageCircle size={13}/> WhatsApp</a>}
+                      {onEdit && typeOf(x) !== 'old' && <button type="button" onClick={() => onEdit({ name: x.name || '', company: x.company || '', mobile: x.mobile || '', ref: refOf(x.notes) })} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-stone-900 px-3 text-xs font-bold text-white"><Pencil size={13}/> Edit this client’s form</button>}
                     </div>
                     {x.notes ? <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap break-words font-sans text-xs text-stone-700">{x.notes}</pre>
                       : <p className="text-xs text-stone-600">{x.kind !== 'prepared' ? 'No answers yet.'

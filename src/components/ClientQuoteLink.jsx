@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Copy, Check, MessageCircle, Link2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Copy, Check, MessageCircle, Link2, Pencil } from 'lucide-react';
 import { PACKAGES, CARDS, STORAGE_OPTIONS, PRESET_EXTRAS, PRESET_DROPS } from '../pricing/packages';
 import { supabase } from '../supabase';
 import { createSavedBrief } from '../enquiries/brief';
@@ -9,7 +9,7 @@ import { createSavedBrief } from '../enquiries/brief';
 // an optional suggested package, and a ref so the reply can be matched to the lead.
 const BASE = 'https://solarflow.deeprootsystems.in/#/plans';
 
-export function clientQuoteLink({ name, company, phone, pkg, ref, card = '', storage = '', extras = [], drop = [] }) {
+export function clientQuoteLink({ name, company, phone, pkg, ref, card = '', storage = '', extras = [], drop = [], stamp = '' }) {
   const qs = new URLSearchParams();
   if (name.trim()) qs.set('name', name.trim());
   if (company.trim()) qs.set('company', company.trim());
@@ -21,19 +21,37 @@ export function clientQuoteLink({ name, company, phone, pkg, ref, card = '', sto
   if (storage) qs.set('storage', storage);
   if (extras.length) qs.set('extras', extras.join(','));
   if (drop.length) qs.set('drop', drop.join(','));
+  // A fresh stamp on each sent link makes these ticks apply even if the client already started.
+  if (stamp && (extras.length || drop.length)) qs.set('set', stamp);
   return `${BASE}?${qs.toString()}`;
 }
 
 // Short reference so each client's answers can be matched to their link (e.g. SF-4K7Q).
 const newRef = () => 'SF-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-const blank = () => ({ name: '', company: '', phone: '', pkg: '', ref: newRef(), card: '', storage: '', extras: [], drop: [] });
+const newStamp = () => Date.now().toString(36);
+const blank = () => ({ name: '', company: '', phone: '', pkg: '', ref: newRef(), card: '', storage: '', extras: [], drop: [], stamp: newStamp() });
+// What you ticked for each client is remembered on this admin device (keyed by phone),
+// so "Edit this client's form" opens with your last choices.
 const chip = on => `min-h-10 rounded-xl border-2 px-3 text-sm ${on ? 'border-orange-500 bg-orange-50 font-bold' : 'border-stone-200'}`;
 const commissionIds = PRESET_EXTRAS().filter(a => a.exclusive).map(a => a.id);
+const PRESETS_KEY = 'solarflow_admin_client_presets';
+const readPresets = () => { try { return JSON.parse(localStorage.getItem(PRESETS_KEY) || '{}'); } catch { return {}; } };
+const rememberPresets = f => {
+  const key = f.phone.replace(/\D/g, '').slice(-10);
+  if (!key) return;
+  try { const all = readPresets(); all[key] = { pkg: f.pkg, ref: f.ref, card: f.card, storage: f.storage, extras: f.extras, drop: f.drop }; localStorage.setItem(PRESETS_KEY, JSON.stringify(all)); } catch { /* storage blocked */ }
+};
+function fromEntry(c) {
+  const last = readPresets()[(c.mobile || '').replace(/\D/g, '').slice(-10)] || {};
+  return { ...blank(), ...last, name: c.name, company: c.company, phone: c.mobile, ref: c.ref || last.ref || newRef(), stamp: newStamp() };
+}
 
-export default function ClientQuoteLink({ adminCode = '', onSaved }) {
+export default function ClientQuoteLink({ adminCode = '', onSaved, editing = null, onStopEditing }) {
   const [f, setF] = useState(blank);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(''); // '', 'saving', 'saved', 'failed', 'nophone'
+  // "Edit this client's form" in All clients fills the tool with that client and what you set last time.
+  useEffect(() => { if (editing) { setF(fromEntry(editing)); setCopied(false); setSaved(''); } }, [editing]);
   const set = (k, v) => { setF(x => ({ ...x, [k]: v })); setCopied(false); setSaved(''); };
   // Tick/untick in a list; commissions are one choice at a time.
   const flip = (k, id) => setF(x => {
@@ -45,6 +63,9 @@ export default function ClientQuoteLink({ adminCode = '', onSaved }) {
   });
   // Record every form we send, so it shows in All clients as "Sent – not opened yet".
   async function record() {
+    rememberPresets(f);
+    // Editing a client already in All clients: just resend – don't add a second entry.
+    if (editing) { setSaved('updated'); return; }
     if (saved === 'saved' || saved === 'saving') return;
     if (!/^\d{10}$/.test(digits) || !f.name.trim()) { setSaved('nophone'); return; }
     setSaved('saving');
@@ -63,6 +84,12 @@ export default function ClientQuoteLink({ adminCode = '', onSaved }) {
   return (
     <section className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm sm:p-6" aria-label="Client quotation link">
       <h2 className="flex items-center gap-2 text-lg font-black text-stone-900"><Link2 size={18}/> Send a client their form</h2>
+      {editing && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
+          <span className="flex items-center gap-1.5"><Pencil size={14}/> <span>Editing <strong>{editing.name || 'this client'}</strong>’s form. Change anything below, then send the new link – your ticks apply even if they already started.</span></span>
+          <button type="button" onClick={() => { setF(blank()); onStopEditing?.(); }} className="min-h-9 rounded-lg px-2 text-xs font-bold underline">Stop editing</button>
+        </div>
+      )}
       <p className="mt-1 text-sm text-stone-500">Fill in their details and send the link. It opens with their name, company and phone already filled. They can come back to the same link to edit – each change updates the same request. At the end they share it with you on WhatsApp.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="block text-xs font-bold text-stone-700">Client name<input className="sf-input mt-1" value={f.name} onChange={e => set('name', e.target.value)} placeholder="Sunny Chauhan"/></label>
@@ -118,10 +145,11 @@ export default function ClientQuoteLink({ adminCode = '', onSaved }) {
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={copy} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 text-sm font-bold text-stone-800">{copied ? <Check size={15}/> : <Copy size={15}/>} {copied ? 'Copied' : 'Copy link'}</button>
             <a href={`https://wa.me/${digits ? `91${digits}` : ''}?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer" onClick={record} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#25D366] px-3 text-sm font-bold text-[#073B1C]"><MessageCircle size={15}/> Send on WhatsApp</a>
-            <button type="button" onClick={() => { setF(blank()); setSaved(''); setCopied(false); }} className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-bold text-stone-500 underline">Next client</button>
+            <button type="button" onClick={() => { setF(blank()); setSaved(''); setCopied(false); onStopEditing?.(); }} className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-bold text-stone-500 underline">Next client</button>
           </div>
-          {saved && <p role="status" className={`mt-2 text-xs font-semibold ${saved === 'saved' ? 'text-emerald-700' : saved === 'saving' ? 'text-stone-500' : 'text-rose-700'}`}>{
-            saved === 'saved' ? '✓ Saved – it shows in All clients as “Sent – not opened yet”.'
+          {saved && <p role="status" className={`mt-2 text-xs font-semibold ${saved === 'saved' || saved === 'updated' ? 'text-emerald-700' : saved === 'saving' ? 'text-stone-500' : 'text-rose-700'}`}>{
+            saved === 'updated' ? '✓ Updated link ready – send it to them. Your ticks are remembered for next time.'
+            : saved === 'saved' ? '✓ Saved – it shows in All clients as “Sent – not opened yet”.'
             : saved === 'saving' ? 'Saving…'
             : saved === 'nophone' ? 'Add their name and 10-digit number so this form shows in All clients.'
             : 'Could not save it to All clients – the link still works. Try again.'}</p>}

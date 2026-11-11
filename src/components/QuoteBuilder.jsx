@@ -161,8 +161,12 @@ export default function QuoteBuilder() {
   const [s, setS] = useState(() => { const x = { data: '', customers: '', source: '', sourceOther: '', website: '', websiteUrl: '', storage: '', live: '', ...(d.s || {}) }; const ls = STORAGE_OPTIONS.some(o => o.id === urlParam('storage')) ? urlParam('storage') : ''; return ls ? { ...x, storage: ls } : x; });
   const [linkExtras] = useState(() => urlList('extras'));   // page 2 features pre-ticked after a call
   const [linkDrops] = useState(() => urlList('drop').filter(id => PRESET_DROPS().some(a => a.id === id)));
-  const [addons, setAddons] = useState(new Set(d.addons || []));
-  const [dropped, setDropped] = useState(new Set(d.dropped || [])); // included features the client doesn't want
+  // ?set= is a stamp on each link you send. A new stamp re-applies your ticks to a form the client already started.
+  const [linkStamp] = useState(() => urlParam('set'));
+  const freshSet = !!(linkStamp && d.pkg && d.appliedSet !== linkStamp);
+  const [appliedSet] = useState(() => linkStamp || d.appliedSet || '');
+  const [addons, setAddons] = useState(() => new Set([...(d.addons || []), ...(freshSet ? presetExtrasFor(d.pkg, linkExtras) : [])]));
+  const [dropped, setDropped] = useState(() => new Set(freshSet ? linkDrops : (d.dropped || []))); // included features the client doesn't want
   const [interested, setInterested] = useState(new Set(d.interested || [])); // 'launching soon' features they want to hear about
   const [preview, setPreview] = useState(''); // '' | 'simple' | 'stage'
   const [docView, setDocView] = useState(null); // { title, docIds, addonId, included }
@@ -178,9 +182,9 @@ export default function QuoteBuilder() {
   // Keep every answer on this device so the same link opens filled in.
   useEffect(() => {
     try {
-      localStorage.setItem(draftKey(), JSON.stringify({ confirmed, help, budget, pkg, card, s, addons: [...addons], dropped: [...dropped], interested: [...interested], name, company, mobile, note, identity: identity.current, savedAt }));
+      localStorage.setItem(draftKey(), JSON.stringify({ confirmed, help, budget, pkg, card, s, addons: [...addons], dropped: [...dropped], interested: [...interested], name, company, mobile, note, identity: identity.current, savedAt, appliedSet }));
     } catch { /* storage blocked – the form still works */ }
-  }, [confirmed, help, budget, pkg, card, s, addons, dropped, interested, name, company, mobile, note, savedAt]);
+  }, [confirmed, help, budget, pkg, card, s, addons, dropped, interested, name, company, mobile, note, savedAt, appliedSet]);
   const top = useRef(null);
   // Browser tab shows whose quotation this is.
   useEffect(() => { if (fromLink && (company.trim() || name.trim())) document.title = `SolarFlow quotation – ${company.trim() || name.trim()}`; }, [fromLink, company, name]);

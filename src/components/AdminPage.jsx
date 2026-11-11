@@ -9,6 +9,7 @@ import AdminGate, { readAdminCode, forgetAdminCode } from './AdminGate';
 export default function AdminPage() {
     const [adminCode, setAdminCode] = useState(readAdminCode);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [editing, setEditing] = useState(null); // client picked in All clients → filled into the link tool
     const logOut = () => {forgetAdminCode();setAdminCode('');};
     if (!adminCode) return <AdminGate onUnlock={setAdminCode}/>;
     return (
@@ -21,8 +22,8 @@ export default function AdminPage() {
                 <h1 className="mt-2 text-2xl sm:text-3xl font-black text-stone-900">Clients & forms</h1>
                 <p className="mt-2 text-sm text-stone-600">1. Enter the client’s details and send them their form. 2. They fill it in (and can come back to edit). 3. It reaches you on WhatsApp and shows up in All clients below – together with every old client.</p>
             </header>
-            <ClientQuoteLink adminCode={adminCode} onSaved={() => setRefreshKey(k => k + 1)}/>
-            <QuoteRequestAlerts adminCode={adminCode} onLocked={logOut} refreshKey={refreshKey}/>
+            <div id="client-link-tool"><ClientQuoteLink adminCode={adminCode} editing={editing} onStopEditing={() => setEditing(null)} onSaved={() => setRefreshKey(k => k + 1)}/></div>
+            <QuoteRequestAlerts adminCode={adminCode} onLocked={logOut} refreshKey={refreshKey} onEdit={c => { setEditing({ ...c, at: Date.now() }); setTimeout(() => document.getElementById('client-link-tool')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); }}/>
             <details className="rounded-3xl border border-stone-200 bg-white p-4 shadow-sm">
                 <summary className="cursor-pointer text-sm font-bold text-stone-700">Edit old forms (open, change or re-send an old client form)</summary>
                 <div className="mt-3"><CustomizationEnquiryForm key="admin" startInPrepareMode adminCode={adminCode}/></div>
