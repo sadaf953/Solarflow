@@ -26,7 +26,9 @@ Deno.serve(async req => {
         select e.code, c.company, c.name, c.phone, c.email, c.channel, e.event,
                min(e.created_at) as first_at, count(*)::int as times
         from link_private.events e join link_private.contacts c using (code)
-        where e.created_at > now() - interval '24 hours'
+        -- Everything since the last email that went out (or the last 24 hours).
+        where e.created_at > coalesce((select max(sent_at) from link_private.digest_log where day < ${day}::date),
+                                      now() - interval '24 hours')
         group by e.code, c.company, c.name, c.phone, c.email, c.channel, e.event`;
 
     const message = digestMessage(rows, day, sender);
