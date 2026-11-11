@@ -14,6 +14,7 @@ import BrandMark from './BrandMark';
 import QuoteOnWhatsApp from '../demo/QuoteOnWhatsApp';
 import { rememberVisitor } from '../demo/whatsapp';
 import '../demo/demo.css';
+import TourVideo from '../demo/TourVideo';
 const icons=[ShieldCheck,BriefcaseBusiness,Building2,ChartNoAxesCombined,Handshake,Users,Truck,Stamp];
 const DEMO_ACCESS_PASSWORD='admin@2026';
 const DEMO_CONTACT_EMAIL='enquiry@deeprootsystems.in';
@@ -729,6 +730,7 @@ export default function LoginScreen({onLogin,onOpenPlans,initialError=''}) {
     )}
    </div>
 
+   <TourVideo/>
    <div className="demo-next-links">
     <div><strong>Plans for every team size</strong><p>Four packages, one-time payment. See your estimate in about a minute.</p><button type="button" onClick={onOpenPlans}>View Plans &amp; Pricing <ArrowRight size={15}/></button><p className="mt-2"><QuoteOnWhatsApp variant="link" label="Or ask on WhatsApp" name={visitorName.trim() || undefined} company={invite?.company || undefined} context="plans card"/></p></div>
     <div><strong>Make it work for your team</strong><p>Pick a package, answer a few taps and share your estimate with us on WhatsApp.</p><button type="button" aria-expanded={showEnquiry} aria-controls="demo-enquiry" onClick={() => setShowEnquiry(!showEnquiry)}>{showEnquiry ? 'Hide' : 'Get my estimate'} <ArrowRight size={15}/></button></div>
