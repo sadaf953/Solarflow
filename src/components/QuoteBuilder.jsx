@@ -5,8 +5,8 @@ import { logLinkEvent, readClientCode } from '../demo/linkTracking';
 import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
 import {
   PACKAGES, ADDONS, CUSTOMER_COUNTS, LIVE_COUNTS, CARDS, CARD_COMPARISON,
-  STORAGE_OPTIONS, STORAGE_GUIDE, STORAGE_PRICES_CHECKED, SAMPLE_DOCS, FIELD_SETUP, AFTER_CONFIRMATION, HELP_TEAM, HELP_MANAGE,
-  CARE_PLAN, fitsTeam, quote, money, helpPick, helpAddons, packageRange, fullPackageRange, addonsFor, includedFeatures, comingSoon, ADDON_GROUPS, LAUNCH_OFFER,
+  STORAGE_OPTIONS, STORAGE_GUIDE, STORAGE_PRICES_CHECKED, SAMPLE_DOCS, FIELD_SETUP, AFTER_CONFIRMATION, HELP_TEAM, HELP_MANAGE, helpOptions,
+  CARE_PLAN, fitsTeam, quote, money, helpPick, helpLift, atLeast, helpAddons, packageRange, fullPackageRange, addonsFor, includedFeatures, comingSoon, ADDON_GROUPS, LAUNCH_OFFER,
   BUDGETS, budgetFit, TEAM_VIDEOS, teamVideo,
 } from '../pricing/packages';
 import { SALES_WHATSAPP } from '../demo/whatsapp';
@@ -52,6 +52,21 @@ function Segmented({ options, value, onPick, label, multi = false }) {
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// Separate tick boxes – clearly "pick one or more", unlike the joined Segmented bar.
+function TickList({ options, value, onToggle, label, cols = 'grid-cols-2' }) {
+  return (
+    <div className={`grid gap-2 ${cols}`} role="group" aria-label={label}>
+      {options.map(o => { const on = value.includes(o.id); return (
+        <button key={o.id} type="button" aria-pressed={on} onClick={() => onToggle(o.id)}
+          className={`flex min-h-11 items-start gap-2.5 rounded-xl border-2 px-3 py-2 text-left ${on ? 'border-orange-500 bg-orange-50' : 'border-stone-200 bg-white hover:border-orange-300'}`}>
+          <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${on ? 'border-orange-500 bg-orange-500 text-white' : 'border-stone-300'}`}>{on && <Check size={14}/>}</span>
+          <span><span className="block text-sm font-bold text-stone-900">{o.label}</span>{o.sub && <span className="block text-xs text-stone-500">{o.sub}</span>}</span>
+        </button>
+      ); })}
     </div>
   );
 }
@@ -130,10 +145,13 @@ export default function QuoteBuilder() {
   const [step, setStep] = useState(() => (fromLink && !d.confirmed ? 0 : 1));
   const [teamLink] = useState(() => (TEAM_VIDEOS[urlParam('team')] ? urlParam('team') : ''));
   const [help, setHelp] = useState(() => d.help?.team ? d.help : { team: TEAM_VIDEOS[teamLink]?.team || '', manage: d.help?.manage || [] });
+  const toggleHelp = id => setHelp(h => ({ ...h, manage: h.manage.includes(id) ? h.manage.filter(x => x !== id) : [...h.manage.filter(x => HELP_MANAGE.some(m => m.id === x)), id] }));
   const [budget, setBudget] = useState(d.budget || '');
   const [pkg, setPkg] = useState(knownPkg(d.pkg || ''));
-  const [card, setCard] = useState(d.card || 'simple');
-  const [s, setS] = useState({ data: '', customers: '', source: '', sourceOther: '', website: '', websiteUrl: '', storage: '', live: '', ...(d.s || {}) });
+  // ?card=stage|simple preselects the version; ?storage=gdrive (etc.) locks the storage choice agreed with the client.
+  const [card, setCard] = useState(() => d.card || (CARDS.some(c => c.id === urlParam('card')) ? urlParam('card') : ''));
+  const [lockedStorage] = useState(() => (STORAGE_OPTIONS.some(o => o.id === urlParam('storage')) ? urlParam('storage') : ''));
+  const [s, setS] = useState(() => { const x = { data: '', customers: '', source: '', sourceOther: '', website: '', websiteUrl: '', storage: '', live: '', ...(d.s || {}) }; const ls = STORAGE_OPTIONS.some(o => o.id === urlParam('storage')) ? urlParam('storage') : ''; return ls ? { ...x, storage: ls } : x; });
   const [addons, setAddons] = useState(new Set(d.addons || []));
   const [dropped, setDropped] = useState(new Set(d.dropped || [])); // included features the client doesn't want
   const [interested, setInterested] = useState(new Set(d.interested || [])); // 'launching soon' features they want to hear about
@@ -159,19 +177,30 @@ export default function QuoteBuilder() {
   useEffect(() => { if (fromLink && (company.trim() || name.trim())) document.title = `SolarFlow quotation – ${company.trim() || name.trim()}`; }, [fromLink, company, name]);
 
   // Needs (team + what they manage) decide the package; the budget only steers it when there are no answers yet.
-  const suggested = help.team ? helpPick(help.team, help.manage) : (BUDGETS.find(b => b.id === budget)?.pkg || linkPkg);
+  const rawSuggested = help.team ? helpPick(help.team, help.manage) : helpLift(BUDGETS.find(b => b.id === budget)?.pkg || linkPkg, help.manage);
+  // Old version = Lite only; new version starts at Standard.
+  const suggested = card === 'simple' ? 'starter' : card === 'stage' ? atLeast(rawSuggested || 'growth', 'growth') : rawSuggested;
+  const needsNewVersion = card === 'simple' && rawSuggested && rawSuggested !== 'starter';
+  const shownPackages = PACKAGES.filter(p => !card || p.cards.includes(card));
   const fit = budgetFit(suggested, budget);
   const budgetLabel = BUDGETS.find(b => b.id === budget)?.label || '';
   const helpExtras = (pkgId) => helpAddons(help.manage).filter(id => pkgId && addonsFor(pkgId).some(a => a.id === id));
   const P = PACKAGES.find(p => p.id === pkg);
   const usedCard = P ? (P.cards.length === 1 ? P.cards[0] : card) : card;
+  const setBranches = yes => setHelp(h => ({ ...h, branches: yes ? 'Yes' : 'No', manage: yes ? [...h.manage.filter(x => x !== 'branches'), 'branches'] : h.manage.filter(x => x !== 'branches') }));
   const q = useMemo(() => quote({ pkg, data: s.data, customers: s.customers, addons, card: usedCard }), [pkg, s.data, s.customers, addons, usedCard]);
   const set = (k, v) => setS(x => ({ ...x, [k]: v }));
   const cardName = id => CARDS.find(c => c.id === id)?.name || '—';
   const pkgName = id => PACKAGES.find(p => p.id === id)?.name || '—';
   const scrollTop = () => setTimeout(() => top.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   const go = n => { setStep(n); setError(''); scrollTop(); };
-  const choose = id => { if (id !== pkg) { setPkg(id); setAddons(new Set(helpExtras(id))); setDropped(new Set()); } go(2); };
+  // Extras hidden on page 2 always follow the page 1 answers; other ticks are kept for the same package.
+  const isHidden = id => !!ADDONS.find(a => a.id === id)?.hidden;
+  const choose = id => {
+    if (id !== pkg) { setPkg(id); setAddons(new Set(helpExtras(id))); setDropped(new Set()); }
+    else setAddons(prev => new Set([...[...prev].filter(x => !isHidden(x)), ...helpExtras(id)]));
+    go(2);
+  };
   const toggleDropped = id => setDropped(prev => { const x = new Set(prev); x.has(id) ? x.delete(id) : x.add(id); return x; });
   // Move up a package and keep only the add-ons the new package still lacks.
   const upgradeTo = id => { setPkg(id); setAddons(prev => new Set([...prev].filter(a => addonsFor(id).some(x => x.id === a)))); };
@@ -189,15 +218,18 @@ export default function QuoteBuilder() {
   const summaryLines = () => [
     ...(ref ? [`Ref: ${ref}`] : []),
     `Package: ${pkgName(pkg)}${suggested && pkg !== suggested ? ` (suggested ${pkgName(suggested)})` : ''}`,
-    `Customer card: ${cardName(usedCard)}`,
+    `Customer card: ${CARDS.find(c => c.id === usedCard)?.version || ''} – ${cardName(usedCard)}`,
     ...(budgetLabel ? [`Budget: ${budgetLabel}`] : []),
-    ...(help.team ? [`Team: ${help.team} · Manages: ${HELP_MANAGE.filter(m => help.manage.includes(m.id)).map(m => m.label).join(', ') || 'Just customers'}`] : []),
+    ...(help.team ? [`Team: ${help.team}`] : []),
+    `Logins: ${helpOptions('logins').filter(m => help.manage.includes(m.id)).map(m => m.label).join(', ') || 'Not said'}`,
+    `Add-on packages: ${helpOptions('packages').filter(m => help.manage.includes(m.id)).map(m => m.label).join(', ') || 'None'}`,
+    `Branches: ${help.manage.includes('branches') ? 'Yes' : help.branches || 'Not said'}`,
     `Data: ${s.data === 'move' ? `Transfer existing data (${(s.customers || '?').toLowerCase()} customers, from ${sourceText || '?'})` : s.data === 'fresh' ? 'Start fresh' : 'Not said'}`,
     `Live customers: ${s.live || 'Not said'}`,
     ...(interested.size ? [`Interested (launching soon): ${ADDONS.filter(a => interested.has(a.id)).map(a => a.label).join(', ')}`] : []),
     ...(dropped.size ? [`Not needed: ${ADDONS.filter(a => dropped.has(a.id)).map(a => a.label).join(', ')}`] : []),
     `Website: ${s.website === 'Yes' ? `Yes${s.websiteUrl.trim() ? ` (${s.websiteUrl.trim()})` : ''}` : s.website || 'Not said'}`,
-    `File storage: ${STORAGE_OPTIONS.find(o => o.id === s.storage)?.short || 'Not said'}${s.storage && s.storage !== 'none' ? ' (paid by us to the provider, separate from CRM price)' : ''}`,
+    `File storage: ${STORAGE_OPTIONS.find(o => o.id === s.storage)?.short || 'Not said'}${lockedStorage ? ' (agreed)' : ''}${s.storage && s.storage !== 'none' ? ' (paid by us to the provider, separate from CRM price)' : ''}`,
     ...(note.trim() ? [`Notes: ${note.trim()}`] : []),
     `${q.publicLines[0].label}: ${q.publicLines[0].amount}`,
     ...(q.publicLines.length > 1 ? [`Extras: ${q.publicLines.slice(1).map(l => l.label + (l.amount === 'price after a call' ? ' (price after a call)' : '')).join(', ')}`] : []),
@@ -315,38 +347,58 @@ export default function QuoteBuilder() {
       {/* ── STEP 1: choose a package ───────────────────────────── */}
       {step === 1 && (<>
         <div className={box}>
-          <p className="text-base font-black text-stone-900">{fromLink && first ? `${first}, not sure which package? Answer three questions.` : 'Not sure which package? Answer three questions.'}</p>
+          <p className="text-base font-black text-stone-900">Which version do you want?</p>
+          <p className="mt-0.5 text-xs text-stone-500">Both show every customer from enquiry to subsidy. They differ in how the customer card is laid out.</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Version">
+            {CARDS.slice().reverse().map(c => { const on = card === c.id; return (
+              <div key={c.id} className={`flex flex-col rounded-2xl border-2 p-3 ${on ? 'border-orange-500 bg-orange-50' : 'border-stone-200 bg-white'}`}>
+                <button type="button" role="radio" aria-checked={on} onClick={() => setCard(on ? '' : c.id)} className="flex min-h-11 items-start gap-2.5 text-left">
+                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${on ? 'border-orange-500 bg-orange-500 text-white' : 'border-stone-300'}`}>{on && <Check size={12}/>}</span>
+                  <span><span className="block text-[11px] font-bold uppercase tracking-wider text-orange-800">{c.version}</span><strong className="block text-sm text-stone-900">{c.name}</strong><span className="block text-xs text-stone-500">{c.id === 'stage' ? 'A tab for each of the 13 stages, filled by the person who does that step · Standard, Pro, Complete' : 'Everything on 4 tabs, one office person updates it · Lite'}</span></span>
+                </button>
+                <button type="button" onClick={() => setPreview(c.id)} className="mt-2 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 text-xs font-bold text-stone-700 hover:border-orange-400"><Eye size={13}/> See the {c.id === 'stage' ? 'step-by-step' : '4-tab'} card</button>
+              </div>
+            ); })}
+          </div>
+        </div>
+
+        <div className={box}>
+          <p className="text-base font-black text-stone-900">{fromLink && first ? `${first}, not sure which package? Answer five quick questions.` : 'Not sure which package? Answer five quick questions.'}</p>
           <div className="mt-4">
             <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">1</span> What budget do you have in mind?</p>
             <Segmented options={BUDGETS} value={budget} onPick={v => setBudget(b => (b === v ? '' : v))} label="Your budget"/>
             <p className="mt-1.5 text-[11px] text-stone-500">One-time, not monthly. It only helps us suggest a package – it doesn’t change the price.</p>
           </div>
+          <div className="mt-5">
+            <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">2</span> How many people will use it?</p>
+            <Segmented options={HELP_TEAM.map(t => ({ id: t, label: t }))} value={help.team} onPick={v => setHelp(h => ({ ...h, team: v }))} label="People who will use it"/>
+          </div>
           <div className="mt-5 grid gap-5 lg:grid-cols-2 lg:gap-8">
             <div>
-              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">2</span> How many people will use it?</p>
-              <Segmented options={HELP_TEAM.map(t => ({ id: t, label: t }))} value={help.team} onPick={v => setHelp(h => ({ ...h, team: v }))} label="People who will use it"/>
+              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">3</span> Who will log in? <span className="font-normal text-stone-500">Tick all that apply</span></p>
+              <TickList options={helpOptions('logins')} value={help.manage} onToggle={toggleHelp} label="Who will log in"/>
             </div>
             <div>
-              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">3</span> Besides customers, what else do you manage?</p>
-              <Segmented multi options={HELP_MANAGE} value={help.manage} onPick={v => setHelp(h => {
-                const cur = h.manage;
-                if (v === 'customers') return { ...h, manage: cur.includes('customers') ? [] : ['customers'] };
-                const rest = cur.filter(x => x !== 'customers');
-                return { ...h, manage: rest.includes(v) ? rest.filter(x => x !== v) : [...rest, v] };
-              })} label="Besides customers, you also manage"/>
-              <p className="mt-1.5 text-[11px] text-stone-500">Pick one or more.</p>
+              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">4</span> Need the godown & delivery package? <span className="font-normal text-stone-500">Tick if yes</span></p>
+              <TickList options={helpOptions('packages')} value={help.manage} onToggle={toggleHelp} label="Add-on packages" cols="grid-cols-1"/>
             </div>
           </div>
+          <div className="mt-5">
+            <p className="mb-2 flex items-center gap-2 text-sm font-bold text-stone-800"><span className="grid h-6 w-6 place-items-center rounded-full bg-stone-900 text-xs text-white">5</span> Do you have branch offices?</p>
+            <Segmented options={[{ id: 'Yes', label: 'Yes' }, { id: 'No', label: 'No' }]} value={help.manage.includes('branches') ? 'Yes' : help.branches || ''} onPick={v => setBranches(v === 'Yes')} label="Branch offices"/>
+            <p className="mt-1.5 text-[11px] text-stone-500">Branch logins come with the Complete package.</p>
+          </div>
+          {needsNewVersion && <p className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-800">Installation team, godown and branches need the new version. Pick the step-by-step card above to add them.</p>}
           {suggested
             ? <p className="mt-4 rounded-xl bg-orange-50 px-3 py-2 text-sm font-bold text-orange-900"><Star size={14} className="inline -mt-0.5"/> {pkgName(suggested)} fits you best ({packageRange(suggested)}) – marked below.{helpExtras(suggested).length > 0 && <span className="block text-xs font-semibold text-orange-800">{helpExtras(suggested).map(id => ADDONS.find(a => a.id === id).label).join(' + ')} will be added as extras – included in the estimate.</span>}
                 {fit === 'fits' && <span className="block text-xs font-semibold text-emerald-800">Inside your budget of {budgetLabel}.</span>}
-                {fit === 'room' && <span className="block text-xs font-semibold text-emerald-800">Inside your budget of {budgetLabel}, with room for extras like OTP login or GPS check-in.</span>}
+                {fit === 'room' && <span className="block text-xs font-semibold text-emerald-800">Inside your budget of {budgetLabel}, with room for extras like the Warranty package or E-sign.</span>}
                 {fit === 'over' && <span className="block text-xs font-semibold text-rose-700">That’s above your budget of {budgetLabel}. Tell us on WhatsApp – we can start with fewer features and add the rest later.</span>}</p>
             : <p className="mt-4 text-xs text-stone-500">Or just pick a package below.</p>}
         </div>
 
         <div className="grid gap-3 pt-2 sm:grid-cols-2 xl:grid-cols-4">
-          {PACKAGES.map(p => {
+          {shownPackages.map(p => {
             const best = p.id === suggested;
             const sizeOk = fitsTeam(p.id, help.team);
             return (
@@ -360,7 +412,7 @@ export default function QuoteBuilder() {
 
                 <dl className="mt-3 space-y-2 rounded-2xl bg-stone-50 p-3 text-xs">
                   <div className="flex gap-2"><Users size={14} className="mt-0.5 shrink-0 text-stone-500"/><div><dt className="font-bold text-stone-900">{p.maxUsers ? `Up to ${p.maxUsers} users` : 'Unlimited users'}</dt><dd className="text-stone-600">{p.who}</dd></div></div>
-                  <div className="flex gap-2"><LayoutGrid size={14} className="mt-0.5 shrink-0 text-stone-500"/><div><dt className="font-bold text-stone-900">Customer card</dt><dd className="text-stone-600">{p.cards.length > 1 ? 'Simple or Stage-by-stage – you choose' : p.cards[0] === 'simple' ? 'Simple – 4 tabs' : 'Stage-by-stage – 13 tabs'}</dd></div></div>
+                  <div className="flex gap-2"><LayoutGrid size={14} className="mt-0.5 shrink-0 text-stone-500"/><div><dt className="font-bold text-stone-900">Customer card</dt><dd className="text-stone-600">{p.cards[0] === 'simple' ? 'Old version · 4-tab card' : 'New version · step-by-step card, 13 tabs'}</dd></div></div>
                   <div className="flex gap-2"><FileText size={14} className="mt-0.5 shrink-0 text-stone-500"/><div><dt className="font-bold text-stone-900">{p.docs.length} documents filled for you</dt><dd className="text-stone-600">{p.docs.map((id, i) => { const d = SAMPLE_DOCS.find(x => x.id === id); return <span key={id}>{i ? ', ' : ''}<a href={sample(d.file, 'pdf')} target="_blank" rel="noopener noreferrer" className="underline decoration-stone-300 hover:text-orange-700">{d.name}</a></span>; })}</dd></div></div>
                 </dl>
 
@@ -375,29 +427,7 @@ export default function QuoteBuilder() {
         </div>
 
         <div className={box}>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-black text-stone-900">Two customer cards</p>
-              <p className="text-xs text-stone-500">Lite uses the Simple card: everything on 4 tabs. Standard, Pro and Complete use Stage-by-stage: 13 stages, lead to subsidy, each filled by the person who does it.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setPreview('simple')} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-800 hover:border-orange-400"><Eye size={14}/> See the Simple card</button>
-              <button type="button" onClick={() => setPreview('stage')} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 px-3 text-xs font-bold text-stone-800 hover:border-orange-400"><Eye size={14}/> See the Stage-by-stage card</button>
-            </div>
-          </div>
-          <details className="mt-2">
-            <summary className="cursor-pointer text-xs font-bold text-orange-800">Compare them</summary>
-            <dl className="mt-2 divide-y divide-stone-100 text-xs">
-              {CARD_COMPARISON.map(r => (
-                <div key={r.label} className="grid gap-1 py-2 sm:grid-cols-[140px_1fr_1fr] sm:gap-3">
-                  <dt className="font-bold text-stone-500">{r.label}</dt>
-                  <dd className="text-stone-700"><span className="font-bold text-stone-900 sm:hidden">Simple: </span>{r.simple}</dd>
-                  <dd className="text-stone-700"><span className="font-bold text-stone-900 sm:hidden">Stage: </span>{r.stage}</dd>
-                </div>
-              ))}
-            </dl>
-          </details>
-          <p className="mt-3 text-xs text-stone-500">Free in every package: rename stages and fields, your logo on documents, hide what you don’t use. Prefer to talk? <a href={`https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(`Hi${name ? `, I'm ${name}` : ''}. I'd like help choosing a SolarFlow package.`)}`} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-700 underline">Ask on WhatsApp</a></p>
+          <p className="text-xs text-stone-500">Free in every package: rename stages and fields, your logo on documents, hide what you don’t use. Prefer to talk? <a href={`https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(`Hi${name ? `, I'm ${name}` : ''}. I'd like help choosing a SolarFlow package.`)}`} target="_blank" rel="noopener noreferrer" className="font-bold text-emerald-700 underline">Ask on WhatsApp</a></p>
         </div>
       </>)}
 
@@ -446,9 +476,9 @@ export default function QuoteBuilder() {
             {s.website === 'Yes' && <input className="sf-input mt-2" value={s.websiteUrl} onChange={e => set('websiteUrl', e.target.value)} placeholder="www.yoursolar.in (optional)" inputMode="url" aria-label="Website address"/>}
           </Row>
 
-          <Row label="Where should customer files go?" hint="(extra cost, paid by you to the provider – not part of the CRM price)" important answered={!!s.storage}>
+          <Row label="Where should customer files go?" hint={lockedStorage ? '(as agreed with you – paid by you to the provider, not part of the CRM price)' : '(extra cost, paid by you to the provider – not part of the CRM price)'} important answered={!!s.storage}>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4" role="radiogroup" aria-label="File storage">
-              {STORAGE_OPTIONS.map(o => { const on = s.storage === o.id; return (
+              {STORAGE_OPTIONS.filter(o => !lockedStorage || o.id === lockedStorage).map(o => { const on = s.storage === o.id; return (
                 <button key={o.id} type="button" role="radio" aria-checked={on} onClick={() => set('storage', o.id)} className={`relative flex flex-col rounded-2xl border-2 p-3 text-left ${on ? 'border-orange-500 bg-orange-50' : o.recommended ? 'border-emerald-400 hover:border-orange-300' : 'border-stone-200 hover:border-orange-300'}`}>
                   {o.recommended && <span className="mb-1 inline-flex w-fit items-center gap-1 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"><Star size={10}/> Recommended</span>}
                   <strong className="text-sm text-stone-900">{o.label}</strong>
@@ -463,9 +493,12 @@ export default function QuoteBuilder() {
           </Row>
 
           <Row label="Features" hint="(green = in your package – tap View to see a sample document, untick what you don’t need · tick more if you want, the estimate goes up a little)">
+            {ADDONS.some(x => x.hidden && addons.has(x.id) && addonsFor(pkg).some(y => y.id === x.id)) && (
+              <p className="mb-3 rounded-xl bg-orange-50 px-3 py-2 text-xs text-orange-900"><strong>Added from your answers:</strong> {ADDONS.filter(x => x.hidden && addons.has(x.id) && addonsFor(pkg).some(y => y.id === x.id)).map(x => x.label).join(' · ')}. <button type="button" onClick={() => go(1)} className="font-bold underline">Change</button></p>
+            )}
             {ADDON_GROUPS.map(g => {
-              const inc = includedFeatures(pkg).filter(x => x.group === g);
-              const more = addonsFor(pkg).filter(x => x.group === g);
+              const inc = includedFeatures(pkg).filter(x => x.group === g && !x.hidden);
+              const more = addonsFor(pkg).filter(x => x.group === g && !x.hidden);
               const soon = comingSoon().filter(x => x.group === g);
               if (!inc.length && !more.length && !soon.length) return null;
               return (

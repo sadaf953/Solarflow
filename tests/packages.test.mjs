@@ -79,18 +79,25 @@ test('ticked logins and documents decide the package', () => {
   assert.equal(simpleAllowed({ team: '11–25', logins: ['dealer'], docs: [] }), false);
 });
 
-import { helpPick, helpAddons } from '../src/pricing/packages.js';
-test('helper: team size sets the package; godown & delivery → Pro; branches → Complete', () => {
-  assert.equal(helpPick('1–10', ['customers']), 'starter');
-  assert.equal(helpPick('1–10', ['dealers']), 'starter');           // dealer logins are in Lite
-  assert.equal(helpPick('1–10', ['dealers', 'stock']), 'pro');      // godown & delivery are in Pro
-  assert.deepEqual(helpAddons(['dealers', 'stock']), []);
-  assert.equal(helpPick('11–25', []), 'growth');
-  assert.equal(helpPick('26–50', ['dealers']), 'pro');
-  assert.equal(helpPick('1–10', ['branches']), 'complete');
-  assert.equal(helpPick('50+', ['customers']), 'complete');
-  assert.equal(helpPick('1–15', []), 'starter');
-  assert.equal(helpPick('16–25', []), 'growth');
+import { helpPick, helpLift, helpAddons, helpOptions, atLeast } from '../src/pricing/packages.js';
+test('helper: team size sets the package; ticked packages add extras and lift Lite to Standard', () => {
+  assert.deepEqual(helpOptions('logins').map(m => m.label), ['Admin', 'Staff', 'Channel partners', 'Installation team']);
+  assert.deepEqual(helpOptions('packages').map(m => m.id), ['stock']);
+  assert.equal(helpPick('1–15', ['admin', 'staff', 'dealers']), 'starter');  // channel partner logins are in Lite
+  assert.equal(helpPick('1–15', ['stock']), 'growth');                       // godown/delivery/BOM needs Standard+
+  assert.equal(helpPick('1–15', ['installers']), 'growth');
+  assert.equal(helpPick('16–25', ['stock']), 'growth');
+  assert.equal(helpPick('26–50', []), 'pro');
+  assert.equal(helpPick('50+', []), 'complete');
+  assert.deepEqual(helpAddons(['installers', 'stock']), ['installation', 'delivery', 'godown']);
+  for (const id of ['installation', 'warranty', 'delivery', 'godown']) assert.ok(addonsFor('growth').some(a => a.id === id), id);
+  assert.ok(addonsFor('starter').some(a => a.id === 'warranty'));
+  assert.equal(helpLift('starter', ['stock']), 'growth');
+  assert.equal(helpLift('pro', ['stock']), 'pro');
+  assert.equal(helpLift('', ['stock']), '');
+  assert.equal(helpPick('1–15', ['branches']), 'complete');                  // branch logins only in Complete
+  assert.equal(atLeast('starter', 'growth'), 'growth');
+  assert.equal(atLeast('pro', 'growth'), 'pro');
 });
 
 import { rangeLabel, packageRange } from '../src/pricing/packages.js';
@@ -109,10 +116,10 @@ import { addonsFor, includedFeatures } from '../src/pricing/packages.js';
 test('extras: Lite is sold as it is (plus OTP, GPS, e-sign), Standard and Pro can add what the next tier has', () => {
   const ids = id => addonsFor(id).map(a => a.id);
   const X = ['otp', 'gps', 'esign'];
-  assert.deepEqual(ids('starter'), X);
-  assert.deepEqual(ids('growth'), ['delivery', 'installation', 'godown', 'attendance', 'calendar', 'commission_install', ...X]);
-  assert.deepEqual(ids('pro'), ['attendance', 'calendar', ...X]);
-  assert.deepEqual(ids('complete'), X);
+  assert.deepEqual(ids('starter'), ['warranty', ...X]);
+  assert.deepEqual(ids('growth'), ['delivery', 'installation', 'warranty', 'godown', 'attendance', 'calendar', 'commission_install', ...X]);
+  assert.deepEqual(ids('pro'), ['warranty', 'attendance', 'calendar', ...X]);
+  assert.deepEqual(ids('complete'), ['warranty', ...X]);
   assert.ok(includedFeatures('pro').some(a => a.id === 'delivery'));
   assert.ok(!includedFeatures('complete').some(a => a.id === 'commission_both'));
   assert.equal(quote({ pkg: 'starter', data: 'fresh', customers: '', addons: new Set(['godown']), card: 'simple' }).total, 40000);

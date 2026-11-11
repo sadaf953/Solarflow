@@ -35,7 +35,7 @@ export default function SimpleCardPreview({ onClose }) {
         <div className="bg-stone-900 px-5 pt-4 text-white">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Simple card · sample customer</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">4-tab customer card (old version) · sample customer</span>
               <h2 className="text-lg font-black">{c.name}</h2>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <span className="rounded-lg bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">{c.stage}</span>

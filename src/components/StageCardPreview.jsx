@@ -21,7 +21,7 @@ export default function StageCardPreview({ onClose }) {
         <div className="bg-stone-900 px-5 pb-3 pt-4 text-white">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Stage-by-stage card · sample customer</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Step-by-step customer card (new version) · sample customer</span>
               <h2 className="text-lg font-black">{c.name}</h2>
               <p className="mt-0.5 text-xs text-stone-300">Now at <strong className="text-amber-300">{c.current}</strong> · stage {stages.filter(s => !s.skip).findIndex(s => s.id === c.current) + 1} of {shown} · {c.payment} customer</p>
             </div>

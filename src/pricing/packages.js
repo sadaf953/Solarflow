@@ -18,9 +18,9 @@ export const PACKAGES = [
     id: 'starter', name: 'Lite', price: 40000, range: [35000, 45000], floor: 33000, tagline: 'The simple 4-tab CRM for a smaller team',
     logins: 'Up to 15 users', maxUsers: 15,
     who: 'Admin + Staff, or Admin + Staff + Dealer', cards: ['simple'], docs: ['quotation', 'discom', 'feasibility'],
-    highlights: ['Simple customer card – 4 tabs, 11 stages, payment and subsidy tags', 'Quotation maker in your format', 'DISCOM agreement + feasibility report', 'Checklists, Google Drive links, Excel export', 'Year 1 hosting and support included'],
+    highlights: ['4-tab customer card (old version) – 11 stages, payment and subsidy tags', 'Quotation maker in your format', 'DISCOM agreement + feasibility report', 'Checklists, Google Drive links, Excel export', 'Year 1 hosting and support included'],
     includes: [
-      'Simple customer card – 4 tabs: Overview · Finance & Bank · Checklist · Notes & History',
+      '4-tab customer card (old version): Overview · Finance & Bank · Checklist · Notes & History',
       'Quotation maker in your format',
       'Every customer’s stage, next follow-up and pending work on one dashboard',
       'DISCOM agreement and bank feasibility report – filled from the customer card',
@@ -33,9 +33,9 @@ export const PACKAGES = [
     id: 'growth', name: 'Standard', price: 52000, range: [45000, 60000], floor: 43000, tagline: 'Every stage, dealers and money tracked', popular: true,
     logins: 'Up to 25 users', maxUsers: 25,
     who: 'Admin, Staff, Dealer', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility'],
-    highlights: ['Stage-by-stage customer card – 13 stages, lead to subsidy', 'Dealer logins – each dealer sees only their own leads', 'Finance bundle – invoice maker, payments, loan & subsidy tracking', 'Dealer commissions · staff management', 'Year 1 hosting and support included'],
+    highlights: ['Step-by-step customer card (new version) – 13 stages, lead to subsidy', 'Dealer logins – each dealer sees only their own leads', 'Invoice maker, payments, loan & subsidy tracking', 'Dealer commissions · staff management', 'Year 1 hosting and support included'],
     includes: [
-      'Stage-by-stage customer card – a tab for every stage, each filled by the person who does it',
+      'Step-by-step customer card (new version) – a tab for every stage, each filled by the person who does it',
       'Dealer logins – each dealer sees only their own leads',
       'Dealer commission tracking',
       'Payment & loan tracking with pending-amount view',
@@ -47,7 +47,7 @@ export const PACKAGES = [
     id: 'pro', name: 'Pro', price: 67000, range: [60000, 75000], floor: 57000, tagline: 'Godown, delivery and installation teams',
     logins: 'Up to 50 users', maxUsers: 50,
     who: 'Admin, Staff, Dealer, Installation team, Godown', cards: ['stage'], docs: ['quotation', 'discom', 'feasibility', 'bom', 'truck', 'gatepass'],
-    highlights: ['Everything in Standard', 'Delivery bundle – delivery batches, BOM, challan, gate pass, truck loading sheet', 'Inventory (godown)', 'Installation team logins, jobs and payments', 'Year 1 hosting and support included'],
+    highlights: ['Everything in Standard', 'Godown, delivery & BOM – stock, delivery batches, challan, gate pass, truck loading sheet', 'Installation team logins, jobs and payments', 'Year 1 hosting and support included'],
     includes: [
       'Everything in Standard',
       'Godown stock, BOM & material checklist',
@@ -87,13 +87,13 @@ export const LIVE_COUNTS = ['Under 50', '50 – 200', '200 – 500', '500+'];
 // "stage" = SolarFlow's stage-by-stage card (Standard, Pro and Complete).
 export const CARDS = [
   {
-    id: 'simple', name: 'Simple card', sub: 'Original version · 4 tabs',
+    id: 'simple', name: '4-tab customer card', version: 'Old version', sub: 'Old version · everything on 4 tabs',
     tabs: ['Overview', 'Finance & Bank', 'Checklist', 'Notes & History'],
     bestFor: 'Fewer things to track · one office person updates everything',
     packages: ['starter'],
   },
   {
-    id: 'stage', name: 'Stage-by-stage card', sub: 'New version · 13 stages',
+    id: 'stage', name: 'Step-by-step customer card', version: 'New version', sub: 'New version · a tab for each of the 13 stages',
     tabs: ['Lead', 'Registration', 'Loan / Cash', 'Material order', 'Integration', 'Delivery', 'Installation', 'Geo-tag photo', 'DISCOM submission', 'Meter', 'Inspection', 'Subsidy', 'Final review'],
     bestFor: 'Many things to track, different people per stage · any team size',
     packages: ['growth', 'pro', 'complete'],
@@ -303,14 +303,16 @@ export const ADDONS = [
   { id: 'discom_doc', group: 'Included documents', label: 'DISCOM submission document', from: 'starter', docs: ['discom'] },
   { id: 'feasibility_doc', group: 'Included documents', label: 'Bank feasibility document', from: 'starter', docs: ['feasibility'] },
 
-  { id: 'finance', group: 'Bundles', label: 'Finance bundle', price: 5000, from: 'growth',
+  { id: 'finance', group: 'Bundles', label: 'Invoices, payments & loan tracking', price: 5000, from: 'growth', hidden: true,
     example: 'Bill / invoice maker, payments received and pending, loan tags (1st, 2nd payment) and subsidy tags.' },
-  { id: 'delivery', group: 'Bundles', label: 'Delivery bundle', price: 7000, from: 'pro',
+  { id: 'delivery', group: 'Bundles', label: 'Delivery, challan & BOM', price: 7000, from: 'pro', hidden: true,
     example: 'Delivery batches page, BOM maker, delivery challan, gate pass and truck loading sheet.', docs: ['bom', 'truck', 'gatepass'] },
-  { id: 'installation', group: 'Bundles', label: 'Installation bundle', price: 5000, from: 'pro',
+  { id: 'installation', group: 'Bundles', label: 'Installation team logins', price: 5000, from: 'pro', hidden: true,
     example: 'Installation team logins with job assignment, installation view, geo-tag photos and installation team payments.' },
+  { id: 'warranty', group: 'Bundles', label: 'Warranty package', custom: true, any: true,
+    example: 'Technician logins, customer complaints closed with an OTP sent to the customer, and GPS tracking of technicians on warranty visits.' },
 
-  { id: 'godown', group: 'Stand-alone', label: 'Inventory (godown)', price: 5500, from: 'pro', example: 'Stock on hand, movements and daily godown report.' },
+  { id: 'godown', group: 'Stand-alone', label: 'Godown stock', price: 5500, from: 'pro', hidden: true, example: 'Stock on hand, movements and daily godown report.' },
   { id: 'attendance', group: 'Stand-alone', label: 'Attendance', price: 4000, from: 'complete', example: 'Daily check-in for office and site staff.' },
   { id: 'calendar', group: 'Stand-alone', label: 'Calendar', price: 2000, from: 'complete', example: 'Team and installation team calendar.' },
 
@@ -319,8 +321,8 @@ export const ADDONS = [
   { id: 'commission_both', group: 'Commissions', label: 'Both', price: 6500, from: 'pro', exclusive: 'commission', hideIncluded: true },
 
   // Extras for every package, Lite included. `custom: true` = "price after a call" until prices are set.
-  { id: 'otp', group: 'Extras', label: 'OTP login', custom: true, any: true, example: 'Staff and dealers log in with a one-time code sent to their phone. No passwords to share.' },
-  { id: 'gps', group: 'Extras', label: 'GPS check-in for the installation team', custom: true, any: true, example: 'The team checks in at the site from their phone. You see who reached which site, and when.' },
+  { id: 'otp', group: 'Extras', label: 'OTP login', custom: true, any: true, hidden: true, example: 'Staff and dealers log in with a one-time code sent to their phone. No passwords to share.' },
+  { id: 'gps', group: 'Extras', label: 'GPS check-in for the installation team', custom: true, any: true, hidden: true, example: 'The team checks in at the site from their phone. You see who reached which site, and when.' },
   { id: 'esign', group: 'Extras', label: 'E-sign', custom: true, any: true, example: 'Customers sign the agreement and other documents on their phone. The signed copy stays on the customer card.' },
 
   { id: 'commercial', group: 'Custom', label: 'Commercial projects', soon: true, example: 'Commercial / industrial rooftop with your own stages.' },
@@ -408,22 +410,36 @@ export function quote({ pkg, data, customers, addons, card }) {
 
 // ── 2-tap helper on the package screen ──
 export const HELP_TEAM = ['1–15', '16–25', '26–50', '50+'];
-// "Besides customers, you also manage" – pick one or more (Just customers clears the rest).
+// Two pick-one-or-more questions under team size:
+//   q: 'logins'   – "Who will log in?"
+//   q: 'packages' – "Which add-on packages do you need?"
+// The Warranty package is not asked here – it is offered on the Features page (ADDONS 'warranty').
 // Team size sets the package (1–15 Lite, 16–25 Standard, 26–50 Pro, 50+ Complete).
-// Dealers: dealer logins are already in Lite, so no change.
-// Godown & delivery: part of Pro.
-// Branches: branch logins exist only in Complete.
+// `addons` = extras pre-ticked in the estimate. `min` = lowest package that offers those extras
+// (Lite only takes the any-package Extras, so these lift Lite to Standard).
 export const HELP_MANAGE = [
-  { id: 'customers', label: 'Just customers' },
-  { id: 'dealers', label: 'Dealers' },
-  { id: 'stock', label: 'Godown & delivery', pkg: 'pro' },
-  { id: 'branches', label: 'Branches', pkg: 'complete' },
+  { id: 'admin', q: 'logins', label: 'Admin' },
+  { id: 'staff', q: 'logins', label: 'Staff' },
+  { id: 'dealers', q: 'logins', label: 'Channel partners' },          // dealer logins are in Lite
+  { id: 'installers', q: 'logins', label: 'Installation team', addons: ['installation'], min: 'growth' },
+  { id: 'stock', q: 'packages', label: 'Godown, delivery & BOM package', sub: 'Godown stock · delivery batches, challan, gate pass, truck loading sheet · BOM', addons: ['delivery', 'godown'], min: 'growth' },
+  { id: 'branches', q: 'branches', label: 'Branches', min: 'complete' },     // branch logins are only in Complete
 ];
+export const helpOptions = q => HELP_MANAGE.filter(m => m.q === q);
 export function helpPick(team, manage = []) {
   let r = teamRank(team);
-  for (const m of HELP_MANAGE) if (manage.includes(m.id) && m.pkg) r = Math.max(r, RANK[m.pkg]);
+  for (const m of HELP_MANAGE) if (manage.includes(m.id) && m.min) r = Math.max(r, RANK[m.min]);
   return BY_RANK[r];
 }
+// Without a team size: lift a budget/link package to the lowest one that offers the ticked extras.
+export function helpLift(pkgId, manage = []) {
+  if (!pkgId) return pkgId;
+  let r = RANK[pkgId] ?? 0;
+  for (const m of HELP_MANAGE) if (manage.includes(m.id) && m.min) r = Math.max(r, RANK[m.min]);
+  return BY_RANK[r];
+}
+// The new (step-by-step) card starts at Standard; the old 4-tab card is Lite only.
+export const atLeast = (pkgId, min) => (pkgId && RANK[pkgId] < RANK[min] ? min : pkgId);
 // Extras to pre-tick for the chosen package from the helper answers.
 export const helpAddons = (manage = []) => HELP_MANAGE.filter(m => manage.includes(m.id)).flatMap(m => m.addons || []);
 
