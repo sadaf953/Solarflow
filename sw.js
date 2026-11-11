@@ -14,7 +14,7 @@
  *   so the UI can show a "New version available" prompt.
  */
 
-const VERSION = "14bc484433f8"
+const VERSION = "59aee6bbdaea"
 const PRECACHE = [
   "./",
   "./index.html",
@@ -25,8 +25,8 @@ const PRECACHE = [
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
   "./apple-touch-icon.png",
-  "./assets/index-C37si9cw.css",
-  "./assets/index-xu-jvoMT.js"
+  "./assets/index-BksnEwS1.js",
+  "./assets/index-DqDnPESh.css"
 ]
 
 const CACHE_PREFIX = 'solarflow-'
@@ -78,6 +78,8 @@ self.addEventListener('fetch', (event) => {
   const relPath = url.pathname.startsWith(scopePath) ? url.pathname.slice(scopePath.length) : url.pathname
   // The update checks must always hit the network.
   if (relPath === 'version.json' || relPath === 'sw.js') return
+  // Videos stream with Range requests; iPhones fail to play them through a service worker.
+  if (relPath.startsWith('videos/')) return
 
   if (request.mode === 'navigate') {
     event.respondWith(handleNavigation(request))
