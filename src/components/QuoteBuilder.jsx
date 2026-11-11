@@ -149,7 +149,7 @@ export default function QuoteBuilder() {
   const [budget, setBudget] = useState(d.budget || '');
   const [pkg, setPkg] = useState(knownPkg(d.pkg || ''));
   // ?card=stage|simple preselects the version; ?storage=gdrive (etc.) locks the storage choice agreed with the client.
-  const [card, setCard] = useState(() => d.card || (CARDS.some(c => c.id === urlParam('card')) ? urlParam('card') : ''));
+  const [card, setCard] = useState(() => (CARDS.some(c => c.id === urlParam('card')) ? urlParam('card') : d.card || ''));
   const [lockedStorage] = useState(() => (STORAGE_OPTIONS.some(o => o.id === urlParam('storage')) ? urlParam('storage') : ''));
   const [s, setS] = useState(() => { const x = { data: '', customers: '', source: '', sourceOther: '', website: '', websiteUrl: '', storage: '', live: '', ...(d.s || {}) }; const ls = STORAGE_OPTIONS.some(o => o.id === urlParam('storage')) ? urlParam('storage') : ''; return ls ? { ...x, storage: ls } : x; });
   const [addons, setAddons] = useState(new Set(d.addons || []));
