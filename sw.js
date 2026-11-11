@@ -14,7 +14,7 @@
  *   so the UI can show a "New version available" prompt.
  */
 
-const VERSION = "c1758ec42d6e"
+const VERSION = "77845eba9858"
 const PRECACHE = [
   "./",
   "./index.html",
@@ -26,7 +26,7 @@ const PRECACHE = [
   "./icons/icon-maskable-512.png",
   "./apple-touch-icon.png",
   "./assets/index--ycI3x4q.css",
-  "./assets/index-DAdC1kCy.js"
+  "./assets/index-BA98krB6.js"
 ]
 
 const CACHE_PREFIX = 'solarflow-'
