@@ -6,7 +6,7 @@ import { enquiryPayload, saveEnquiryStep } from '../enquiries/submit';
 import {
   PACKAGES, ADDONS, CUSTOMER_COUNTS, LIVE_COUNTS, CARDS, CARD_COMPARISON,
   STORAGE_OPTIONS, STORAGE_GUIDE, STORAGE_PRICES_CHECKED, SAMPLE_DOCS, FIELD_SETUP, AFTER_CONFIRMATION, HELP_TEAM, HELP_MANAGE, helpOptions,
-  CARE_PLAN, fitsTeam, quote, money, helpPick, helpLift, atLeast, helpAddons, packageRange, fullPackageRange, addonsFor, includedFeatures, comingSoon, ADDON_GROUPS, LAUNCH_OFFER,
+  CARE_PLAN, fitsTeam, quote, money, helpPick, helpLift, atLeast, helpAddons, presetExtrasFor, PRESET_DROPS, packageRange, fullPackageRange, addonsFor, includedFeatures, comingSoon, ADDON_GROUPS, LAUNCH_OFFER,
   BUDGETS, budgetFit, TEAM_VIDEOS, teamVideo,
 } from '../pricing/packages';
 import { SALES_WHATSAPP } from '../demo/whatsapp';
@@ -27,6 +27,13 @@ import DocPreview from './DocPreview';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const stored = key => { try { return localStorage.getItem(key) || ''; } catch { return ''; } };
+// Comma list from the link (?extras=a,b) – longer than urlParam allows.
+const urlList = key => {
+  try {
+    const qs = new URLSearchParams(window.location.search || (window.location.hash.split('?')[1] || ''));
+    return (qs.get(key) || '').split(',').map(x => x.trim()).filter(Boolean).slice(0, 30);
+  } catch { return []; }
+};
 const urlParam = key => {
   try {
     const qs = new URLSearchParams(window.location.search || (window.location.hash.split('?')[1] || ''));
@@ -152,6 +159,8 @@ export default function QuoteBuilder() {
   const [card, setCard] = useState(() => (CARDS.some(c => c.id === urlParam('card')) ? urlParam('card') : d.card || ''));
   const [lockedStorage] = useState(() => (STORAGE_OPTIONS.some(o => o.id === urlParam('storage')) ? urlParam('storage') : ''));
   const [s, setS] = useState(() => { const x = { data: '', customers: '', source: '', sourceOther: '', website: '', websiteUrl: '', storage: '', live: '', ...(d.s || {}) }; const ls = STORAGE_OPTIONS.some(o => o.id === urlParam('storage')) ? urlParam('storage') : ''; return ls ? { ...x, storage: ls } : x; });
+  const [linkExtras] = useState(() => urlList('extras'));   // page 2 features pre-ticked after a call
+  const [linkDrops] = useState(() => urlList('drop').filter(id => PRESET_DROPS().some(a => a.id === id)));
   const [addons, setAddons] = useState(new Set(d.addons || []));
   const [dropped, setDropped] = useState(new Set(d.dropped || [])); // included features the client doesn't want
   const [interested, setInterested] = useState(new Set(d.interested || [])); // 'launching soon' features they want to hear about
@@ -197,7 +206,7 @@ export default function QuoteBuilder() {
   // Extras hidden on page 2 always follow the page 1 answers; other ticks are kept for the same package.
   const isHidden = id => !!ADDONS.find(a => a.id === id)?.hidden;
   const choose = id => {
-    if (id !== pkg) { setPkg(id); setAddons(new Set(helpExtras(id))); setDropped(new Set()); }
+    if (id !== pkg) { setPkg(id); setAddons(new Set([...helpExtras(id), ...presetExtrasFor(id, linkExtras)])); setDropped(new Set(linkDrops)); }
     else setAddons(prev => new Set([...[...prev].filter(x => !isHidden(x)), ...helpExtras(id)]));
     go(2);
   };
@@ -493,6 +502,7 @@ export default function QuoteBuilder() {
           </Row>
 
           <Row label="Features" hint="(green = in your package – tap View to see a sample document, untick what you don’t need · tick more if you want, the estimate goes up a little)">
+            {(linkExtras.length > 0 || linkDrops.length > 0) && <p className="mb-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-900"><strong>Set up from our call:</strong> we’ve ticked what we discussed. You can still change anything.</p>}
             {ADDONS.some(x => x.hidden && addons.has(x.id) && addonsFor(pkg).some(y => y.id === x.id)) && (
               <p className="mb-3 rounded-xl bg-orange-50 px-3 py-2 text-xs text-orange-900"><strong>Added from your answers:</strong> {ADDONS.filter(x => x.hidden && addons.has(x.id) && addonsFor(pkg).some(y => y.id === x.id)).map(x => x.label).join(' · ')}. <button type="button" onClick={() => go(1)} className="font-bold underline">Change</button></p>
             )}

@@ -158,3 +158,12 @@ test('video: own file first, Drive as backup link, nothing set = hidden', () => 
   assert.ok(teamVideo('small').driveView);
   Object.assign(v, keep);
 });
+
+import { presetExtrasFor, PRESET_EXTRAS } from '../src/pricing/packages.js';
+test('call presets: link extras are kept only when the package can take them, one commission at a time', () => {
+  assert.ok(!PRESET_EXTRAS().some(a => a.hidden || a.group === 'Included documents'));
+  assert.deepEqual(presetExtrasFor('growth', ['warranty', 'attendance', 'delivery', 'nope']), ['warranty', 'attendance']); // delivery follows page 1
+  assert.deepEqual(presetExtrasFor('starter', ['warranty', 'attendance', 'esign']), ['warranty', 'esign']);               // Lite takes extras only
+  assert.deepEqual(presetExtrasFor('growth', ['commission_install', 'commission_both']), ['commission_install']);
+  assert.deepEqual(presetExtrasFor('complete', ['calendar', 'warranty']), ['warranty']);                                  // calendar already included
+});

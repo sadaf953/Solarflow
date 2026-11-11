@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Copy, Check, MessageCircle, Link2 } from 'lucide-react';
-import { PACKAGES } from '../pricing/packages';
+import { PACKAGES, CARDS, STORAGE_OPTIONS, PRESET_EXTRAS, PRESET_DROPS } from '../pricing/packages';
 import { supabase } from '../supabase';
 import { createSavedBrief } from '../enquiries/brief';
 
@@ -9,7 +9,7 @@ import { createSavedBrief } from '../enquiries/brief';
 // an optional suggested package, and a ref so the reply can be matched to the lead.
 const BASE = 'https://solarflow.deeprootsystems.in/#/plans';
 
-export function clientQuoteLink({ name, company, phone, pkg, ref }) {
+export function clientQuoteLink({ name, company, phone, pkg, ref, card = '', storage = '', extras = [], drop = [] }) {
   const qs = new URLSearchParams();
   if (name.trim()) qs.set('name', name.trim());
   if (company.trim()) qs.set('company', company.trim());
@@ -17,17 +17,32 @@ export function clientQuoteLink({ name, company, phone, pkg, ref }) {
   if (digits) qs.set('phone', digits);
   if (pkg) qs.set('pkg', pkg);
   if (ref.trim()) qs.set('ref', ref.trim());
+  if (card) qs.set('card', card);
+  if (storage) qs.set('storage', storage);
+  if (extras.length) qs.set('extras', extras.join(','));
+  if (drop.length) qs.set('drop', drop.join(','));
   return `${BASE}?${qs.toString()}`;
 }
 
 // Short reference so each client's answers can be matched to their link (e.g. SF-4K7Q).
 const newRef = () => 'SF-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+const blank = () => ({ name: '', company: '', phone: '', pkg: '', ref: newRef(), card: '', storage: '', extras: [], drop: [] });
+const chip = on => `min-h-10 rounded-xl border-2 px-3 text-sm ${on ? 'border-orange-500 bg-orange-50 font-bold' : 'border-stone-200'}`;
+const commissionIds = PRESET_EXTRAS().filter(a => a.exclusive).map(a => a.id);
 
 export default function ClientQuoteLink({ adminCode = '', onSaved }) {
-  const [f, setF] = useState(() => ({ name: '', company: '', phone: '', pkg: '', ref: newRef() }));
+  const [f, setF] = useState(blank);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(''); // '', 'saving', 'saved', 'failed', 'nophone'
   const set = (k, v) => { setF(x => ({ ...x, [k]: v })); setCopied(false); setSaved(''); };
+  // Tick/untick in a list; commissions are one choice at a time.
+  const flip = (k, id) => setF(x => {
+    const has = x[k].includes(id);
+    let next = has ? x[k].filter(i => i !== id) : [...x[k], id];
+    if (!has && commissionIds.includes(id)) next = next.filter(i => i === id || !commissionIds.includes(i));
+    setCopied(false); setSaved('');
+    return { ...x, [k]: next };
+  });
   // Record every form we send, so it shows in All clients as "Sent – not opened yet".
   async function record() {
     if (saved === 'saved' || saved === 'saving') return;
@@ -35,14 +50,14 @@ export default function ClientQuoteLink({ adminCode = '', onSaved }) {
     setSaved('saving');
     try {
       await createSavedBrief(supabase, { name: f.name.trim(), company: f.company.trim() || f.name.trim(), mobile: digits,
-        customRequest: `New quote form sent · Ref ${f.ref.trim()}${f.pkg ? ` · Suggested ${f.pkg}` : ''}` }, adminCode);
+        customRequest: [`New quote form sent · Ref ${f.ref.trim()}`, f.pkg && `Suggested ${f.pkg}`, f.card && `Version ${CARDS.find(c => c.id === f.card)?.version}`, f.storage && `Storage ${STORAGE_OPTIONS.find(o => o.id === f.storage)?.short}`, f.extras.length && `Pre-ticked: ${f.extras.map(id => PRESET_EXTRAS().find(a => a.id === id)?.label).join(', ')}`, f.drop.length && `Not needed: ${f.drop.map(id => PRESET_DROPS().find(a => a.id === id)?.label).join(', ')}`].filter(Boolean).join(' · ') }, adminCode);
       setSaved('saved'); onSaved?.();
     } catch { setSaved('failed'); }
   }
   const ready = f.name.trim() || f.company.trim();
   const link = clientQuoteLink(f);
   const digits = f.phone.replace(/\D/g, '').slice(-10);
-  const message = `Hi ${f.name.trim() || 'there'}, here is your personal SolarFlow quotation page${f.company.trim() ? ` for ${f.company.trim()}` : ''}. It takes about a minute – pick a package, answer a few taps and share it back on WhatsApp. You can open the same link again to change anything:\n${link}`;
+  const message = `Hi ${f.name.trim() || 'there'}, here is your personal SolarFlow quotation page${f.company.trim() ? ` for ${f.company.trim()}` : ''}. It takes about a minute – answer a few quick questions, pick a package and share it back on WhatsApp. You can open the same link again to change anything:\n${link}`;
   const copy = async () => { record(); try { await navigator.clipboard.writeText(link); setCopied(true); } catch { setCopied(false); } };
 
   return (
@@ -62,6 +77,40 @@ export default function ClientQuoteLink({ adminCode = '', onSaved }) {
             ))}
           </div>
         </div>
+        <div className="sm:col-span-2">
+          <p className="mb-1.5 text-xs font-bold text-stone-700">Version <span className="font-normal text-stone-500">(optional – preselected for them)</span></p>
+          <div className="flex flex-wrap gap-2">
+            {[{ id: '', label: 'Let them choose' }, ...CARDS.slice().reverse().map(c => ({ id: c.id, label: `${c.version} · ${c.name}` }))].map(o => (
+              <button key={o.id || 'none'} type="button" aria-pressed={f.card === o.id} onClick={() => set('card', o.id)} className={chip(f.card === o.id)}>{o.label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="sm:col-span-2">
+          <p className="mb-1.5 text-xs font-bold text-stone-700">File storage <span className="font-normal text-stone-500">(optional – locks it to what you agreed)</span></p>
+          <div className="flex flex-wrap gap-2">
+            {[{ id: '', short: 'Let them choose' }, ...STORAGE_OPTIONS].map(o => (
+              <button key={o.id || 'none'} type="button" aria-pressed={f.storage === o.id} onClick={() => set('storage', o.id)} className={chip(f.storage === o.id)}>{o.id === 'gdrive' ? 'Google Drive (personal)' : o.short}</button>
+            ))}
+          </div>
+        </div>
+        <div className="sm:col-span-2">
+          <p className="mb-1.5 text-xs font-bold text-stone-700">Page 2 features to tick for them <span className="font-normal text-stone-500">(from your call – they can still change them; page 1 is left to them)</span></p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {PRESET_EXTRAS().map(a => { const on = f.extras.includes(a.id); return (
+              <button key={a.id} type="button" aria-pressed={on} onClick={() => flip('extras', a.id)} className={`flex items-start gap-2 rounded-xl border-2 px-3 py-2 text-left text-sm ${on ? 'border-orange-500 bg-orange-50' : 'border-stone-200'}`}>
+                <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${on ? 'border-orange-500 bg-orange-500 text-white' : 'border-stone-300'}`}>{on && <Check size={13}/>}</span>
+                <span><span className="font-bold text-stone-900">{a.exclusive ? `Commissions – ${a.label.toLowerCase()}` : a.label}</span>{a.custom && <span className="text-stone-500"> · price after a call</span>}</span>
+              </button>
+            ); })}
+          </div>
+          <p className="mt-3 mb-1.5 text-xs font-bold text-stone-700">Included documents they don’t need <span className="font-normal text-stone-500">(optional)</span></p>
+          <div className="flex flex-wrap gap-2">
+            {PRESET_DROPS().map(a => (
+              <button key={a.id} type="button" aria-pressed={f.drop.includes(a.id)} onClick={() => flip('drop', a.id)} className={chip(f.drop.includes(a.id))}>{f.drop.includes(a.id) ? '✕ ' : ''}{a.label}</button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-stone-500">Features their package already includes, or can’t take, are skipped automatically on their page.</p>
+        </div>
       </div>
       {ready && (
         <div className="mt-4 rounded-2xl bg-stone-50 p-3">
@@ -69,7 +118,7 @@ export default function ClientQuoteLink({ adminCode = '', onSaved }) {
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={copy} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-stone-300 bg-white px-3 text-sm font-bold text-stone-800">{copied ? <Check size={15}/> : <Copy size={15}/>} {copied ? 'Copied' : 'Copy link'}</button>
             <a href={`https://wa.me/${digits ? `91${digits}` : ''}?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer" onClick={record} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#25D366] px-3 text-sm font-bold text-[#073B1C]"><MessageCircle size={15}/> Send on WhatsApp</a>
-            <button type="button" onClick={() => { setF({ name: '', company: '', phone: '', pkg: '', ref: newRef() }); setSaved(''); setCopied(false); }} className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-bold text-stone-500 underline">Next client</button>
+            <button type="button" onClick={() => { setF(blank()); setSaved(''); setCopied(false); }} className="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-bold text-stone-500 underline">Next client</button>
           </div>
           {saved && <p role="status" className={`mt-2 text-xs font-semibold ${saved === 'saved' ? 'text-emerald-700' : saved === 'saving' ? 'text-stone-500' : 'text-rose-700'}`}>{
             saved === 'saved' ? '✓ Saved – it shows in All clients as “Sent – not opened yet”.'

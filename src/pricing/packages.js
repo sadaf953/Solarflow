@@ -327,6 +327,22 @@ export const ADDONS = [
 
   { id: 'commercial', group: 'Custom', label: 'Commercial projects', soon: true, example: 'Commercial / industrial rooftop with your own stages.' },
 ];
+// Page 2 features you can pre-tick on a client's link after a call (?extras=a,b), and
+// included documents you can mark not needed (?drop=a). Hidden ones follow page 1 answers instead.
+export const PRESET_EXTRAS = () => ADDONS.filter(a => !a.hidden && !a.soon && a.group !== 'Included documents');
+export const PRESET_DROPS = () => ADDONS.filter(a => a.group === 'Included documents');
+// The link's extras that this package can take, keeping only one commission choice.
+export function presetExtrasFor(pkgId, ids = []) {
+  const ok = new Set(addonsFor(pkgId).map(a => a.id));
+  const out = []; let commission = false;
+  for (const id of ids) {
+    const a = ADDONS.find(x => x.id === id);
+    if (!a || a.hidden || !ok.has(id)) continue;
+    if (a.exclusive) { if (commission) continue; commission = true; }
+    out.push(id);
+  }
+  return out;
+}
 export const approx = n => `≈ ₹${(Math.round(n / 500) * 500 / 1000).toString().replace(/\.0$/, '')}k`;
 // Add-ons the chosen package doesn't already include.
 const has = (a, pkgId) => a.from && RANK_OF[a.from] <= RANK_OF[pkgId];
